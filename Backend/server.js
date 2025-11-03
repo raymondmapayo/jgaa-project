@@ -14,7 +14,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 dotenv.config();
 const { sendVerificationEmailToClient } = require("./service/EmailService");
-const nodemailer = require("nodemailer");
+const { sendResetEmail } = require("./service/ForgotEmail");
 const { upload } = require("./cloudinary");
 const app = express();
 
@@ -94,8 +94,6 @@ app.use(
   "/uploads/images",
   express.static(path.join(__dirname, "uploads/images"))
 );
-
-const { sendResetEmail } = require("./service/ForgotEmail");
 
 // -------------------- MySQL Connection --------------------
 const db = mysql.createConnection({
@@ -1476,7 +1474,7 @@ app.post("/forgot_password", (req, res) => {
       async (err2) => {
         if (err2) return res.status(500).json({ message: "DB update error" });
 
-        const resetUrl = `https://jgaa-project.vercel.app//reset-password/${resetToken}`;
+        const resetUrl = `https://jgaa-project.vercel.app/reset-password/${resetToken}`;
         try {
           await sendResetEmail(user, resetUrl);
           return res.json({ success: true, message: "Reset email sent!" });
@@ -1492,7 +1490,7 @@ app.post("/forgot_password", (req, res) => {
 });
 
 // ==================== Reset Password ====================
-app.post("/reset-password/:token", (req, res) => {
+app.post("/reset-password/:token", async (req, res) => {
   const { token } = req.params;
   const { password } = req.body;
 
@@ -1501,16 +1499,14 @@ app.post("/reset-password/:token", (req, res) => {
 
   const sql =
     "SELECT * FROM user_tbl WHERE reset_token = ? AND reset_expiry > NOW()";
-  db.query(sql, [token], (err, results) => {
+  db.query(sql, [token], async (err, results) => {
     if (err) return res.status(500).json({ message: "DB error" });
     if (results.length === 0)
       return res.status(400).json({ message: "Invalid or expired token" });
 
     try {
-      const hashedPassword = crypto
-        .createHash("sha256")
-        .update(password)
-        .digest("hex");
+      const bcrypt = require("bcryptjs");
+      const hashedPassword = await bcrypt.hash(password, 10);
       const updateSql =
         "UPDATE user_tbl SET password = ?, reset_token = NULL, reset_expiry = NULL WHERE reset_token = ?";
       db.query(updateSql, [hashedPassword, token], (err2) => {
@@ -1523,6 +1519,7 @@ app.post("/reset-password/:token", (req, res) => {
     }
   });
 });
+
 // Update Password Route (using app.put directly)
 // @ts-ignore
 // Update Password Route (app.put)

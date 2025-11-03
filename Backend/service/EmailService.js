@@ -17,9 +17,13 @@ async function sendVerificationEmailToClient(user) {
       subject: "Please Verify Your Email Address",
       html: `
         <p>Hello ${user.fname},</p>
-        <p>Please click the link below to verify your email:</p>
+         <p>This is <b>${ADMIN_NAME}</b>. Please <b>Click</b> the following link to verify your email address:</p>
         <p><a href="${verificationUrl}">Verify Email</a></p>
         <p><b>This link expires in 7 days.</b></p>
+         <footer>
+          <p>This email was sent to: <b>${user.email}</b> for protecting the security of your account. Please make sure to verify your email to complete your registration.</p>
+          <p>Thank you for registering with us.</p>
+        </footer>
         <p>Thank you for registering with ${ADMIN_NAME}.</p>
       `,
     });
