@@ -18,15 +18,25 @@ async function sendVerificationEmailToClient(user) {
       html: `
       <div style="font-family: Arial, sans-serif; font-size: 16px; color: #333;"> 
         <p>Hello ${user.fname},</p>
-          <p>Please verify your email by clicking the button below:</p>
-       <p style="margin: 20px 0;">
+        <p>Please verify your email by clicking the button below:</p>
+        <p style="margin: 20px 0;">
           <a href="${verificationUrl}" style="background-color: #007BFF; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
             Verify Email
           </a>
         </p>
         <p><b>This link expires in 7 days.</b></p>
+
+        <!-- Footer -->
+        <footer style="margin-top: 30px; font-size: 14px; color: #555;">
+          <p>This email was sent to <b>${
+            user.email
+          }</b> to protect your account security.</p>
+          <p>If you did not register, please ignore this email.</p>
+          <p>© ${new Date().getFullYear()} ${ADMIN_NAME}. All rights reserved.</p>
+        </footer>
+
         <p>Thank you for registering with ${ADMIN_NAME}.</p>
-        </div>
+      </div>
       `,
     });
 
