@@ -15,33 +15,19 @@ async function sendVerificationEmailToClient(user) {
       from: `${ADMIN_NAME} <${ADMIN_EMAIL}>`,
       to: user.email,
       subject: "Please Verify Your Email Address",
-      // HTML version
       html: `
-      <div style="font-family: Arial, sans-serif; font-size: 16px; color: #333;">
+      <div style="font-family: Arial, sans-serif; font-size: 16px; color: #333;"> 
         <p>Hello ${user.fname},</p>
-        <p>This is <b>${ADMIN_NAME}</b>. Please click the link below to verify your email address:</p>
-        <p style="margin: 20px 0;">
+          <p>Please verify your email by clicking the button below:</p>
+       <p style="margin: 20px 0;">
           <a href="${verificationUrl}" style="background-color: #007BFF; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
             Verify Email
           </a>
         </p>
         <p><b>This link expires in 7 days.</b></p>
-        <footer style="margin-top: 30px; font-size: 14px; color: #555;">
-          <p>This email was sent to <b>${user.email}</b> for protecting the security of your account.</p>
-          <p>Thank you for registering with ${ADMIN_NAME}.</p>
-        </footer>
-      </div>
+        <p>Thank you for registering with ${ADMIN_NAME}.</p>
+        </div>
       `,
-
-      // Plain-text fallback
-      text: `Hello ${user.fname},
-
-      This is ${ADMIN_NAME}. Please verify your email by clicking the link below:
-      ${verificationUrl}
-
-    This link expires in 7 days.
-
-    This email was sent to ${user.email} to protect your account. Thank you for registering with ${ADMIN_NAME}.`,
     });
 
     if (error) {

@@ -14,14 +14,20 @@ async function sendResetEmail(user, resetUrl) {
       to: user.email,
       subject: "Reset Your Password",
       html: `
+       <div style="font-family: Arial, sans-serif; font-size: 16px; color: #333;">
         <p>Hello ${user.fname},</p>
         <p>This is <b>${ADMIN_NAME}</b>. You requested a password reset. Please <b>Click</b> the following link to reset your password:</p>
-        <p><a href="${resetUrl}">Reset Password</a></p>
+        <p style="margin: 20px 0;">
+        <a href="${resetUrl}" style="background-color: #007BFF; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">>
+        
+        Reset Password</a>
+        </p>
         <b>This link expires in 1 hour</b>
-        <footer>
-          <p>This email was sent to: <b>${user.email}</b> to protect your account security. Please make sure to reset your password promptly.</p>
-          <p>Thank you for using ${ADMIN_NAME}.</p>
-        </footer>
+      <footer style="margin-top: 30px; font-size: 14px; color: #555;">
+  <p>This email was sent to <b>${user.email}</b> for protecting the security of your account.</p>
+  <p>Thank you for registering with ${ADMIN_NAME}.</p>
+</footer>
+      </div>
       `,
       text: `Hello ${user.fname}, you requested a password reset. Click the following link to reset your password: ${resetUrl}. This link expires in 1 hour. Thank you for using ${ADMIN_NAME}.`,
     });
