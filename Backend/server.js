@@ -1490,7 +1490,7 @@ app.post("/forgot_password", (req, res) => {
 });
 
 // ==================== Reset Password ====================
-app.post("/reset-password/:token", async (req, res) => {
+app.post("/reset-password/:token", (req, res) => {
   const { token } = req.params;
   const { password } = req.body;
 
@@ -1499,14 +1499,16 @@ app.post("/reset-password/:token", async (req, res) => {
 
   const sql =
     "SELECT * FROM user_tbl WHERE reset_token = ? AND reset_expiry > NOW()";
-  db.query(sql, [token], async (err, results) => {
+  db.query(sql, [token], (err, results) => {
     if (err) return res.status(500).json({ message: "DB error" });
     if (results.length === 0)
       return res.status(400).json({ message: "Invalid or expired token" });
 
     try {
-      const bcrypt = require("bcryptjs");
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = crypto
+        .createHash("sha256")
+        .update(password)
+        .digest("hex");
       const updateSql =
         "UPDATE user_tbl SET password = ?, reset_token = NULL, reset_expiry = NULL WHERE reset_token = ?";
       db.query(updateSql, [hashedPassword, token], (err2) => {
@@ -1519,7 +1521,6 @@ app.post("/reset-password/:token", async (req, res) => {
     }
   });
 });
-
 // Update Password Route (using app.put directly)
 // @ts-ignore
 // Update Password Route (app.put)
