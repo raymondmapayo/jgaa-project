@@ -11,6 +11,7 @@ interface EditValidationModalProps {
   onUpdateOrder?: (updatedOrder: any) => void;
 }
 const apiUrl = import.meta.env.VITE_API_URL;
+
 const EditValidationModal: React.FC<EditValidationModalProps> = ({
   order,
   onUpdateOrder,
@@ -34,6 +35,13 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
   }, [order]);
 
   const handleSave = async () => {
+    if (paymentStatus === "Pending") {
+      antdMessage.warning(
+        "Please select 'Paid' before saving. The current status is still Pending."
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const workerId = sessionStorage.getItem("user_id");
@@ -48,38 +56,38 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
       });
 
       if (paymentStatus === "Paid") {
-        // Update order status & created_by
+        // Update order status & related tables
         const { data } = await axios.put(`${apiUrl}/update_order_status`, {
           order_id: order?.order_id,
           payment_status: "Paid",
-          created_by: workerId, // ✅ fixed key name
+          created_by: workerId,
         });
-        // Update transaction/payment tables
+
         await axios.put(`${apiUrl}/update_transaction_status`, {
           user_id: order?.user_id,
           status: "Completed",
         });
+
         await axios.put(`${apiUrl}/update_payment_status`, {
           user_id: order?.user_id,
           payment_status: "Completed",
         });
 
-        // ✅ Deduct inventory automatically
-        await axios.post(
-          `${apiUrl}/update_payment_status/${order.order_id}`,
-          { paymentStatus: "paid" } // must match backend check
-        );
+        await axios.post(`${apiUrl}/update_payment_status/${order.order_id}`, {
+          paymentStatus: "paid",
+        });
 
-        // Update frontend state
         if (onUpdateOrder && data.updatedOrder) {
           onUpdateOrder(data.updatedOrder);
         }
 
-        setIsSaved(true);
         antdMessage.success("Payment completed & inventory updated!");
       } else {
         antdMessage.success("Validation saved successfully!");
       }
+
+      // ✅ Disable after successful save
+      setIsSaved(true);
     } catch (error: any) {
       console.error("Error saving order:", error);
       antdMessage.error(
@@ -96,9 +104,13 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
         <label className="block font-medium mb-1">Payment Status</label>
         <Select
           value={paymentStatus}
-          onChange={setPaymentStatus}
+          onChange={(value) => {
+            setPaymentStatus(value);
+            // ⚠️ Re-enable Save if user changes dropdown again
+            setIsSaved(false);
+          }}
           className="w-full"
-          disabled={isSaved}
+          disabled={isSaved} // ✅ disable only after successful save
         >
           <Option value="Pending">Pending</Option>
           <Option value="Paid">Paid</Option>
@@ -112,19 +124,19 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Enter a note or message..."
-          disabled={isSaved}
+          disabled={isSaved} // ✅ disable only after successful save
         />
       </div>
 
       <div className="flex justify-end gap-2">
         <Tooltip
-          title={isSaved ? "Cannot edit a paid order" : "Save your changes"}
+          title={isSaved ? "Changes have been saved" : "Save your changes"}
         >
           <Button
             type="primary"
             loading={loading}
             onClick={handleSave}
-            disabled={isSaved}
+            disabled={isSaved} // ✅ disable only after successful save
           >
             Save Changes
           </Button>

@@ -60,7 +60,7 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
         },
         {
           key: "recipe",
-          label: "Ingredients",
+          label: "Ingredients & Drinks",
           link: "/Worker/Manage/Ingredients",
         },
       ],

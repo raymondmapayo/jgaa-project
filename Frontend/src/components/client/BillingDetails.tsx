@@ -24,6 +24,7 @@ const BillingDetails = () => {
     notes: "",
   });
 
+  const [initialData, setInitialData] = useState<BillingData | null>(null); // Store initial fetched data
   const [errors, setErrors] = useState<any>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false); // Track saving state
@@ -46,8 +47,7 @@ const BillingDetails = () => {
       const userData = response.data.data;
       if (userData) {
         const { fname, lname, email, pnum, city, country, notes } = userData;
-        setBillingData((prevData) => ({
-          ...prevData,
+        const fetchedData: BillingData = {
           fname,
           lname,
           email,
@@ -55,7 +55,9 @@ const BillingDetails = () => {
           city,
           country,
           notes,
-        }));
+        };
+        setBillingData(fetchedData);
+        setInitialData(fetchedData); // Save initial data for comparison
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
@@ -83,58 +85,70 @@ const BillingDetails = () => {
   };
 
   const handleCancel = () => {
-    setBillingData({
-      ...billingData,
-      city: "",
-      country: "",
-      notes: "",
-    });
+    if (initialData) setBillingData(initialData); // Reset to initial fetched data
     setErrors({});
   };
 
   // Handle save for city, country, and notes
   const handleSave = async () => {
-    if (validateForm()) {
-      setIsSaving(true);
+    if (!initialData) return;
 
-      try {
-        // Send the data to the backend as JSON
-        const response = await axios.put(
-          `${apiUrl}/update_save_billing_details/${userId}`,
-          {
-            city: billingData.city,
-            country: billingData.country,
-            // Send notes as null if it is empty
-            notes:
-              billingData.notes.trim() !== "" ? billingData.notes : undefined, // Use undefined for empty notes
-          }
-        );
+    // Check if any changes were made
+    const isChanged =
+      billingData.city !== initialData.city ||
+      billingData.country !== initialData.country ||
+      (billingData.notes || "") !== (initialData.notes || "");
 
-        console.log("Billing details updated:", response.data);
+    if (!isChanged) {
+      notification.warning({
+        message: "No Changes Detected",
+        description:
+          "No changes have been made. Please modify your billing details before saving.",
+      });
+      return;
+    }
 
-        if (response.data.success) {
-          // Fetch the updated user details to ensure the changes are reflected
-          fetchUserData();
+    if (!validateForm()) return;
 
-          notification.success({
-            message: "Changes Saved Successfully",
-            description: "Your changes have been saved successfully.",
-          });
+    setIsSaving(true);
+
+    try {
+      // Send the data to the backend as JSON
+      const response = await axios.put(
+        `${apiUrl}/update_save_billing_details/${userId}`,
+        {
+          city: billingData.city,
+          country: billingData.country,
+          // Send notes as null if it is empty
+          notes:
+            billingData.notes.trim() !== "" ? billingData.notes : undefined, // Use undefined for empty notes
         }
-      } catch (error) {
-        // Log the error to the console
-        console.error("Error updating billing details:", error);
+      );
 
-        // Show error notification using Ant Design
-        notification.error({
-          message: "Error Saving Changes",
-          description:
-            "An error occurred while saving changes: " +
-            (error instanceof Error ? error.message : String(error)),
+      console.log("Billing details updated:", response.data);
+
+      if (response.data.success) {
+        // Fetch the updated user details to ensure the changes are reflected
+        fetchUserData();
+
+        notification.success({
+          message: "Changes Saved Successfully",
+          description: "Your changes have been saved successfully.",
         });
-      } finally {
-        setIsSaving(false);
       }
+    } catch (error) {
+      // Log the error to the console
+      console.error("Error updating billing details:", error);
+
+      // Show error notification using Ant Design
+      notification.error({
+        message: "Error Saving Changes",
+        description:
+          "An error occurred while saving changes: " +
+          (error instanceof Error ? error.message : String(error)),
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 

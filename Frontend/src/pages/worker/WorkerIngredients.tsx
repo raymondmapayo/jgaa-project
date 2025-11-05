@@ -88,7 +88,7 @@ const WorkerIngredients: React.FC = () => {
         <header className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 w-full">
           {/* Title */}
           <h1 className="text-3xl sm:text-4xl font-bold text-orange-500 flex-1 text-center sm:text-left">
-            Ingredients
+            Ingredients &amp; Drinks
           </h1>
 
           {/* Search + Button */}

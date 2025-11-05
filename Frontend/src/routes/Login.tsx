@@ -118,8 +118,12 @@ const Login = () => {
       </div>
 
       {/* Right Side: Login Form */}
-      <div className="w-full md:w-1/2 flex flex-col justify-center items-center p-8">
-        <div className="w-full md:w-[80%] bg-white p-10 rounded-2xl shadow-xl">
+      <div className="flex w-full md:w-1/2 justify-center items-center bg-white md:bg-transparent">
+        {/* 👆 Added bg-white and md:bg-transparent like in Register.jsx */}
+
+        <div className="w-full sm:w-[95%] md:w-[80%] bg-white p-6 sm:p-8 md:p-10 rounded-none md:rounded-2xl shadow-none md:shadow-xl">
+          {/* 👆 Matched your Register page styling */}
+
           <h1 className="text-4xl font-bold mb-8 text-center text-gray-800">
             Get Started Now
           </h1>
@@ -135,7 +139,6 @@ const Login = () => {
               rules={[
                 { required: true, message: "Please enter your email" },
                 {
-                  // Custom validation for email verification status
                   validator: async (_, value) => {
                     if (value) {
                       try {
@@ -143,7 +146,6 @@ const Login = () => {
                           `${apiUrl}/check-email-status`,
                           { email: value }
                         );
-
                         if (response.data.status !== "active") {
                           return Promise.reject(
                             new Error(
@@ -152,7 +154,6 @@ const Login = () => {
                           );
                         }
                       } catch (error) {
-                        // Handle error: 404 (user not found) or other errors
                         if (
                           axios.isAxiosError(error) &&
                           error.response &&
@@ -184,7 +185,7 @@ const Login = () => {
                 placeholder="Enter Email"
                 size="large"
                 className="rounded-lg p-4 text-lg border-gray-300 shadow-sm"
-                autoComplete="username" // ✅ Fix here
+                autoComplete="username"
               />
             </Form.Item>
 
@@ -213,11 +214,11 @@ const Login = () => {
             <Form.Item>
               <Checkbox
                 className="text-lg text-gray-600"
-                onChange={(e) => setIsChecked(e.target.checked)} // Update the checkbox state
+                onChange={(e) => setIsChecked(e.target.checked)}
               >
                 By signing in, you agree to our{" "}
                 <span
-                  onClick={() => setIsTermsModalOpen(true)} // Open the terms modal
+                  onClick={() => setIsTermsModalOpen(true)}
                   className="font-semibold text-blue-600 cursor-pointer"
                 >
                   Terms of Service
@@ -237,11 +238,12 @@ const Login = () => {
                 size="large"
                 className="text-xl h-14 rounded-lg shadow-md"
                 htmlType="submit"
-                disabled={!isChecked} // Disable button if checkbox is not checked
+                disabled={!isChecked}
               >
                 Sign In
               </Button>
             </Form.Item>
+
             <div className="flex justify-end space-x-4 w-full -mt-4 mb-4">
               <span
                 className="text-blue-600 cursor-pointer text-sm"
@@ -266,6 +268,7 @@ const Login = () => {
           </p>
         </div>
       </div>
+
       <ForgotPasswordModal
         visible={isForgotPasswordVisible}
         onClose={() => setIsForgotPasswordVisible(false)}

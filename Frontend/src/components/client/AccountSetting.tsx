@@ -58,7 +58,25 @@ const AccountSetting = () => {
 
   // Save changes including profile picture upload
   const handleSaveChanges = async () => {
-    if (!userData) return;
+    if (!userData || !initialData) return;
+
+    // Check if any changes were made
+    const isDataChanged =
+      userData.fname !== initialData.fname ||
+      userData.lname !== initialData.lname ||
+      userData.email !== initialData.email ||
+      userData.pnum !== initialData.pnum ||
+      userData.address !== initialData.address ||
+      newProfilePic !== null; // Include profile picture change
+
+    if (!isDataChanged) {
+      notification.warning({
+        message: "No Changes Detected",
+        description:
+          "No changes have been made. Please modify your data before saving.",
+      });
+      return;
+    }
 
     setIsSaving(true); // Start loading when saving
 
@@ -84,7 +102,14 @@ const AccountSetting = () => {
       );
       console.log("User updated:", response.data);
 
-      // Success notification using Ant Design
+      // Update sessionStorage so other components reflect the new name
+      sessionStorage.setItem("fname", userData.fname);
+      sessionStorage.setItem("lname", userData.lname);
+      sessionStorage.setItem("email", userData.email);
+      sessionStorage.setItem("phone", userData.pnum);
+      sessionStorage.setItem("address", userData.address);
+
+      // Success notification
       notification.success({
         message: "Changes Saved Successfully",
         description: "Your changes have been saved successfully.",
@@ -92,7 +117,6 @@ const AccountSetting = () => {
     } catch (error) {
       console.error("Error updating user:", error);
 
-      // Error notification using Ant Design
       notification.error({
         message: "Error Saving Changes",
         description:
@@ -123,23 +147,26 @@ const AccountSetting = () => {
         Account Settings
       </h1>
 
-      <div className="bg-white">
+      <div className="bg-white p-4 md:p-6 rounded-lg shadow">
         {/* Profile Photo Section */}
-        <div className="flex items-center mb-8">
-          <div className="w-24 h-24 rounded-full overflow-hidden mr-6">
+        <div className="flex flex-col md:flex-row items-center md:items-start mb-8 gap-4 md:gap-6">
+          <div className="w-24 h-24 rounded-full overflow-hidden flex-shrink-0">
             <img
               src={
                 newProfilePic
-                  ? URL.createObjectURL(newProfilePic) // Display selected image as preview
+                  ? URL.createObjectURL(newProfilePic)
                   : userData.profile_pic
-                  ? `${apiUrl}/uploads/images/${userData.profile_pic}`
-                  : "/avatar.jpg" // Fallback image if no profile picture
+                  ? userData.profile_pic.startsWith("http")
+                    ? userData.profile_pic
+                    : `${apiUrl}/uploads/images/${userData.profile_pic}`
+                  : "/avatar.jpg"
               }
               alt="Profile"
               className="w-full h-full object-cover"
             />
           </div>
-          <div>
+
+          <div className="flex flex-col">
             <input
               type="file"
               id="profile-upload"
@@ -156,7 +183,7 @@ const AccountSetting = () => {
             {newProfilePic && (
               <button
                 onClick={() => setNewProfilePic(null)}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 mt-2"
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 mt-2 md:mt-0"
               >
                 Cancel
               </button>
@@ -168,7 +195,7 @@ const AccountSetting = () => {
         </div>
 
         {/* Form Section */}
-        <form className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-gray-700 font-medium mb-2">
               First Name
@@ -237,17 +264,17 @@ const AccountSetting = () => {
         </form>
 
         {/* Buttons Section */}
-        <div className="mt-8 flex justify-end gap-4">
+        <div className="mt-8 flex flex-col sm:flex-row justify-end gap-4">
           <button
             onClick={handleCancelChanges}
-            className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
+            className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 w-full sm:w-auto"
           >
             Cancel
           </button>
           <button
             onClick={handleSaveChanges}
             disabled={isSaving}
-            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 w-full sm:w-auto"
           >
             {isSaving ? "Saving..." : "Save changes"}
           </button>
