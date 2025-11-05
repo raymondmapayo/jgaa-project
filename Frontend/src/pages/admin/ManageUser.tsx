@@ -119,13 +119,17 @@ const ManageUser = () => {
         <div className="flex items-center gap-3">
           {record.profile_pic ? (
             <img
-              src={`http://localhost:8081/uploads/images/${record.profile_pic}`}
+              src={
+                record.profile_pic.startsWith("http")
+                  ? record.profile_pic
+                  : `http://localhost:8081/uploads/images/${record.profile_pic}`
+              }
               alt={record.fname}
               className="w-10 h-10 rounded"
             />
           ) : (
             <img
-              src="/avatar.jpg" // Replace with the actual image URL
+              src="/avatar.jpg" // Default avatar
               alt="User Avatar"
               className="w-10 h-10 rounded"
             />

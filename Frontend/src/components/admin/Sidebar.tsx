@@ -134,9 +134,9 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
       icon: <MdAnnouncement size={25} />,
       children: [
         {
-          key: "workers_management",
-          label: "Workers Management",
-          link: "/Admin/Manage/Workers",
+          key: "chats",
+          label: "Chats",
+          link: "/Admin/Chats",
         },
         {
           key: "announcements",

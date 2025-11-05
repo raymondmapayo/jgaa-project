@@ -43,10 +43,37 @@ const AccountSetting = () => {
     }
   }, [user_id]);
 
-  // Handle profile picture change
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setNewProfilePic(e.target.files[0]);
+      const file = e.target.files[0];
+
+      // ✅ ADDED: Allowed types for Cloudinary
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/gif",
+      ];
+      // ✅ ADDED: Max size (Cloudinary allows larger, adjust as needed)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+
+      if (!allowedTypes.includes(file.type)) {
+        notification.error({
+          message: "Invalid File Type",
+          description: "Only JPG, GIF, or PNG files are allowed.",
+        });
+        return;
+      }
+
+      if (file.size > maxSize) {
+        notification.error({
+          message: "File Too Large",
+          description: "Maximum file size is 5MB (Cloudinary limit).",
+        });
+        return;
+      }
+
+      setNewProfilePic(file);
     }
   };
 
@@ -174,22 +201,24 @@ const AccountSetting = () => {
               onChange={handleFileChange}
               className="hidden"
             />
-            <label
-              htmlFor="profile-upload"
-              className="bg-blue-500 text-white px-4 py-2 rounded-lg mr-2 hover:bg-blue-600 font-medium cursor-pointer"
-            >
-              {newProfilePic ? "Change photo" : "Upload new photo"}
-            </label>
-            {newProfilePic && (
-              <button
-                onClick={() => setNewProfilePic(null)}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 mt-2 md:mt-0"
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="profile-upload"
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 font-medium cursor-pointer"
               >
-                Cancel
-              </button>
-            )}
+                {newProfilePic ? "Change photo" : "Upload new photo"}
+              </label>
+              {newProfilePic && (
+                <button
+                  onClick={() => setNewProfilePic(null)}
+                  className="bg-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-400 text-sm"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
             <p className="text-gray-500 text-sm mt-2 font-light">
-              Allowed JPG, GIF, or PNG. Max size of 800K
+              Allowed JPG, GIF, or PNG. Max size of 5MB.
             </p>
           </div>
         </div>

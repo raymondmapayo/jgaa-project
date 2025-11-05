@@ -65,8 +65,10 @@ export const ClientHeader = () => {
           size={48}
           src={
             profilePic
-              ? `${apiUrl}/uploads/images/${profilePic}`
-              : "/avatar.jpg"
+              ? profilePic.startsWith("http")
+                ? profilePic // Cloudinary or external URL
+                : `${apiUrl}/uploads/images/${profilePic}` // local fallback
+              : "/avatar.jpg" // default
           }
           alt="User Avatar"
         />

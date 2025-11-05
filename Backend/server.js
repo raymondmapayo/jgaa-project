@@ -1930,7 +1930,8 @@ app.get("/get_user/:id", (req, res) => {
 });
 app.put("/update_user/:id", upload.single("profile_pic"), (req, res) => {
   const { user_id, fname, lname, pnum, email, address } = req.body;
-  const profilePic = req.file ? req.file.filename : req.body.profile_pic; // Preserve the existing profile picture if no new file is uploaded
+  // Use Cloudinary URL if new file uploaded, otherwise preserve existing
+  const profilePic = req.file ? req.file.path : req.body.profile_pic;
 
   const sql =
     "UPDATE user_tbl SET fname = ?, lname = ?, pnum = ?, email = ?, address = ?, profile_pic = ? WHERE user_id = ?";
