@@ -65,12 +65,15 @@ const ChatWindow = ({
             <>
               <img
                 src={
-                  selectedUser.profile_pic && selectedUser.profile_pic !== ""
+                  selectedUser.profile_pic?.startsWith("http")
+                    ? selectedUser.profile_pic
+                    : selectedUser.profile_pic
                     ? `${apiUrl}/uploads/images/${selectedUser.profile_pic}`
                     : "/avatar.jpg"
                 }
                 className="w-10 h-10 rounded-full"
               />
+
               <h2 className="text-lg font-bold truncate sm:truncate md:overflow-visible max-w-[120px] md:max-w-full">
                 {selectedUser.fname} {selectedUser.lname}
               </h2>
@@ -105,7 +108,9 @@ const ChatWindow = ({
               {msg.sender === "worker" && selectedWorker && (
                 <img
                   src={
-                    selectedWorker.profile_pic
+                    selectedWorker.profile_pic?.startsWith("http")
+                      ? selectedWorker.profile_pic
+                      : selectedWorker.profile_pic
                       ? `${apiUrl}/uploads/images/${selectedWorker.profile_pic}`
                       : "/avatar.jpg"
                   }
@@ -116,7 +121,9 @@ const ChatWindow = ({
               {msg.sender !== "worker" && selectedUser && (
                 <img
                   src={
-                    selectedUser.profile_pic
+                    selectedUser.profile_pic?.startsWith("http")
+                      ? selectedUser.profile_pic
+                      : selectedUser.profile_pic
                       ? `${apiUrl}/uploads/images/${selectedUser.profile_pic}`
                       : "/avatar.jpg"
                   }

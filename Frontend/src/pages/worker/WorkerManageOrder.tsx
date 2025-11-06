@@ -201,9 +201,11 @@ const WorkerManageOrder = () => {
         <div className="flex items-center gap-3 min-w-[180px]">
           <img
             src={
-              record.profile_pic && record.profile_pic !== ""
-                ? `${apiUrl}/uploads/images/${record.profile_pic}`
-                : "/avatar.jpg"
+              record.profile_pic
+                ? record.profile_pic.startsWith("http")
+                  ? record.profile_pic // from Cloudinary
+                  : `${apiUrl}/uploads/images/${record.profile_pic}` // from local uploads folder
+                : "/avatar.jpg" // default placeholder
             }
             alt={`${record.fname} ${record.lname}`}
             className="w-10 h-10 rounded-full object-cover flex-shrink-0"
@@ -251,7 +253,10 @@ const WorkerManageOrder = () => {
           <div className="flex items-center gap-3 min-w-[180px]">
             <img
               src={
-                record.worker_profile_pic && record.worker_profile_pic !== ""
+                record.worker_profile_pic?.startsWith("http")
+                  ? record.worker_profile_pic
+                  : record.worker_profile_pic &&
+                    record.worker_profile_pic !== ""
                   ? `${apiUrl}/uploads/images/${record.worker_profile_pic}`
                   : "/avatar.jpg"
               }
@@ -262,6 +267,7 @@ const WorkerManageOrder = () => {
               }
               className="w-10 h-10 rounded-full object-cover flex-shrink-0"
             />
+
             <span className="font-medium text-sm sm:text-base">
               {hasName
                 ? `${record.worker_fname} ${record.worker_lname}`

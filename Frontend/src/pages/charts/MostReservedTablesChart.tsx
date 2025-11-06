@@ -78,27 +78,44 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
 
       const hasData = formatted.some((t) => t.reservations > 0);
       if (hasData) {
-        const sorted = [...formatted].sort(
+        const validTables = formatted.filter((t) => t.reservations > 0);
+        const sorted = [...validTables].sort(
           (a, b) => b.reservations - a.reservations
         );
         const top = sorted[0];
         const bottom = sorted[sorted.length - 1];
 
         const avg =
-          formatted.reduce((sum, item) => sum + item.reservations, 0) /
-          formatted.length;
+          validTables.reduce((sum, item) => sum + item.reservations, 0) /
+          validTables.length;
 
-        let desc = `📌 ${top.name} was the most reserved with ${
-          top.reservations
-        } reservation${top.reservations !== 1 ? "s" : ""}, `;
-        if (bottom && bottom.name !== top.name) {
-          desc += `while ${bottom.name} had the fewest with ${
-            bottom.reservations === 0 ? "none" : bottom.reservations
-          } reservation${bottom.reservations !== 1 ? "s" : ""}. `;
+        const allEqual = sorted.every(
+          (t) => t.reservations === top.reservations
+        );
+
+        let desc = "";
+
+        if (allEqual) {
+          // ✅ All tables have same number of reservations
+          desc = `📊 All reserved tables had the same number of reservations (${
+            top.reservations
+          }). On average, each of the ${
+            validTables.length
+          } tables was reserved ${avg.toFixed(1)} times today.`;
+        } else {
+          // ✅ Normal analytics with comparison
+          desc = `📊 ${top.name} was the most reserved with ${
+            top.reservations
+          } reservation${top.reservations !== 1 ? "s" : ""}, `;
+          if (bottom && bottom.name !== top.name) {
+            desc += `while ${bottom.name} had the fewest with ${
+              bottom.reservations === 0 ? "none" : bottom.reservations
+            } reservation${bottom.reservations !== 1 ? "s" : ""}. `;
+          }
+          desc += `On average, each reserved table was used about ${avg.toFixed(
+            1
+          )} times today.`;
         }
-        desc += `On average, each table was reserved about ${avg.toFixed(
-          1
-        )} times, showing varying levels of table usage across the restaurant.`;
 
         setDescription(desc);
       } else {

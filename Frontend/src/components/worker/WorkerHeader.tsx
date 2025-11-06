@@ -1,15 +1,6 @@
-import {
-  Avatar,
-  Badge,
-  Button,
-  Dropdown,
-  Layout,
-  List,
-  Menu,
-  Spin,
-} from "antd";
+import { Avatar, Badge, Dropdown, Layout, Menu, Spin } from "antd";
 import axios from "axios";
-import dayjs from "dayjs";
+
 import { useEffect, useState } from "react";
 import { CiMenuFries } from "react-icons/ci";
 import { FaBell, FaSun } from "react-icons/fa";
@@ -17,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { useTheme } from "../../contexts/ThemeContext";
 import { logoutworker } from "../../zustand/store/store.provider";
+import WorkerNotification from "../../pages/WorkerModals/WorkerNotificationModal";
 // Define the Notification type
 interface Notification {
   id: number; // For both message_id or announcement_id
@@ -210,53 +202,7 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
       </Menu.Item>
     </Menu>
   );
-  const notificationMenu = (
-    <List
-      dataSource={notifications}
-      renderItem={(item) => (
-        <List.Item>
-          <List.Item.Meta
-            avatar={
-              <Avatar
-                src={
-                  item.profile_pic
-                    ? `${apiUrl}/uploads/images/${item.profile_pic}`
-                    : "/avatar.jpg"
-                }
-              />
-            }
-            title={
-              <div className="flex items-center gap-2">
-                <span className="text-black dark:text-blue-100 font-medium">
-                  {item.title || "Message"}
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  {dayjs(item.time).format("YYYY-MM-DD h:mm A")}
-                </span>
-              </div>
-            }
-            description={
-              <p className="text-gray-600 dark:text-gray-300">
-                {item.description}
-              </p>
-            }
-          />
-        </List.Item>
-      )}
-      footer={
-        <div className="flex justify-center">
-          <Button type="link" className="text-black dark:text-blue-100">
-            View all notifications
-          </Button>
-        </div>
-      }
-      style={{
-        maxHeight: 430,
-        overflowY: "auto",
-      }}
-      className="w-72 sm:w-80 md:w-96 shadow-lg bg-white dark:bg-[#0f172a] dark:text-white"
-    />
-  );
+
   return (
     <StyledHeader>
       {/* Menu Button for toggling Sidebar */}
@@ -286,11 +232,13 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
         )}
 
         <Dropdown
-          menu={{ items: [] }} // placeholder; we are using overlay-like content below
-          dropdownRender={() => notificationMenu} // replace overlay
+          menu={{ items: [] }} // placeholder
+          dropdownRender={() => (
+            <WorkerNotification notifications={notifications} apiUrl={apiUrl} />
+          )}
           trigger={["click"]}
-          open={isNotificationVisible} // replace visible
-          onOpenChange={setIsNotificationVisible} // replace onVisibleChange
+          open={isNotificationVisible}
+          onOpenChange={setIsNotificationVisible}
         >
           <StyledBadge count={unreadCount}>
             <FaBell
@@ -298,9 +246,7 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
             />
           </StyledBadge>
         </Dropdown>
-
         {loading && <Spin size="small" style={{ marginLeft: 10 }} />}
-
         <ProfileDropdown overlay={profileMenu} trigger={["click"]}>
           <Avatar
             size={40}

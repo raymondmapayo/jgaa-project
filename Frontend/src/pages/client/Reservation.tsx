@@ -41,22 +41,36 @@ const Reservation = () => {
 
   // 🔹 Sync with worker toggle (via backend)
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+
     const fetchReservationStatus = async () => {
       try {
         const res = await axios.get(`${apiUrl}/get_reservation_status`);
-        setIsWorkerEnabled(res.data.reservation_enabled === 1);
+        const { reservation_enabled } = res.data;
+
+        setIsWorkerEnabled(reservation_enabled === 1);
+
+        if (reservation_enabled !== 1 && interval) {
+          clearInterval(interval);
+          interval = null;
+          console.log("⏹️ Interval stopped — reservation disabled");
+        }
       } catch (error) {
         console.error("Error fetching reservation status:", error);
-        setIsWorkerEnabled(true); // default to true
       } finally {
-        setLoading(false); // ✅ hide loading after fetch
+        setLoading(false);
       }
     };
-    fetchReservationStatus();
 
-    // Optional: refresh every 10s
-    const interval = setInterval(fetchReservationStatus, 10000);
-    return () => clearInterval(interval);
+    fetchReservationStatus();
+    interval = setInterval(fetchReservationStatus, 10000);
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+        console.log("🧹 Interval cleared (component unmounted)");
+      }
+    };
   }, [apiUrl]);
 
   useEffect(() => {

@@ -44,13 +44,16 @@ const Sidebar = ({
             <div className="relative w-10 h-10 mr-3 flex-shrink-0">
               <img
                 src={
-                  user.profile_pic && user.profile_pic !== ""
+                  user.profile_pic?.startsWith("http")
+                    ? user.profile_pic
+                    : user.profile_pic
                     ? `${apiUrl}/uploads/images/${user.profile_pic}`
                     : "/avatar.jpg"
                 }
                 alt={`${user.fname} ${user.lname}`}
                 className="w-full h-full rounded-full object-cover"
               />
+
               {user.status === "active" && (
                 <div className="absolute w-3 h-3 bg-green-500 rounded-full bottom-0 right-0 border-2 border-white"></div>
               )}

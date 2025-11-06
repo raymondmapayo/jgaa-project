@@ -61,20 +61,30 @@ export const ClientHeader = () => {
   const userPopoverContent = (
     <div className="w-64">
       <div className="flex items-start sm:items-center gap-4 p-4 border-b">
-        <Avatar
-          size={48}
-          src={
-            profilePic
-              ? profilePic.startsWith("http")
-                ? profilePic // Cloudinary or external URL
-                : `${apiUrl}/uploads/images/${profilePic}` // local fallback
-              : "/avatar.jpg" // default
-          }
-          alt="User Avatar"
-        />
-        <div className="flex flex-col">
-          <h3 className="font-semibold text-base sm:text-lg">{userName}</h3>
-          <p className="text-gray-500 text-sm break-all">{userEmail}</p>
+        {/* Avatar slightly shifted left */}
+        <div className="-ml-2 flex-shrink-0">
+          <Avatar
+            size={48}
+            src={
+              profilePic?.startsWith("http")
+                ? profilePic
+                : profilePic
+                ? `${apiUrl}/uploads/images/${profilePic}`
+                : "/avatar.jpg"
+            }
+            alt="User Avatar"
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover"
+          />
+        </div>
+
+        {/* User info */}
+        <div className="flex flex-col justify-center">
+          <h3 className="font-semibold text-base sm:text-lg text-gray-800 dark:text-blue-100">
+            {userName}
+          </h3>
+          <p className="text-gray-500 text-sm sm:text-base break-all">
+            {userEmail}
+          </p>
         </div>
       </div>
 
@@ -96,6 +106,8 @@ export const ClientHeader = () => {
             }
 
             setIsAccountSettingVisible(true); // 🔹 Only open if authenticated
+
+            setIsMenuOpen(false); // close dropdown/menu if any
             document.body.click();
           }}
           className="flex items-center p-3 hover:bg-gray-100 text-gray-700 w-full text-left"
@@ -103,45 +115,49 @@ export const ClientHeader = () => {
           <span className="flex-grow">Account Setting</span>
         </button>
 
-        <button
-          onClick={() => {
+        <Link
+          to="/MyPurchase"
+          onClick={(e) => {
             const isAuthenticated =
               sessionStorage.getItem("isAuthenticated") === "true";
-            if (isAuthenticated) {
-              navigate("/MyPurchase");
-            } else {
+
+            if (!isAuthenticated) {
+              e.preventDefault(); // prevent navigation
               notification.info({
                 message: "Authentication Required",
                 description: "Please login first to view your purchases.",
                 placement: "topRight",
                 duration: 2,
               });
+            } else {
+              setIsMenuOpen(false); // close the menu if authenticated
             }
           }}
           className="flex items-center p-3 hover:bg-gray-100 text-gray-700"
         >
           <span className="flex-grow">My Purchase</span>
-        </button>
+        </Link>
 
-        <button
+        <Link
+          to="/MyFavourates"
           onClick={() => {
             const isAuthenticated =
               sessionStorage.getItem("isAuthenticated") === "true";
-            if (isAuthenticated) {
-              navigate("/MyFavourates");
-            } else {
+            if (!isAuthenticated) {
               notification.info({
                 message: "Authentication Required",
                 description: "Please login first to view your favourites.",
                 placement: "topRight",
                 duration: 2,
               });
+            } else {
+              setIsMenuOpen(false); // Close the menu if authenticated
             }
           }}
           className="flex items-center p-3 hover:bg-gray-100 text-gray-700"
         >
           <span className="flex-grow">My Favourites</span>
-        </button>
+        </Link>
 
         <button
           onClick={() => {
@@ -158,7 +174,8 @@ export const ClientHeader = () => {
               return; // stop here if not authenticated
             }
 
-            setIsLogVisible(true); // show the modal if authenticated
+            setIsLogVisible(true); // show modal
+            setIsMenuOpen(false); // close dropdown/menu if any
             document.body.click(); // optional: close dropdowns or other overlays
           }}
           className="flex items-center p-3 hover:bg-gray-100 text-gray-700 w-full text-left"
@@ -181,6 +198,8 @@ export const ClientHeader = () => {
             }
 
             setIsCommentUsVisible(true); // show the modal if authenticated
+
+            setIsMenuOpen(false); // close dropdown/menu if any
             document.body.click(); // optional: close dropdowns or other overlays
           }}
           className="flex items-center p-3 hover:bg-gray-100 text-gray-700 w-full text-left"
@@ -209,10 +228,16 @@ export const ClientHeader = () => {
   // Dropdown Menu for Products
   const productsMenu = (
     <Menu style={{ width: "200px" }}>
-      <Menu.Item style={{ fontSize: "18px" }}>
+      <Menu.Item
+        style={{ fontSize: "18px" }}
+        onClick={() => setIsMenuOpen(false)}
+      >
         <Link to="/Menus">Our Menu</Link>
       </Menu.Item>
-      <Menu.Item style={{ fontSize: "18px" }}>
+      <Menu.Item
+        style={{ fontSize: "18px" }}
+        onClick={() => setIsMenuOpen(false)}
+      >
         <Link to="/Bestseller">Our Bestseller</Link>
       </Menu.Item>
     </Menu>
@@ -362,13 +387,7 @@ export const ClientHeader = () => {
               Shop Now
             </button>
           </Dropdown>
-          <Link
-            to="/Menus"
-            onClick={() => setIsMenuOpen(false)}
-            className="px-6 py-3 hover:bg-gray-100 text-gray-700"
-          >
-            Menu
-          </Link>
+
           <Link
             to="/Reservation"
             onClick={() => setIsMenuOpen(false)}
@@ -387,12 +406,13 @@ export const ClientHeader = () => {
             <>
               <ClientNotification asTextButton />
 
-              <button
-                onClick={() => navigate("/My-Cart")}
+              <Link
+                to="/My-Cart"
+                onClick={() => setIsMenuOpen(false)}
                 className="px-6 py-3 text-left hover:bg-gray-100 text-gray-700"
               >
                 My Cart
-              </button>
+              </Link>
               <Popover content={userPopoverContent} trigger="click">
                 <button className="px-6 py-3 text-left hover:bg-gray-100 text-gray-700">
                   My Profile
