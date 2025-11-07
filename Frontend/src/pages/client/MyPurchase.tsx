@@ -35,42 +35,17 @@ const MyPurchase = () => {
   const apiUrl = import.meta.env.VITE_API_URL;
   useEffect(() => {
     const userId = sessionStorage.getItem("user_id");
-    if (!userId) return;
 
-    let previousData: any[] = [];
-
-    const fetchOrders = async () => {
-      try {
-        const response = await fetch(`${apiUrl}/fetch_my_purchase/${userId}`);
-        const data = await response.json();
-
-        // Only update if data has changed
-        const isDifferent =
-          JSON.stringify(data) !== JSON.stringify(previousData);
-        if (isDifferent) {
+    if (userId) {
+      fetch(`${apiUrl}/fetch_my_purchase/${userId}`)
+        .then((response) => response.json())
+        .then((data) => {
           setOrdersData(data);
-          previousData = data;
-        }
-
-        // ✅ Stop polling if all orders are paid
-        const allPaid = data.every(
-          (order: any) => order.payment_status?.toLowerCase() === "paid"
-        );
-        if (allPaid) {
-          clearInterval(intervalId);
-        }
-      } catch (error) {
-        console.error("Error fetching purchase data:", error);
-      }
-    };
-
-    // Initial fetch
-    fetchOrders();
-
-    // Poll every 5 seconds
-    const intervalId = setInterval(fetchOrders, 5000);
-
-    return () => clearInterval(intervalId);
+        })
+        .catch((error) => {
+          console.error("Error fetching purchase data:", error);
+        });
+    }
   }, []);
 
   useEffect(() => {
@@ -227,9 +202,9 @@ const MyPurchase = () => {
   };
 
   return (
-    <div className="p-0 sm:p-6 container mx-auto min-h-screen">
+    <div className="p-6 container mx-auto min-h-screen">
       {/* Tabs */}
-      <div className="font-core flex space-x-6 border-b-2 pb-3 bg-orange-300 shadow-md rounded-none sm:rounded-lg px-4 py-3 flex-wrap w-full">
+      <div className="font-core flex space-x-6 border-b-2 pb-3 bg-orange-300 shadow-md rounded-lg px-4 py-3 flex-wrap">
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -246,26 +221,26 @@ const MyPurchase = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="relative my-6 px-3 sm:px-0">
+      <div className="relative my-6">
         <input
           type="text"
           placeholder="Search...."
           className="font-core w-full p-3 pl-12 rounded-md border border-gray-300 shadow-sm focus:ring-2 focus:ring-red-400 transition"
         />
-        <FaSearch className="absolute left-7 top-3 text-gray-400 text-lg" />
+        <FaSearch className="absolute left-4 top-3 text-gray-400 text-lg" />
       </div>
 
       {/* Orders List */}
-      <div className="flex flex-col gap-6 px-0 sm:px-0">
+      <div className="flex flex-col gap-6">
         {ordersData.length === 0 ? (
-          <div className="font-core bg-white p-6 rounded-none sm:rounded-lg shadow-lg text-center text-gray-500 w-full mt-8">
+          <div className="font-core bg-white p-6 rounded-lg shadow-lg text-center text-gray-500">
             <p>No purchases yet.</p>
           </div>
         ) : (
           groupedOrdersData.map((order, idx) => (
             <div
               key={idx}
-              className="bg-white p-4 sm:p-6 rounded-none sm:rounded-lg shadow-md transition transform flex flex-col w-full"
+              className="bg-white p-6 rounded-lg shadow-lg transition transform flex flex-col"
             >
               {Object.keys(order.groupedProducts).map((category, idx) => (
                 <div key={idx} className="mb-6 flex flex-col">
@@ -284,62 +259,56 @@ const MyPurchase = () => {
                     {order.groupedProducts[category].map((product, idx) => (
                       <div
                         key={idx}
-                        className="font-core flex flex-col sm:flex-row sm:items-center justify-between py-4 border-b flex-wrap"
+                        className="font-core flex items-center py-4 border-b flex-wrap"
                       >
-                        <div className="flex items-center">
-                          <img
-                            src={
-                              product.menu_img
-                                ? product.menu_img.startsWith("http")
-                                  ? product.menu_img
-                                  : `${apiUrl}/uploads/images/${product.menu_img}`
-                                : "https://via.placeholder.com/80?text=No+Image"
-                            }
-                            alt={product.item_name}
-                            className="w-20 h-20 rounded-full shadow-md"
-                          />
+                        <img
+                          src={
+                            product.menu_img
+                              ? product.menu_img.startsWith("http")
+                                ? product.menu_img // Cloudinary URL
+                                : `${apiUrl}/uploads/images/${product.menu_img}` // local backend
+                              : "https://via.placeholder.com/80?text=No+Image" // fallback placeholder
+                          }
+                          alt={product.item_name}
+                          className="w-20 h-20 rounded-full shadow-md"
+                        />
 
-                          {/* Product Details */}
-                          <div className="ml-4 flex flex-col">
-                            <h3 className="text-md font-semibold text-gray-800">
-                              {product.item_name}{" "}
-                              <span className="text-gray-500 text-sm">
-                                ({product.order_quantity} pcs)
-                              </span>
-                            </h3>
-
-                            <p className="font-core text-gray-500 text-sm">
-                              Category: {product.categories_name}
-                            </p>
-
-                            {/* Quantity Display */}
-                            <p className="font-core text-gray-500 text-sm">
-                              x{product.order_quantity}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Price + Rating Button Layout */}
-                        <div className="flex items-center justify-end gap-3 w-full sm:w-auto mt-3 sm:mt-0">
-                          <p className="font-core text-lg font-bold text-red-600">
-                            ₱{product.price}
+                        {/* Product Details */}
+                        <div className="ml-5 flex-1 flex flex-col">
+                          <h3 className="text-md font-semibold text-gray-800">
+                            {product.item_name}{" "}
+                            <span className="text-gray-500 text-sm">
+                              ({product.order_quantity} pcs)
+                            </span>
+                          </h3>
+                          <p className="font-core text-gray-500 text-sm hidden md:block">
+                            Category: {product.categories_name}
                           </p>
-
-                          {order.payment_status?.toLowerCase() === "paid" ? (
-                            <button
-                              onClick={() => showModal(product)}
-                              className="font-core px-3 py-1 sm:px-5 sm:py-2 text-red-500 hover:text-red-600 transition text-sm sm:text-base"
-                            >
-                              Rate
-                            </button>
-                          ) : (
-                            <Tooltip title="Pending">
-                              <span className="font-core px-3 py-1 sm:px-5 sm:py-2 text-gray-400 cursor-not-allowed text-sm sm:text-base">
-                                Rate
-                              </span>
-                            </Tooltip>
-                          )}
+                          <p className="font-core text-gray-500 text-sm hidden md:block">
+                            x{product.order_quantity}
+                          </p>
                         </div>
+
+                        {/* Price */}
+                        <p className="font-core text-lg font-bold text-red-600 mr-4">
+                          ₱{product.price}
+                        </p>
+
+                        {/* Rating Button */}
+                        {order.payment_status?.toLowerCase() === "paid" ? (
+                          <button
+                            onClick={() => showModal(product)}
+                            className="font-core px-5 py-2 transition text-red-500"
+                          >
+                            Rate
+                          </button>
+                        ) : (
+                          <Tooltip title="Pending">
+                            <span className="font-core px-5 py-2 text-gray-400 cursor-not-allowed">
+                              Rate
+                            </span>
+                          </Tooltip>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -356,7 +325,7 @@ const MyPurchase = () => {
                 </span>
               </div>
 
-              {/* Total + Payment Status */}
+              {/* Total with payment status on the right */}
               <div className="flex items-center mt-4 gap-2 flex-wrap">
                 <p className="font-core text-xl font-bold text-red-500 flex items-center gap-2">
                   Total:
@@ -370,7 +339,8 @@ const MyPurchase = () => {
                   </span>
                   {order.payment_status && (
                     <>
-                      <span className="text-gray-400 text-sm">|</span>
+                      <span className="text-gray-400 text-sm">|</span>{" "}
+                      {/* Vertical line */}
                       <span className="flex items-center text-sm gap-1">
                         <span
                           className={`font-core font-semibold px-1 py-0.5 rounded-md ${
