@@ -4649,55 +4649,46 @@ app.get("/bestselling", (req, res) => {
 app.get("/get_reserved", (req, res) => {
   const { start, end } = req.query;
 
-  const query = `
+  // Base query
+  let query = `
     SELECT table_id, most_reservation, date_created
     FROM most_reserve_tbl
-    WHERE DATE(date_created) BETWEEN ? AND ?
-    ORDER BY table_id, date_created ASC;
   `;
+  const params = [];
 
-  db.query(query, [start, end], (err, result) => {
+  // Optional date filter
+  if (start && end) {
+    query += ` WHERE DATE(date_created) BETWEEN ? AND ?`;
+    params.push(start, end);
+  }
+
+  query += ` ORDER BY table_id, date_created ASC`;
+
+  db.query(query, params, (err, result) => {
     if (err) {
       console.error("Error fetching reserved tables:", err);
       return res.status(500).json({ error: "Error fetching data" });
     }
 
-    // Format results: group by table_id and by date
+    // Group results by table_id
     const tableMap = new Map();
 
-    result.forEach((row) => {
-      const { table_id, most_reservation, date_created } = row;
-
-      // Use only date part as key (YYYY-MM-DD)
-      const dateKey = date_created.toISOString().split("T")[0];
-
+    result.forEach(({ table_id, most_reservation, date_created }) => {
       if (!tableMap.has(table_id)) {
         tableMap.set(table_id, {
           table_id,
-          most_reservation,
-          details: {},
+          details: [],
         });
       }
 
-      const table = tableMap.get(table_id);
-
-      if (!table.details[dateKey]) {
-        table.details[dateKey] = 0;
-      }
-
-      table.details[dateKey] += most_reservation; // sum reservations for same table/date
+      tableMap.get(table_id).details.push({
+        date: date_created, // raw date
+        reservations: most_reservation,
+      });
     });
 
-    // Convert details object to array
-    const formattedResult = Array.from(tableMap.values()).map((table) => ({
-      table_id: table.table_id,
-      most_reservation: table.most_reservation,
-      details: Object.entries(table.details).map(([date, reservations]) => ({
-        date,
-        reservations,
-      })),
-    }));
-
+    // Convert Map to array for frontend
+    const formattedResult = Array.from(tableMap.values());
     res.status(200).json({ reservedTables: formattedResult });
   });
 });

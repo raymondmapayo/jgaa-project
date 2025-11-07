@@ -76,73 +76,86 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
 
       setData(formatted);
 
-      const hasData = formatted.some((t) => t.reservations > 0);
-      if (hasData) {
-        const validTables = formatted.filter((t) => t.reservations > 0);
-        const sorted = [...validTables].sort(
-          (a, b) => b.reservations - a.reservations
+      const validTables = formatted.filter((t) => t.reservations > 0);
+
+      // 🧠 CASE 1: No reservation data
+      if (validTables.length === 0) {
+        setDescription(
+          "📊 No table reservation data available for the selected date range."
         );
-        const top = sorted[0];
-        const bottom = sorted[sorted.length - 1];
+        setLoading(false);
+        return;
+      }
 
-        const avg =
-          validTables.reduce((sum, item) => sum + item.reservations, 0) /
-          validTables.length;
+      const sorted = [...validTables].sort(
+        (a, b) => b.reservations - a.reservations
+      );
+      const top = sorted[0];
+      const bottom = sorted[sorted.length - 1];
+      const avg =
+        validTables.reduce((sum, item) => sum + item.reservations, 0) /
+        validTables.length;
 
-        const allEqual = sorted.every(
+      const allEqual = sorted.every((t) => t.reservations === top.reservations);
+
+      let desc = "";
+
+      // 🧠 CASE 2: All equal
+      if (allEqual) {
+        desc = `📊 All reserved tables had the same number of reservations (${
+          top.reservations
+        }). On average, each of the ${
+          validTables.length
+        } tables was reserved ${avg.toFixed(1)} times today.`;
+      }
+      // 🧠 CASE 3: Only one table reserved
+      else if (validTables.length === 1) {
+        desc = `📊 Only ${validTables[0].name} had reservations today with ${
+          validTables[0].reservations
+        } reservation${validTables[0].reservations !== 1 ? "s" : ""}.`;
+      }
+      // 🧠 CASE 4: Tied for most reserved
+      else {
+        const topTables = validTables.filter(
           (t) => t.reservations === top.reservations
         );
-
-        let desc = "";
-
-        if (allEqual) {
-          // ✅ All tables have same number of reservations
-          desc = `📊 All reserved tables had the same number of reservations (${
+        if (topTables.length > 1) {
+          const tableNames = topTables.map((t) => t.name).join(" and ");
+          desc = `📊 ${tableNames} were the most reserved with ${
             top.reservations
-          }). On average, each of the ${
-            validTables.length
-          } tables was reserved ${avg.toFixed(1)} times today.`;
-        } else {
-          // ✅ Normal analytics with comparison
-          desc = `📊 ${top.name} was the most reserved with ${
-            top.reservations
-          } reservation${top.reservations !== 1 ? "s" : ""}, `;
-          if (bottom && bottom.name !== top.name) {
-            desc += `while ${bottom.name} had the fewest with ${
-              bottom.reservations === 0 ? "none" : bottom.reservations
-            } reservation${bottom.reservations !== 1 ? "s" : ""}. `;
-          }
-          desc += `On average, each reserved table was used about ${avg.toFixed(
+          } reservation${
+            top.reservations !== 1 ? "s" : ""
+          } each. On average, each reserved table was used ${avg.toFixed(
             1
           )} times today.`;
         }
-
-        setDescription(desc);
-      } else {
-        setDescription(
-          "No table reservation data available for the selected date range."
-        );
+        // 🧠 CASE 5: Normal (clear top and bottom)
+        else {
+          desc = `📊 ${top.name} was the most reserved with ${
+            top.reservations
+          } reservation${top.reservations !== 1 ? "s" : ""}, while ${
+            bottom.name
+          } had the fewest with ${
+            bottom.reservations === 0 ? "none" : bottom.reservations
+          } reservation${
+            bottom.reservations !== 1 ? "s" : ""
+          }. On average, each reserved table was used about ${avg.toFixed(
+            1
+          )} times today.`;
+        }
       }
+
+      setDescription(desc);
     } catch (error) {
       console.error(error);
-      const zeroTables = Array.from({ length: 9 }, (_, i) => ({
-        name: `Table ${i + 1}`,
-        reservations: 0,
-        details: [],
-      }));
-      setData(zeroTables);
-      setDescription(
-        "No table reservation data available for the selected date range."
-      );
+      setDescription("📊 Error fetching reservation data.");
     }
     setLoading(false);
   };
 
-  // 🔹 Fetch whenever date range changes
   useEffect(() => {
     fetchData();
   }, [dates]);
-
   return (
     <div className="relative -mx-6 sm:mx-0">
       <div className="bg-white dark:bg-[#001f3f] rounded-lg shadow-lg sm:w-full h-full p-6 flex flex-col transition-colors">

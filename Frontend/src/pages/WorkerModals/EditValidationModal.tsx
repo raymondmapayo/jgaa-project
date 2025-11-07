@@ -30,7 +30,8 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
       setPaymentStatus(formattedStatus || "Pending");
       setMessage(order.validation_message || "Your GCash payment is verified");
 
-      if (formattedStatus === "Paid") setIsSaved(true);
+      // ✅ Disable only if the order is already paid
+      setIsSaved(formattedStatus === "Paid");
     }
   }, [order]);
 
@@ -82,12 +83,11 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
         }
 
         antdMessage.success("Payment completed & inventory updated!");
+        // ✅ Disable inputs only for this order after successful save
+        setIsSaved(true);
       } else {
         antdMessage.success("Validation saved successfully!");
       }
-
-      // ✅ Disable after successful save
-      setIsSaved(true);
     } catch (error: any) {
       console.error("Error saving order:", error);
       antdMessage.error(
@@ -106,11 +106,11 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
           value={paymentStatus}
           onChange={(value) => {
             setPaymentStatus(value);
-            // ⚠️ Re-enable Save if user changes dropdown again
+            // ✅ Re-enable Save button if user changes dropdown before saving
             setIsSaved(false);
           }}
           className="w-full"
-          disabled={isSaved} // ✅ disable only after successful save
+          disabled={isSaved} // ✅ Only disable after this order is saved as Paid
         >
           <Option value="Pending">Pending</Option>
           <Option value="Paid">Paid</Option>
@@ -124,7 +124,7 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Enter a note or message..."
-          disabled={isSaved} // ✅ disable only after successful save
+          disabled={isSaved} // ✅ Only disable after this order is saved as Paid
         />
       </div>
 
@@ -136,7 +136,7 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
             type="primary"
             loading={loading}
             onClick={handleSave}
-            disabled={isSaved} // ✅ disable only after successful save
+            disabled={isSaved} // ✅ Only disable after this order is saved as Paid
           >
             Save Changes
           </Button>
