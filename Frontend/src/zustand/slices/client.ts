@@ -326,13 +326,15 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
 
     set((state) => {
       const existingCart = state.client?.cart || [];
-      const updatedCart = existingCart
-        .map((item) =>
-          item.id === productId && item.item_name === itemName
-            ? { ...item, quantity: item.quantity - 1 }
-            : item
-        )
-        .filter((item) => item.quantity > 0);
+      const updatedCart = existingCart.map((item) => {
+        if (item.id === productId && item.item_name === itemName) {
+          // Only decrement if not paid
+          if (item.status !== "paid") {
+            return { ...item, quantity: Math.max(item.quantity - 1, 0) }; // <-- keep 0, don’t remove
+          }
+        }
+        return item;
+      });
 
       return {
         ...state,
@@ -353,6 +355,7 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
       console.error("Failed to decrement on backend:", err);
     }
   },
+
   deleteCartItem: async (product: any) => {
     const userId = sessionStorage.getItem("user_id");
     if (!userId) {

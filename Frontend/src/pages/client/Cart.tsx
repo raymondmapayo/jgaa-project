@@ -178,13 +178,17 @@ const Cart = () => {
       price: item.price,
       menu_img: item.menu_img,
       finalTotal: item.price * item.quantity,
-      size: item.size || "Normals ize", // Include the size field (default to "Regular" if not provided)
+      size: item.size || "Normals ize",
     }));
 
     try {
       await axios.post(`${apiUrl}/add_to_cart/${userId}`, {
         items: data,
       });
+
+      // ✅ Clear the selected checkboxes so they don't revert
+      setSelectedItemsByCategory({});
+
       setIsModalVisible(false);
       setIsOrderModalVisible(true); // Show order details modal after adding to cart
     } catch (error) {
