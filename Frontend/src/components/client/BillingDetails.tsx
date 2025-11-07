@@ -12,8 +12,11 @@ interface BillingData {
   country: string;
   notes: string;
 }
+interface BillingDetailsProps {
+  onClose?: () => void;
+}
 
-const BillingDetails = () => {
+const BillingDetails: React.FC<BillingDetailsProps> = ({ onClose }) => {
   const [billingData, setBillingData] = useState<BillingData>({
     fname: "",
     lname: "",
@@ -135,6 +138,8 @@ const BillingDetails = () => {
           message: "Changes Saved Successfully",
           description: "Your changes have been saved successfully.",
         });
+        // ✅ Close modal after successful save
+        if (onClose) onClose();
       }
     } catch (error) {
       // Log the error to the console

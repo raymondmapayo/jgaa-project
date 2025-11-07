@@ -11,8 +11,11 @@ interface UsersItem {
   address: string;
   profile_pic: string;
 }
+interface AccountSettingProps {
+  onClose?: () => void; // ✅ optional onClose prop
+}
 
-const AccountSetting = () => {
+const AccountSetting: React.FC<AccountSettingProps> = ({ onClose }) => {
   const [userData, setUserData] = useState<UsersItem | null>(null);
   const [initialData, setInitialData] = useState<UsersItem | null>(null); // Store initial data
   const [isLoading, setIsLoading] = useState(true);
@@ -141,6 +144,8 @@ const AccountSetting = () => {
         message: "Changes Saved Successfully",
         description: "Your changes have been saved successfully.",
       });
+      // ✅ Auto close modal after successful save
+      if (onClose) onClose();
     } catch (error) {
       console.error("Error updating user:", error);
 

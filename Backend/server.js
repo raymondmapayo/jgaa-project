@@ -3854,10 +3854,12 @@ app.get("/fetch_reservation_activity/:user_id", (req, res) => {
 });
 
 // Fetch client-specific orders
+// Fetch client-specific orders
 app.get("/fetch_my_purchase/:user_id", async (req, res) => {
   const userId = req.params.user_id;
 
   try {
+    // Fetch orders for this user
     const fetchOrdersSql = `
       SELECT 
         o.order_id,
@@ -3884,6 +3886,7 @@ app.get("/fetch_my_purchase/:user_id", async (req, res) => {
       return res.status(200).json([]);
     }
 
+    // Fetch order items and merge duplicates
     const ordersWithItems = await Promise.all(
       orders.map(async (order) => {
         const fetchOrderItemsSql = `
@@ -3906,16 +3909,22 @@ app.get("/fetch_my_purchase/:user_id", async (req, res) => {
           });
         });
 
+        // Merge duplicates by item_name (or menu_id)
+        const mergedItems = {};
+        items.forEach((item) => {
+          const key = item.item_name; // Use menu_id if safer
+          if (!mergedItems[key]) {
+            mergedItems[key] = { ...item };
+          } else {
+            // Sum quantities and final_total
+            mergedItems[key].order_quantity += item.order_quantity;
+            mergedItems[key].final_total += item.final_total;
+          }
+        });
+
         return {
           ...order,
-          products: items.map((item) => ({
-            item_name: item.item_name,
-            menu_img: item.menu_img,
-            price: item.price,
-            order_quantity: item.order_quantity,
-            final_total: item.final_total,
-            categories_name: item.categories_name,
-          })),
+          products: Object.values(mergedItems),
         };
       })
     );

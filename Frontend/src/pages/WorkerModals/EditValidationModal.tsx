@@ -9,12 +9,14 @@ const { Option } = Select;
 interface EditValidationModalProps {
   order: any;
   onUpdateOrder?: (updatedOrder: any) => void;
+  onClose?: () => void; // ✅ Added onClose prop
 }
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const EditValidationModal: React.FC<EditValidationModalProps> = ({
   order,
   onUpdateOrder,
+  onClose, // ✅ Destructure onClose
 }) => {
   const [message, setMessage] = useState<string>("");
   const [paymentStatus, setPaymentStatus] = useState<string>("Pending");
@@ -85,8 +87,13 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
         antdMessage.success("Payment completed & inventory updated!");
         // ✅ Disable inputs only for this order after successful save
         setIsSaved(true);
+
+        // ✅ Close modal automatically after successful Paid save
+        if (onClose) onClose();
       } else {
         antdMessage.success("Validation saved successfully!");
+        // Optional: auto-close even for Pending
+        if (onClose) onClose();
       }
     } catch (error: any) {
       console.error("Error saving order:", error);

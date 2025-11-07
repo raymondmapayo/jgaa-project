@@ -42,7 +42,11 @@ const ValidationEditTabsModal: React.FC<ValidationEditTabsModalProps> = ({
           <ValidationModal order={order} />
         </TabPane>
         <TabPane tab="Edit" key="2">
-          <EditValidationModal order={order} onUpdateOrder={onUpdateOrder} />
+          <EditValidationModal
+            order={order}
+            onUpdateOrder={onUpdateOrder}
+            onClose={onClose} // ✅ Pass the parent onClose to allow auto-close
+          />
         </TabPane>
       </Tabs>
     </Modal>

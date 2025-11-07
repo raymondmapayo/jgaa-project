@@ -28,21 +28,37 @@ export const ClientHeader = () => {
   const userName = sessionStorage.getItem("fname");
   const userEmail = sessionStorage.getItem("email");
   const apiUrl = import.meta.env.VITE_API_URL;
-  // Get the user profile picture from the backend
   useEffect(() => {
+    const user_id = sessionStorage.getItem("user_id");
+    if (!user_id) return;
+
+    let lastProfilePic = ""; // ✅ Keep track of last pic to avoid re-renders
+
     const fetchProfilePic = async () => {
       try {
-        const user_id = sessionStorage.getItem("user_id");
-        if (user_id) {
-          const response = await axios.get(`${apiUrl}/get_user/${user_id}`);
-          setProfilePic(response.data.profile_pic); // Set profile picture URL
+        const response = await axios.get(`${apiUrl}/get_user/${user_id}`);
+        const newProfilePic = response.data.profile_pic;
+
+        // ✅ Update state only if the profile picture actually changed
+        if (newProfilePic && newProfilePic !== lastProfilePic) {
+          setProfilePic(newProfilePic);
+          lastProfilePic = newProfilePic;
         }
       } catch (error) {
         console.error("Error fetching profile picture:", error);
       }
     };
 
+    // Fetch immediately
     fetchProfilePic();
+
+    // Start interval
+    const intervalId = window.setInterval(fetchProfilePic, 5000);
+
+    // Cleanup on unmount
+    return () => {
+      clearInterval(intervalId);
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -440,10 +456,11 @@ export const ClientHeader = () => {
       >
         <Tabs defaultActiveKey="account" centered>
           <TabPane tab="Account Settings" key="account">
-            <AccountSetting />
+            {/* ✅ Pass onClose to close the modal */}
+            <AccountSetting onClose={() => setIsAccountSettingVisible(false)} />
           </TabPane>
           <TabPane tab="Billing Details" key="billing">
-            <BillingDetails />
+            <BillingDetails onClose={() => setIsAccountSettingVisible(false)} />
           </TabPane>
         </Tabs>
       </Modal>
