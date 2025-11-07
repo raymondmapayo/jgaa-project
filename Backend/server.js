@@ -3852,8 +3852,6 @@ app.get("/fetch_reservation_activity/:user_id", (req, res) => {
     res.status(200).json(result);
   });
 });
-
-// Fetch client-specific orders
 // Fetch client-specific orders
 app.get("/fetch_my_purchase/:user_id", async (req, res) => {
   const userId = req.params.user_id;
@@ -3912,11 +3910,11 @@ app.get("/fetch_my_purchase/:user_id", async (req, res) => {
         // Merge duplicates by item_name (or menu_id)
         const mergedItems = {};
         items.forEach((item) => {
-          const key = item.item_name; // Use menu_id if safer
+          const key = item.menu_id; // Use menu_id instead of item_name
           if (!mergedItems[key]) {
             mergedItems[key] = { ...item };
           } else {
-            // Sum quantities and final_total
+            // Only merge if truly same product, avoid merging different variants
             mergedItems[key].order_quantity += item.order_quantity;
             mergedItems[key].final_total += item.final_total;
           }
