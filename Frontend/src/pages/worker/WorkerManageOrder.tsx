@@ -23,33 +23,59 @@ import ValidationEditTabsModal from "../WorkerModals/ValidationEditModalTabs";
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
+  max-width: 1200px;
   background-color: #fff;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
   transition: background-color 0.3s ease;
   margin: 0 auto;
+  box-sizing: border-box;
 
   .dark & {
     background-color: #001f3f;
     color: white;
   }
 
-  /* ===== Mobile full-stretch ===== */
   @media (max-width: 1024px) {
-    border-radius: 0;
-    box-shadow: none;
     width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
-    padding: 16px;
+    max-width: 100vw;
+    margin: 0;
+    border-radius: 0;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    box-shadow: none;
+    overflow-x: hidden;
+  }
+
+  @media (max-width: 768px) {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  @media (max-width: 480px) {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 `;
 
 const StyledTable = styled(Table)`
   width: 100%;
+
   .ant-table {
     width: 100%;
+  }
+
+  .ant-table-content {
+    width: 100%;
+    min-width: 0 !important; /* allow table to shrink */
+    overflow-x: auto; /* horizontal scroll only if needed */
   }
 
   .ant-table-thead > tr > th {
@@ -62,12 +88,19 @@ const StyledTable = styled(Table)`
     background-color: #f9fafb !important;
   }
 
-  /* Make table responsive on smaller screens */
   @media (max-width: 1024px) {
     font-size: 13px;
-    .ant-table-content {
-      overflow-x: auto;
-    }
+    margin-top: 16px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 11px;
+    margin-top: 24px;
   }
 `;
 

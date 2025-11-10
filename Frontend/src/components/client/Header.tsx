@@ -245,15 +245,15 @@ export const ClientHeader = () => {
 
   return (
     <header className="z-50 fixed top-0 w-full bg-white shadow-md">
-      <div className="flex items-center justify-between px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-6">
-        {/* Logo Section */}
-        <div className="flex items-center">
+      <div className="flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 2xl:px-16 py-2 sm:py-3 md:py-4">
+        {/* Left: Logo + Title */}
+        <div className="flex items-center space-x-3 sm:space-x-4 md:space-x-5 lg:space-x-6">
           <img
             src="/logo.jpg"
             alt="JGAA Thai Restaurant Logo"
-            className="h-8 w-8 sm:h-12 sm:w-12 md:h-14 md:w-14 mr-3 sm:mr-4 md:mr-6 rounded-full"
+            className="h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 lg:h-12 lg:w-12 xl:h-14 xl:w-14 rounded-full"
           />
-          <h1 className="font-core  text-lg sm:text-xl md:text-2xl font-bold text-orange-600">
+          <h1 className="font-core text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl 2xl:text-3xl font-bold text-orange-600 whitespace-nowrap">
             JGAA THAI RESTAURANT
           </h1>
         </div>
@@ -269,9 +269,9 @@ export const ClientHeader = () => {
         </div>
 
         {/* Navigation Links & Icons (Desktop) */}
-        <div className="hidden lg:flex items-center gap-8 xl:gap-14">
+        <div className="hidden md:flex items-center ml-12 gap-8 xl:gap-14">
           {/* Navigation Links */}
-          <nav className="flex font-core items-center space-x-4 sm:space-x-6 md:space-x-8 text-gray-600 text-sm sm:text-base md:text-lg">
+          <nav className="flex font-core items-center space-x-6 text-gray-600 text-sm sm:text-base md:text-lg">
             <Link to="/" className="hover:text-orange-600 transition-colors">
               Home
             </Link>
@@ -279,10 +279,10 @@ export const ClientHeader = () => {
             <Dropdown overlay={productsMenu} trigger={["hover"]}>
               <Link
                 to="/shop"
-                onClick={(e) => e.preventDefault()} // prevent navigation, only open dropdown
+                onClick={(e) => e.preventDefault()}
                 className="hover:text-orange-600 transition-colors"
               >
-                Order now
+                Buy now
               </Link>
             </Dropdown>
 
@@ -292,7 +292,6 @@ export const ClientHeader = () => {
             >
               Reservation
             </Link>
-
             <Link
               to="/Contact-Us"
               className="hover:text-orange-600 transition-colors"
@@ -300,17 +299,15 @@ export const ClientHeader = () => {
               Contact
             </Link>
           </nav>
-          {/* Icons */}
+
+          {/* Icons (Search, Cart, User) */}
           <div className="flex items-center space-x-4 sm:space-x-6">
             <button className="text-yellow-500 hover:text-yellow-600 transform hover:scale-110 transition">
               <FaSearch size={24} />
             </button>
-
             {isAuthenticated ? (
               <div className="flex gap-4 sm:gap-6">
-                {/* 🔔 Notifications */}
                 <ClientNotification />
-
                 {/* 🛒 Cart */}
                 <button
                   onClick={() => {
@@ -335,28 +332,26 @@ export const ClientHeader = () => {
                   {cartItemCount > 0 && (
                     <span
                       className="
-        absolute 
-        -top-1 -right-2
-        text-[11px] sm:text-sm 
-        text-white bg-red-500 
-        rounded-full 
-        w-5 h-5 sm:w-5 sm:h-5 
-        flex items-center justify-center
-      "
+                     absolute 
+                     -top-1 -right-2
+                     text-[11px] sm:text-sm 
+                     text-white bg-red-500 
+                     rounded-full 
+                     w-5 h-5 sm:w-5 sm:h-5 
+                     flex items-center justify-center
+                   "
                     >
                       {cartItemCount}
                     </span>
                   )}
                 </button>
-
-                {/* 👤 User */}
                 <Popover
                   content={userPopoverContent}
                   trigger="click"
                   placement="bottomRight"
                 >
                   <button className="text-orange-500 hover:text-orange-600 transform hover:scale-110 transition">
-                    <FaUser size={24} /> {/* Bigger user icon */}
+                    <FaUser size={24} />
                   </button>
                 </Popover>
               </div>

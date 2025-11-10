@@ -119,7 +119,7 @@ const Bestseller: React.FC = () => {
 
           {/* Grid Layout for Bestseller Products */}
           <motion.div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-8"
             variants={containerVariants}
             initial="hidden"
             whileInView="visible"
@@ -128,11 +128,11 @@ const Bestseller: React.FC = () => {
             {bestselling.map((product) => (
               <motion.div
                 key={product.item_name + product.menu_img}
-                className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center sm:flex sm:flex-row sm:items-center"
+                className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center sm:flex sm:flex-row sm:items-center sm:flex-wrap"
                 variants={cardVariants}
               >
                 {/* Product Image */}
-                <div className="relative w-32 h-32 mx-auto mt-4">
+                <div className="relative w-32 h-32 mx-auto mt-4 flex-shrink-0">
                   <img
                     src={
                       product.menu_img
@@ -147,7 +147,7 @@ const Bestseller: React.FC = () => {
                 </div>
 
                 {/* Product Details */}
-                <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left">
+                <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-1 min-w-0">
                   <h5 className="font-core text-lg font-semibold text-gray-800">
                     {product.item_name}
                   </h5>
@@ -190,21 +190,21 @@ const Bestseller: React.FC = () => {
                       ₱{product.price}
                     </h4>
                   </div>
-                  {/* Buttons Section */}
-                  <div className="mt-4 flex justify-between gap-4">
+
+                  <div className="mt-4 flex flex-wrap justify-between gap-4">
                     <motion.button
-                      className="font-core flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-orange-500 rounded-full text-orange-500 hover:bg-orange-500 hover:text-white transition text-sm font-semibold whitespace-nowrap"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => handleViewMenuClick(product)}
                     >
                       View Menu
                     </motion.button>
 
                     <motion.button
-                      className="font-core flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-orange-500 rounded-full text-orange-500 hover:bg-orange-500 hover:text-white transition text-sm font-semibold whitespace-nowrap"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() =>
                         addToCart({
                           ...product,
@@ -212,7 +212,9 @@ const Bestseller: React.FC = () => {
                         })
                       }
                     >
-                      <FaShoppingBag /> Add to cart
+                      {/* Always visible, scalable icon */}
+                      <FaShoppingBag className="text-sm sm:text-base md:text-base" />{" "}
+                      Add to Cart
                     </motion.button>
                   </div>
                 </div>

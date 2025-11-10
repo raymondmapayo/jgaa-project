@@ -52,7 +52,7 @@ const Menus = () => {
 
   return (
     <motion.section
-      className="container mx-auto py-16"
+      className="container mx-auto py-7 p-4"
       initial="hidden"
       whileInView="visible"
       variants={containerVariants}

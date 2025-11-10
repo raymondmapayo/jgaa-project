@@ -14,36 +14,61 @@ import AddMenuForm from "../../components/form/AddMenu";
 import MenuEditModal from "../WorkerModals/MenuEditModal";
 import ViewDetailsModal from "../WorkerModals/ViewDetailsModal";
 
-// ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
+  max-width: 1200px;
   background-color: #fff;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
   transition: background-color 0.3s ease;
   margin: 0 auto;
+  box-sizing: border-box;
 
   .dark & {
     background-color: #001f3f;
     color: white;
   }
 
-  /* ===== Mobile full-stretch ===== */
   @media (max-width: 1024px) {
-    border-radius: 0;
-    box-shadow: none;
     width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
-    padding: 16px;
+    max-width: 100vw;
+    margin: 0;
+    border-radius: 0;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    box-shadow: none;
+    overflow-x: hidden;
+  }
+
+  @media (max-width: 768px) {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  @media (max-width: 480px) {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 `;
 
 const StyledTable = styled(Table)`
   width: 100%;
+
   .ant-table {
     width: 100%;
+  }
+
+  .ant-table-content {
+    width: 100%;
+    min-width: 0 !important; /* allow table to shrink */
+    overflow-x: auto; /* horizontal scroll only if needed */
   }
 
   .ant-table-thead > tr > th {
@@ -56,12 +81,19 @@ const StyledTable = styled(Table)`
     background-color: #f9fafb !important;
   }
 
-  /* Make table responsive on smaller screens */
   @media (max-width: 1024px) {
     font-size: 13px;
-    .ant-table-content {
-      overflow-x: auto;
-    }
+    margin-top: 16px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 11px;
+    margin-top: 24px;
   }
 `;
 
@@ -216,49 +248,39 @@ const WorkerManageMenu = () => {
   return (
     <StyledContainer>
       {/* Header Section */}
-      <div className="mb-6">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-          {/* Left: Title */}
-          <div>
-            <h2 className="text-xl font-bold">Menu List</h2>
-            <p className="text-gray-500 text-sm">Manage your food menu</p>
-          </div>
+
+      <div className="flex flex-col gap-4 w-full">
+        {/* Title */}
+        <div>
+          <h2 className="text-xl font-bold">Menu List</h2>
+          <p className="text-gray-500 text-sm">Manage your food menu</p>
         </div>
 
         {/* Search + Actions Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 w-full">
           {/* Search */}
           <Input
             placeholder="Search categories"
             prefix={<SearchOutlined />}
-            className="w-full sm:w-1/4 bg-gray-100 dark:bg-[#1f2937] dark:text-white custom-placeholder"
+            className="w-full md:w-1/3 bg-gray-100 dark:bg-[#1f2937] dark:text-white custom-placeholder"
           />
 
-          {/* Right Side: Add + Import + Sort */}
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            {/* Add Menu */}
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
             <Button
               type="primary"
-              size="middle"
               icon={<PlusOutlined />}
-              onClick={() => setIsAddModalVisible(true)}
-              className="px-4 py-1.5 shadow-md w-full sm:w-[140px] text-center"
+              className="w-full sm:w-[140px]"
             >
               Add Menu
             </Button>
-
-            {/* Import Menu */}
             <Button
               type="default"
-              size="middle"
               icon={<UploadOutlined />}
-              className="px-4 py-1.5 w-full sm:w-[140px] text-center"
+              className="w-full sm:w-[140px]"
             >
               Import Menu
             </Button>
-
-            {/* Sort */}
             <Dropdown
               overlay={
                 <Menu>
@@ -269,8 +291,8 @@ const WorkerManageMenu = () => {
               trigger={["click"]}
             >
               <Button
-                icon={<FilterOutlined />}
-                className="w-full sm:w-[140px] px-4 py-1.5 text-center"
+                icon={<FilterOutlined />} // <-- add this
+                className="w-full sm:w-[140px]"
               >
                 Sort
               </Button>

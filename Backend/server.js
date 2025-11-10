@@ -429,6 +429,21 @@ app.put("/update_ingredient/:id", (req, res) => {
   );
 });
 
+// DELETE ingredient by id
+app.delete("/delete_ingredient/:id", (req, res) => {
+  const { id } = req.params;
+
+  const deleteSql = "DELETE FROM ingredients_tbl WHERE ingredients_id = ?";
+
+  db.query(deleteSql, [id], (err, result) => {
+    if (err) {
+      console.error("❌ Error deleting ingredient:", err);
+      return res.status(500).json({ error: "Failed to delete ingredient" });
+    }
+    res.json({ message: "Ingredient deleted successfully" });
+  });
+});
+
 //========================== END ADD CATEGORIES ===========================================
 //========================== Edit start CATEGORIES ===========================================
 app.put(

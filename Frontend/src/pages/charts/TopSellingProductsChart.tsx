@@ -14,6 +14,7 @@ const TopSellingProductsChart = () => {
   const [data, setData] = useState<any[]>([]);
   const [description, setDescription] = useState("");
   const apiUrl = import.meta.env.VITE_API_URL;
+
   useEffect(() => {
     axios.get(`${apiUrl}/most_top_selling`).then((res) => {
       const colors = ["#fa8c16", "#ffc069", "#82ca9d", "#8884d8"];
@@ -49,8 +50,8 @@ const TopSellingProductsChart = () => {
   }, []);
 
   return (
-    <div className="relative -mx-6 sm:mx-0">
-      <div className="bg-white dark:bg-[#001f3f] rounded-lg shadow-lg sm:w-full p-6 flex flex-col transition-colors">
+    <div className="relative -mx-6 sm:mx-0 h-full">
+      <div className="bg-white dark:bg-[#001f3f] rounded-lg shadow-lg p-6 flex flex-col transition-colors h-full">
         {/* Header */}
         <div className="flex justify-between items-center mb-4 border-b border-dotted pb-2">
           <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">
@@ -59,7 +60,7 @@ const TopSellingProductsChart = () => {
         </div>
 
         {/* Chart + Left List */}
-        <div className="flex flex-col sm:flex-row justify-start items-start gap-6 w-full">
+        <div className="flex flex-col md:flex-row justify-start items-start gap-6 w-full mb-4 flex-grow">
           {data.length === 0 ? (
             <div className="flex flex-col items-center justify-center w-full min-h-[300px] text-gray-500 dark:text-gray-300">
               <p>No sales data yet 📉</p>
@@ -82,7 +83,7 @@ const TopSellingProductsChart = () => {
           ) : (
             <>
               {/* Left side list */}
-              <div className="mt-4 space-y-2 w-full sm:w-1/3">
+              <div className="mt-4 space-y-2 w-full md:w-1/3 flex-shrink-0">
                 {data.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <span
@@ -97,7 +98,7 @@ const TopSellingProductsChart = () => {
               </div>
 
               {/* Pie Chart */}
-              <div className="flex justify-center items-center w-full sm:w-2/3 min-h-[300px]">
+              <div className="flex justify-center items-end w-full md:w-2/3 min-h-[300px] mt-auto">
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
@@ -132,9 +133,8 @@ const TopSellingProductsChart = () => {
           )}
         </div>
 
-        {/* Descriptive Analytics */}
-        <div className="mt-6">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2"></h3>
+        {/* Description */}
+        <div className="mt-auto pt-4">
           <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed text-justify">
             {description}
           </p>

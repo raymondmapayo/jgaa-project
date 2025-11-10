@@ -103,11 +103,11 @@ const MyFavourites: React.FC = () => {
           You have no favourite items yet.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {favourites.map((item) => (
             <div
               key={item.user_favourites_id}
-              className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center flex flex-col"
+              className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center flex flex-col h-full **min-w-[260px]**"
             >
               {/* Top row: Category left, Heart right */}
               <div className="flex justify-between items-center">
@@ -129,9 +129,9 @@ const MyFavourites: React.FC = () => {
                   src={
                     item.menu_img
                       ? item.menu_img.startsWith("http")
-                        ? item.menu_img // Cloudinary URL
-                        : `${apiUrl}/uploads/images/${item.menu_img}` // Local image
-                      : "https://via.placeholder.com/150?text=No+Image" // fallback
+                        ? item.menu_img
+                        : `${apiUrl}/uploads/images/${item.menu_img}`
+                      : "https://via.placeholder.com/150?text=No+Image"
                   }
                   alt={item.item_name}
                   className="h-32 w-32 object-cover rounded-full border-4 border-orange-500 shadow-lg"
@@ -153,19 +153,19 @@ const MyFavourites: React.FC = () => {
                 </div>
 
                 {/* Buttons */}
-                <div className="mt-4 flex items-center gap-4">
+                <div className="mt-auto pt-4 flex items-center gap-4">
                   <button
                     onClick={() => handleViewMenuClick(item)}
-                    className="font-core flex-1 flex items-center justify-center px-4 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                    className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
                   >
                     View Menu
                   </button>
 
                   <button
                     onClick={() => addToCart(item)}
-                    className="font-core flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                    className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
                   >
-                    <FaShoppingBag />
+                    <FaShoppingBag className="text-sm sm:text-base" />
                     Add to Cart
                   </button>
                 </div>

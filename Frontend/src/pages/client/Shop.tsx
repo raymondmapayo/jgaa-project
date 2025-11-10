@@ -28,7 +28,6 @@ const Shop: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
 
-  // ✅ Fetch menu items
   const fetchMenuItems = () => {
     fetch(`${apiUrl}/menu_items`)
       .then((res) => res.json())
@@ -48,7 +47,6 @@ const Shop: React.FC = () => {
     fetchMenuItems();
   }, [type]);
 
-  // ✅ Fetch favorites once
   useEffect(() => {
     const user_id = sessionStorage.getItem("user_id");
     if (!user_id) return;
@@ -59,7 +57,6 @@ const Shop: React.FC = () => {
       .catch((err) => console.error("Error fetching user favorites:", err));
   }, []);
 
-  // ✅ Toggle favorite
   const toggleFavorite = (menu_id: number) => {
     const user_id = sessionStorage.getItem("user_id");
     if (!user_id) {
@@ -101,7 +98,6 @@ const Shop: React.FC = () => {
       .catch((err) => console.error("Error toggling favourite:", err));
   };
 
-  // ✅ Handle view menu
   const handleViewMenuClick = (item: MenuItem) => {
     setSelectedItem(item);
     setModalVisible(true);
@@ -123,11 +119,11 @@ const Shop: React.FC = () => {
           No items yet in this category
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {menuItems.map((item) => (
             <div
               key={item.id}
-              className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center flex flex-col"
+              className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center flex flex-col h-full **min-w-[260px]**"
             >
               {/* ❤️ Favourites */}
               <Favourites
@@ -136,42 +132,41 @@ const Shop: React.FC = () => {
                 onToggleFavorite={toggleFavorite}
               />
 
-              {/* 🖼️ Image (cache-busted for new uploads) */}
-              <div className="relative w-32 h-32 mx-auto mt-4">
+              {/* 🖼️ Image */}
+              <div className="relative w-28 h-28 mx-auto mt-2">
                 <img
                   src={
                     item.menu_img
                       ? item.menu_img.startsWith("http")
-                        ? item.menu_img // Cloudinary URL
-                        : `${apiUrl}/uploads/images/${item.menu_img}?v=${item.menu_id}` // local fallback with cache-busting
-                      : "https://via.placeholder.com/150?text=No+Image" // fallback if missing
+                        ? item.menu_img
+                        : `${apiUrl}/uploads/images/${item.menu_img}?v=${item.menu_id}`
+                      : "https://via.placeholder.com/150?text=No+Image"
                   }
                   alt={item.item_name}
-                  className="h-32 w-32 object-cover rounded-full border-4 border-orange-500 shadow-lg"
+                  className="h-28 w-28 object-cover rounded-full border-4 border-orange-500 shadow-md"
                 />
               </div>
 
               {/* 📝 Content */}
-              <div className="mt-4 flex-grow flex flex-col justify-between">
-                <div>
-                  <h2 className="font-core text-xl font-semibold text-orange-600">
-                    {item.item_name}
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-2 line-clamp-3 text-justify">
-                    {item.description}
-                  </p>
-                  <p className="text-lg text-gray-800 mt-4 text-left">
-                    ₱{item.price}
-                  </p>
-                </div>
+
+              <div className="mt-3 flex-grow flex flex-col justify-between items-center text-center">
+                <h2 className="font-core text-lg font-semibold text-orange-600">
+                  {item.item_name}
+                </h2>
+                <p className="text-sm text-gray-600 mt-1 line-clamp-3 text-justify">
+                  {item.description}
+                </p>
+                <p className="text-md text-gray-800 mt-2 self-start">
+                  ₱{item.price}
+                </p>
 
                 {/* ⚡ Buttons */}
-                <div className="mt-4 flex items-center gap-4">
+                <div className="mt-3 flex flex-row flex-wrap items-center justify-center gap-2 w-full">
                   {item.availability?.trim().toLowerCase() === "available" ? (
                     <>
                       <button
                         onClick={() => handleViewMenuClick(item)}
-                        className="font-core flex-1 flex items-center justify-center px-4 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                        className="font-core flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
                       >
                         View Menu
                       </button>
@@ -181,14 +176,14 @@ const Shop: React.FC = () => {
                           e.stopPropagation();
                           addToCart(item);
                         }}
-                        className="font-core flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                        className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
                       >
                         <FaShoppingBag />
                         Add to Cart
                       </button>
                     </>
                   ) : (
-                    <span className="flex-1 text-center px-4 py-2 text-sm font-semibold text-red-500 border border-red-500 rounded-full bg-red-100">
+                    <span className="font-core flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 text-sm font-semibold text-red-500 border border-red-500 rounded-full bg-red-100">
                       Ops! Sorry, We're not Available today.
                     </span>
                   )}
@@ -199,7 +194,7 @@ const Shop: React.FC = () => {
         </div>
       )}
 
-      {/* 🪟 Modal (forced re-render for new item) */}
+      {/* 🪟 Modal */}
       <Modal
         key={selectedItem?.id || "menu-modal"}
         open={modalVisible}

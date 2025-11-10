@@ -111,6 +111,7 @@ const Bestseller: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-12">
+      {/* Section Heading */}
       <motion.div
         className="text-center mx-auto mb-12 max-w-3xl"
         initial={{ opacity: 0, y: -30 }}
@@ -121,61 +122,55 @@ const Bestseller: React.FC = () => {
           Bestseller Products
         </h1>
         <p className="font-core text-gray-600 mt-4">
-          Our Most Popular Products Based On Customer Ratings.
+          Explore our most popular products based on customer ratings.
         </p>
       </motion.div>
 
-      <motion.div
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        viewport={{ once: false, amount: 0.2 }}
-      >
-        {bestselling.length > 0 ? (
-          bestselling.map((product) => (
+      {/* Grid Layout for Bestseller Products */}
+      {bestselling.length > 0 && (
+        <motion.div
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-8"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: false, amount: 0.2 }}
+        >
+          {bestselling.map((product) => (
             <motion.div
               key={product.item_name + product.menu_img}
-              className="bg-[#fff7ec]  cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center sm:flex sm:flex-row sm:items-center"
+              className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 sm:flex sm:flex-row sm:items-center sm:flex-wrap text-center"
               variants={cardVariants}
             >
-              <div className="relative w-32 h-32 mx-auto mt-4">
+              {/* Product Image */}
+              <div className="relative w-32 h-32 mx-auto mt-4 flex-shrink-0">
                 <img
                   src={
                     product.menu_img
                       ? product.menu_img.startsWith("http")
-                        ? product.menu_img // Cloudinary URL
-                        : `${apiUrl}/uploads/images/${product.menu_img}` // local backend
-                      : "https://via.placeholder.com/128?text=No+Image" // fallback
+                        ? product.menu_img
+                        : `${apiUrl}/uploads/images/${product.menu_img}`
+                      : "https://via.placeholder.com/128?text=No+Image"
                   }
                   alt={product.item_name}
                   className="h-32 w-32 object-cover rounded-full border-4 border-orange-500 shadow-lg"
                 />
               </div>
 
-              <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left">
+              {/* Product Details */}
+              <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-1 min-w-0">
                 <h5 className="font-core text-lg font-semibold text-gray-800">
                   {product.item_name}
                 </h5>
 
-                {/* Group rating, review count, and price — align left */}
+                {/* Rating, Reviews, and Price */}
                 <div className="mt-2 text-left">
-                  {/* Rating */}
                   <div className="flex justify-start text-yellow-500">
                     <CustomRate value={parseFloat(product.total_avg_rating)} />
                   </div>
-                  {/* Rating and Review Count */}
                   <div
                     className="font-core text-gray-600 mt-2 cursor-pointer hover:text-orange-500"
                     onClick={() => {
                       if (product.rating_count > 0) {
-                        console.log(
-                          "Opening modal for:",
-                          product.item_name,
-                          "ID:",
-                          product.bestseller_id
-                        );
-
                         setSelectedMenuName(product.item_name);
                         setReviewsModalVisible(true);
                       }
@@ -187,30 +182,26 @@ const Bestseller: React.FC = () => {
                         : "No reviews yet"}
                     </p>
                   </div>
-
-                  {/* Price */}
                   <h4 className="font-core text-xl font-bold text-gray-800 mt-2">
                     ₱{product.price}
                   </h4>
                 </div>
 
-                {/* Buttons Section with Flexbox Layout */}
-                <div className="mt-4 flex justify-between gap-4">
-                  {/* View Menu Button */}
+                {/* Buttons Section */}
+                <div className="mt-4 flex flex-wrap justify-between gap-4">
                   <motion.button
-                    className="font-core flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-orange-500 rounded-full text-orange-500 hover:bg-orange-500 hover:text-white transition text-sm font-semibold whitespace-nowrap"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => handleViewMenuClick(product)} // Pass the product directly
+                    className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleViewMenuClick(product)}
                   >
                     View Menu
                   </motion.button>
 
-                  {/* Add to Cart Button */}
                   <motion.button
-                    className="font-core flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-orange-500 rounded-full text-orange-500 hover:bg-orange-500 hover:text-white transition text-sm font-semibold whitespace-nowrap"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                    className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() =>
                       addToCart({
                         ...product,
@@ -218,40 +209,43 @@ const Bestseller: React.FC = () => {
                       })
                     }
                   >
-                    <FaShoppingBag /> {/* FaShoppingBag Icon */}
-                    Add to cart
+                    {/* Always visible, scalable icon */}
+                    <FaShoppingBag className="text-sm sm:text-base md:text-base" />{" "}
+                    Add to Cart
                   </motion.button>
                 </div>
               </div>
             </motion.div>
-          ))
-        ) : (
-          <div className="col-span-full flex items-center justify-center py-12">
-            <p className="font-core text-gray-500 text-base sm:text-lg md:text-xl font-medium text-center">
-              No bestseller products available at the moment.
-            </p>
-          </div>
-        )}
-        {/* Reviews Modal */}
-        <ClientsCommentsRated
-          visible={reviewsModalVisible}
-          onCancel={() => setReviewsModalVisible(false)}
-          menuName={selectedMenuName} // ✅ Use this
-        />
+          ))}
 
-        {/* Modal for Product Info */}
-        <Modal
-          open={modalVisible} // Modal visibility controlled by the state
-          onCancel={closeModal} // Close modal on cancel button click
-          footer={null} // No footer
-          bodyStyle={{ padding: "20px" }} // Padding for body content
-          width={800} // Set the modal width
-        >
-          {selectedItem && (
-            <ProductInfo item={selectedItem} /> // Pass the selected item as a prop to ProductInfo
-          )}
-        </Modal>
-      </motion.div>
+          {/* Reviews Modal */}
+          <ClientsCommentsRated
+            visible={reviewsModalVisible}
+            onCancel={() => setReviewsModalVisible(false)}
+            menuName={selectedMenuName}
+          />
+
+          {/* Product Info Modal */}
+          <Modal
+            open={modalVisible}
+            onCancel={closeModal}
+            footer={null}
+            bodyStyle={{ padding: "20px" }}
+            width={800}
+          >
+            {selectedItem && <ProductInfo item={selectedItem} />}
+          </Modal>
+        </motion.div>
+      )}
+
+      {/* Fallback when no products */}
+      {bestselling.length === 0 && (
+        <div className="col-span-full flex items-center justify-center py-12">
+          <p className="font-core text-gray-500 text-base sm:text-lg md:text-xl font-medium text-center">
+            No bestseller products available at the moment.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

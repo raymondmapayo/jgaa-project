@@ -211,10 +211,10 @@ const WorkerDashboard = () => {
   return (
     <div
       className="space-y-6 
-    bg-white dark:bg-[rgb(0,51,102)] text-black dark:text-white
-    p-0 rounded-none w-full
-    sm:p-4 sm:rounded-xl"
+bg-white dark:bg-[rgb(0,51,102)] text-black dark:text-white
+p-0 rounded-none w-full"
     >
+      {/* 🔸 Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
         <h1 className="text-lg font-semibold">Dashboard</h1>
 
@@ -241,7 +241,7 @@ const WorkerDashboard = () => {
             <span>Filter by Date</span>
           </div>
 
-          <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="flex items-center justify-center gap-3 mb-4 flex-wrap">
             <div className="border px-3 py-1 rounded-md">
               {dates[0] ? dates[0].format("MMM DD") : "Start"}
             </div>
@@ -283,7 +283,7 @@ const WorkerDashboard = () => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-6">
+          <div className="flex justify-end gap-2 mt-6 flex-wrap">
             <Button onClick={handleCancel}>Cancel</Button>
             <Button type="primary" onClick={handleApply}>
               Apply
@@ -344,7 +344,7 @@ const WorkerDashboard = () => {
       </div>
 
       {/* 🔸 Charts */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-4">
         {/* First row */}
         <TopSellingProductsChart />
         <TopSelling />
@@ -352,9 +352,11 @@ const WorkerDashboard = () => {
         <TotalCustomersChart dates={dates} />
         <MostReservedTablesChart dates={dates} />
       </div>
-      {/* Full-width row */}
+
       {/* 🔸 Revenue Section */}
-      <TotalRevenue dates={dates} />
+      <div className="mt-4 w-full">
+        <TotalRevenue dates={dates} />
+      </div>
 
       {/* 🔸 Modals */}
       <TotalProductsModal

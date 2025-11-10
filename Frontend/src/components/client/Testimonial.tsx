@@ -83,12 +83,15 @@ const TestimonialSection = () => {
                   <img
                     src={
                       testimonial.profile_pic
-                        ? `${apiUrl}/uploads/images/${testimonial.profile_pic}` // Use profile picture if it exists
-                        : "/avatar.jpg" // Fallback image
+                        ? testimonial.profile_pic.startsWith("http")
+                          ? testimonial.profile_pic // Use it directly if it's a full URL
+                          : `${apiUrl}/uploads/images/${testimonial.profile_pic}` // Otherwise, prepend your API URL
+                        : "/avatar.jpg" // Fallback if no profile_pic
                     }
                     alt={testimonial.name}
                     className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 border-yellow-500"
                   />
+
                   {/* Client Info */}
                   <div className="ml-4">
                     <h4 className="text-gray-800 font-bold text-lg">
