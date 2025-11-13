@@ -1,11 +1,12 @@
-import { Modal, notification } from "antd";
+import { notification } from "antd";
 import React, { useEffect, useState } from "react";
 import { FaShoppingBag } from "react-icons/fa";
 import { useParams } from "react-router-dom";
 
 import { addToCart } from "../../zustand/store/store.provider";
 import Favourites from "./Favourites";
-import ProductInfo from "./ProductInfo";
+
+import OrderDetailsModal from "../../clientsmodal/OrderDetailsModal";
 
 interface MenuItem {
   id: number;
@@ -28,7 +29,8 @@ const Shop: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
 
-  const fetchMenuItems = () => {
+  // 🔹 Refactor fetchMenuItems into refreshMenuItems
+  const refreshMenuItems = () => {
     fetch(`${apiUrl}/menu_items`)
       .then((res) => res.json())
       .then((data) => {
@@ -44,7 +46,7 @@ const Shop: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchMenuItems();
+    refreshMenuItems(); // 🔹 Call refresh on category change
   }, [type]);
 
   useEffect(() => {
@@ -93,13 +95,26 @@ const Shop: React.FC = () => {
             } has been ${data.action} your favourites.`,
             placement: "topRight",
           });
+
+          // 🔹 Refresh availability after toggling favorite
+          refreshMenuItems();
         }
       })
       .catch((err) => console.error("Error toggling favourite:", err));
   };
 
-  const handleViewMenuClick = (item: MenuItem) => {
-    setSelectedItem(item);
+  // ✅ When clicking "Buy now" → show OrderDetailsModal
+  const handleBuyNowClick = (item: MenuItem) => {
+    const userId = sessionStorage.getItem("user_id");
+    // 🔒 Check if user is logged in
+    if (!userId) {
+      notification.warning({
+        message: "Login Required",
+        description: "You need to login or register before buying items.",
+      });
+      return; // stop here if not logged in
+    }
+    setSelectedItem({ ...item, quantity: 1 }); // default quantity 1
     setModalVisible(true);
   };
 
@@ -123,7 +138,7 @@ const Shop: React.FC = () => {
           {menuItems.map((item) => (
             <div
               key={item.id}
-              className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center flex flex-col h-full **min-w-[260px]**"
+              className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center flex flex-col h-full min-w-[260px]"
             >
               {/* ❤️ Favourites */}
               <Favourites
@@ -148,7 +163,6 @@ const Shop: React.FC = () => {
               </div>
 
               {/* 📝 Content */}
-
               <div className="mt-3 flex-grow flex flex-col justify-between items-center text-center">
                 <h2 className="font-core text-lg font-semibold text-orange-600">
                   {item.item_name}
@@ -165,16 +179,18 @@ const Shop: React.FC = () => {
                   {item.availability?.trim().toLowerCase() === "available" ? (
                     <>
                       <button
-                        onClick={() => handleViewMenuClick(item)}
+                        onClick={() => handleBuyNowClick(item)}
                         className="font-core flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
                       >
-                        View Menu
+                        Buy now
                       </button>
 
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           addToCart(item);
+                          // 🔹 Refresh availability after adding to cart
+                          refreshMenuItems();
                         }}
                         className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
                       >
@@ -194,20 +210,15 @@ const Shop: React.FC = () => {
         </div>
       )}
 
-      {/* 🪟 Modal */}
-      <Modal
-        key={selectedItem?.id || "menu-modal"}
-        open={modalVisible}
-        onCancel={closeModal}
-        footer={null}
-        bodyStyle={{ padding: "20px" }}
-        width={800}
-        destroyOnClose
-      >
-        {selectedItem && (
-          <ProductInfo key={selectedItem.id} item={selectedItem} />
-        )}
-      </Modal>
+      {/* ✅ Show OrderDetailsModal */}
+      {selectedItem && (
+        <OrderDetailsModal
+          visible={modalVisible}
+          checkoutItems={[selectedItem]}
+          finalTotal={selectedItem.price * (selectedItem.quantity || 1)}
+          onCancel={closeModal}
+        />
+      )}
     </section>
   );
 };

@@ -1,4 +1,4 @@
-import { Modal } from "antd";
+import { Modal, notification } from "antd";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -7,6 +7,7 @@ import { CustomRate } from "../../components/client/Rate";
 import { addToCart } from "../../zustand/store/store.provider"; // Importing addToCart from zustand store
 import ProductInfo from "./ProductInfo";
 import ClientsCommentsRated from "../ClientsModal/ClientsCommentsRated";
+import OrderDetailsModal from "../../clientsmodal/OrderDetailsModal";
 // Define interface for bestselling product
 interface BestsellerProduct {
   bestseller_id?: number; // Optional in case it's not returned
@@ -33,29 +34,44 @@ const Bestseller: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null); // Selected item for the modal
   const [modalVisible, setModalVisible] = useState(false); // Modal visibility state
   const [reviewsModalVisible, setReviewsModalVisible] = useState(false);
-
+  const [orderModalVisible, setOrderModalVisible] = useState(false); // ✅ NEW state for OrderDetailsModal
   const [selectedMenuName, setSelectedMenuName] = useState<string>("");
 
   const apiUrl = import.meta.env.VITE_API_URL;
   // Show the modal when a menu item is clicked
-  const handleViewMenuClick = (product: BestsellerProduct) => {
+  // ✅ NEW - handle Buy Now to open OrderDetailsModal
+  const handleBuyNowClick = (product: BestsellerProduct) => {
+    const userId = sessionStorage.getItem("user_id");
+    // 🔒 Check if user is logged in
+    if (!userId) {
+      notification.warning({
+        message: "Login Required",
+        description: "You need to login or register before buying items.",
+      });
+      return; // stop here if not logged in
+    }
     const menuItem: MenuItem = {
-      id: 1, // Example ID, replace it with the actual ID logic
+      id: 1,
       item_name: product.item_name,
       menu_img: product.menu_img,
-      description: "This is a description", // Replace with actual description
+      description: "This is a description",
       price: product.price,
       categories_name: product.categories_name || "",
-      quantity: 1, // Set quantity as needed
-      size: "Normal size", // Replace with actual size
+      quantity: 1,
+      size: "Normal size",
     };
     setSelectedItem(menuItem);
-    setModalVisible(true); // Open modal
+    setOrderModalVisible(true); // ✅ opens OrderDetailsModal
   };
-  // Close the modal
+
   const closeModal = () => {
     setModalVisible(false);
-    setSelectedItem(null); // Clear the selected item when modal is closed
+    setSelectedItem(null);
+  };
+
+  const closeOrderModal = () => {
+    setOrderModalVisible(false);
+    setSelectedItem(null);
   };
 
   useEffect(() => {
@@ -193,9 +209,9 @@ const Bestseller: React.FC = () => {
                     className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => handleViewMenuClick(product)}
+                    onClick={() => handleBuyNowClick(product)}
                   >
-                    View Menu
+                    Buy now
                   </motion.button>
 
                   <motion.button
@@ -238,6 +254,15 @@ const Bestseller: React.FC = () => {
         </motion.div>
       )}
 
+      {/* ✅ OrderDetailsModal shown here */}
+      {selectedItem && (
+        <OrderDetailsModal
+          visible={orderModalVisible}
+          checkoutItems={[selectedItem]}
+          finalTotal={selectedItem.price * (selectedItem.quantity || 1)}
+          onCancel={closeOrderModal}
+        />
+      )}
       {/* Fallback when no products */}
       {bestselling.length === 0 && (
         <div className="col-span-full flex items-center justify-center py-12">

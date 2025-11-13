@@ -923,7 +923,7 @@ app.get("/get_inventory", (req, res) => {
   });
 });
 
-// Update supply and automatically recalc inventory stock
+// Update supply and automatically recalc inventory stock and menu availability
 app.put("/update_supply/:supply_id", (req, res) => {
   const { supply_id } = req.params;
   const { product_name, category, stock_in, unit, price } = req.body;
@@ -934,10 +934,11 @@ app.put("/update_supply/:supply_id", (req, res) => {
     SET product_name = ?, category = ?, stock_in = ?, unit = ?, price = ?
     WHERE supply_id = ?
   `;
+
   db.query(
     updateSupplySql,
     [product_name, category, stock_in, unit, price, supply_id],
-    (err, result) => {
+    (err) => {
       if (err) {
         console.error("❌ Update Supply Error:", err);
         return res
@@ -976,15 +977,17 @@ app.put("/update_supply/:supply_id", (req, res) => {
           const totalStock = rows2[0].total_stock || 0;
           const latestCreated = rows2[0].latest_created;
 
-          // 4️⃣ Update inventory_tbl with new stock_in
+          // 4️⃣ Update inventory_tbl with new stock and status
+          const inventoryStatus =
+            totalStock > 0 ? "Available" : "Not Available";
           const updateInventorySql = `
             UPDATE inventory_tbl
-            SET stock_in = ?, created_at = ?, category = ?
+            SET stock_in = ?, created_at = ?, status = ?
             WHERE inventory_id = ?
           `;
           db.query(
             updateInventorySql,
-            [totalStock, latestCreated, category, inventoryId],
+            [totalStock, latestCreated, inventoryStatus, inventoryId],
             (err4) => {
               if (err4) {
                 console.error("❌ Update Inventory Error:", err4);
@@ -994,10 +997,37 @@ app.put("/update_supply/:supply_id", (req, res) => {
                 });
               }
 
-              // ✅ Success
-              res.json({
-                success: true,
-                message: "Supply updated & inventory recalculated successfully",
+              // 5️⃣ Update all menu items that use this supply as ingredient
+              const updateMenuSql = `
+             UPDATE menu_tbl m
+                SET m.availability = 
+                  CASE
+                    WHEN NOT EXISTS (
+                      SELECT 1
+                      FROM ingredients_tbl ing
+                      JOIN inventory_tbl i ON i.product_name = ing.ingredients_name
+                      WHERE ing.menu_id = m.menu_id
+                        AND i.stock_in <= 0
+                    ) THEN 'Available'
+                    ELSE 'Not Available'
+                  END;
+            `;
+
+              db.query(updateMenuSql, [product_name], (err5) => {
+                if (err5) {
+                  console.error("❌ Update Menu Availability Error:", err5);
+                  return res.status(500).json({
+                    success: false,
+                    message: "Failed to update menu availability",
+                  });
+                }
+
+                // ✅ Success
+                res.json({
+                  success: true,
+                  message:
+                    "Supply updated & inventory & menu availability updated successfully",
+                });
               });
             }
           );
@@ -3335,18 +3365,20 @@ app.post("/update_payment_status/:order_id", async (req, res) => {
           });
         });
 
-        // ✅ Only update menu_tbl when inventory is Not Available
+        // ✅ Update menu_tbl availability based on all ingredients
         await new Promise((resolve, reject) => {
-          const sql = `
-            UPDATE menu_tbl 
-            SET availability = 'Not Available' 
-            WHERE item_name IN (
-              SELECT DISTINCT item_name 
-              FROM ingredients_tbl 
-              WHERE ingredients_name = ?
-            )
-          `;
-          db.query(sql, [ingredient], (err) => {
+          const sqlNotAvailable = `
+    UPDATE menu_tbl m
+    SET availability = 'Not Available'
+    WHERE EXISTS (
+      SELECT 1
+      FROM ingredients_tbl i
+      JOIN inventory_tbl inv ON i.ingredients_name = inv.product_name
+      WHERE i.item_name = m.item_name
+        AND inv.stock_in <= 0
+    )
+  `;
+          db.query(sqlNotAvailable, (err) => {
             if (err) reject(err);
             else resolve(true);
           });
@@ -3416,13 +3448,18 @@ app.post("/update_payment_status/:order_id", async (req, res) => {
         });
 
         await new Promise((resolve, reject) => {
-          const sql = `
-            UPDATE menu_tbl m
-            INNER JOIN ingredients_tbl i ON m.item_name = i.item_name
-            SET m.availability = 'Available'
-            WHERE i.ingredients_name = ?
-          `;
-          db.query(sql, [ingredient], (err) => {
+          const sqlAvailable = `
+    UPDATE menu_tbl m
+    SET availability = 'Available'
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM ingredients_tbl i
+      JOIN inventory_tbl inv ON i.ingredients_name = inv.product_name
+      WHERE i.item_name = m.item_name
+        AND inv.stock_in <= 0
+    )
+  `;
+          db.query(sqlAvailable, (err) => {
             if (err) reject(err);
             else resolve(true);
           });
@@ -4641,8 +4678,10 @@ app.post("/bestselling", (req, res) => {
 
 app.get("/bestselling", (req, res) => {
   const selectQuery = `
-    SELECT item_name, menu_img, price, total_avg_rating, rating_count, categories_name
-    FROM bestselling_tbl
+    SELECT b.item_name, b.menu_img, b.price, b.total_avg_rating, b.rating_count, b.categories_name,
+           m.availability
+    FROM bestselling_tbl b
+    JOIN menu_tbl m ON b.item_name = m.item_name
   `;
 
   db.query(selectQuery, (err, result) => {
@@ -6010,9 +6049,10 @@ app.get("/get_user_favorites/:user_id", (req, res) => {
 app.get("/get_user_favourites_full/:user_id", (req, res) => {
   const { user_id } = req.params;
   const query = `
-    SELECT *, menu_id AS id 
-    FROM user_favourites_tbl 
-    WHERE user_id = ?
+   SELECT uf.*, m.availability, m.menu_id AS id
+    FROM user_favourites_tbl uf
+    JOIN menu_tbl m ON uf.menu_id = m.menu_id
+    WHERE uf.user_id = ?
   `;
   db.query(query, [user_id], (err, result) => {
     if (err) return res.status(500).json(err);

@@ -1,4 +1,4 @@
-import { Modal } from "antd";
+import { Modal, notification } from "antd";
 import axios from "axios";
 import { motion } from "framer-motion"; // Import motion for animation
 import { useEffect, useState } from "react";
@@ -7,6 +7,7 @@ import ProductInfo from "../../pages/client/ProductInfo";
 import { addToCart } from "../../zustand/store/store.provider"; // Importing addToCart from zustand store
 import { CustomRate } from "./Rate"; // Assuming this is the custom rate component
 import ClientsCommentsRated from "../../pages/ClientsModal/ClientsCommentsRated";
+import OrderDetailsModal from "../../clientsmodal/OrderDetailsModal";
 
 // Define the interface for bestselling product
 interface BestsellerProduct {
@@ -16,6 +17,7 @@ interface BestsellerProduct {
   price: number;
   total_avg_rating: string; // Backend might return this as a string
   rating_count: number;
+  availability?: string; // add this
   categories_name?: string | null; // Optional in case it's null
 }
 
@@ -27,6 +29,7 @@ interface MenuItem {
   price: number;
   categories_name: string;
   quantity: number;
+
   size: string; // Optional size property
 }
 
@@ -35,27 +38,44 @@ const Bestseller: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false); // Modal visibility state
   const [bestselling, setBestselling] = useState<BestsellerProduct[]>([]); // Use the interface here
   const [selectedMenuName, setSelectedMenuName] = useState<string>("");
+  const [orderModalVisible, setOrderModalVisible] = useState(false);
   const [reviewsModalVisible, setReviewsModalVisible] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
   // Show the modal when a menu item is clicked
-  const handleViewMenuClick = (product: BestsellerProduct) => {
+  // ✅ NEW - handle Buy Now to open OrderDetailsModal
+  const handleBuyNowClick = (product: BestsellerProduct) => {
+    const userId = sessionStorage.getItem("user_id");
+    // 🔒 Check if user is logged in
+    if (!userId) {
+      notification.warning({
+        message: "Login Required",
+        description: "You need to login or register before buying items.",
+      });
+      return; // stop here if not logged in
+    }
+
     const menuItem: MenuItem = {
-      id: 1, // Example ID, replace it with the actual ID logic
+      id: 1,
       item_name: product.item_name,
       menu_img: product.menu_img,
-      description: "This is a description", // Replace with actual description
+      description: "This is a description",
       price: product.price,
       categories_name: product.categories_name || "",
-      quantity: 1, // Set quantity as needed
-      size: "Normal size", // Replace with actual size
+      quantity: 1,
+      size: "Normal size",
     };
     setSelectedItem(menuItem);
-    setModalVisible(true); // Open modal
+    setOrderModalVisible(true); // ✅ opens OrderDetailsModal
   };
-  // Close the modal
+
   const closeModal = () => {
     setModalVisible(false);
-    setSelectedItem(null); // Clear the selected item when modal is closed
+    setSelectedItem(null);
+  };
+
+  const closeOrderModal = () => {
+    setOrderModalVisible(false);
+    setSelectedItem(null);
   };
 
   // Fetch the data from the backend
@@ -191,32 +211,39 @@ const Bestseller: React.FC = () => {
                     </h4>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap justify-between gap-4">
-                    <motion.button
-                      className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleViewMenuClick(product)}
-                    >
-                      View Menu
-                    </motion.button>
+                  {(product.availability ?? "available")
+                    .trim()
+                    .toLowerCase() === "available" ? (
+                    <div className="mt-4 flex flex-wrap justify-between gap-4">
+                      <motion.button
+                        className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleBuyNowClick(product)}
+                      >
+                        Buy now
+                      </motion.button>
 
-                    <motion.button
-                      className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() =>
-                        addToCart({
-                          ...product,
-                          categories_name: product.categories_name || null,
-                        })
-                      }
-                    >
-                      {/* Always visible, scalable icon */}
-                      <FaShoppingBag className="text-sm sm:text-base md:text-base" />{" "}
-                      Add to Cart
-                    </motion.button>
-                  </div>
+                      <motion.button
+                        className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() =>
+                          addToCart({
+                            ...product,
+                            categories_name: product.categories_name || null,
+                          })
+                        }
+                      >
+                        <FaShoppingBag className="text-sm sm:text-base md:text-base" />{" "}
+                        Add to Cart
+                      </motion.button>
+                    </div>
+                  ) : (
+                    <span className="font-core flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 text-sm font-semibold text-red-500 border border-red-500 rounded-full bg-red-100">
+                      Ops! Sorry, We're not Available today.
+                    </span>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -236,6 +263,16 @@ const Bestseller: React.FC = () => {
             >
               {selectedItem && <ProductInfo item={selectedItem} />}
             </Modal>
+
+            {/* ✅ OrderDetailsModal shown here */}
+            {selectedItem && (
+              <OrderDetailsModal
+                visible={orderModalVisible}
+                checkoutItems={[selectedItem]}
+                finalTotal={selectedItem.price * (selectedItem.quantity || 1)}
+                onCancel={closeOrderModal}
+              />
+            )}
           </motion.div>
         </>
       )}

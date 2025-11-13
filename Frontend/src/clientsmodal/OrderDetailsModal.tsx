@@ -116,14 +116,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   };
 
-  const handleShowGCash = async () => {
-    try {
-      await createOrder("GCash");
-      setShowGCash(true);
-    } catch (error) {
-      console.error(error);
-      message.error("Failed to initiate GCash payment. Please try again.");
-    }
+  const handleShowGCash = () => {
+    // Simply show the GCash form; don't create order yet
+    setShowGCash(true);
   };
 
   return (

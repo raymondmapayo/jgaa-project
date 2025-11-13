@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { FaSearch, FaTrashAlt } from "react-icons/fa";
 import ConfirmationModal from "../../clientsmodal/ConfirmationModal";
 import OrderDetailsModal from "../../clientsmodal/OrderDetailsModal";
-
 import BillingDetailsModal from "../../animation/BillingDetailsModal";
 import useStore from "../../zustand/store/store";
 import {
@@ -21,17 +20,23 @@ const Cart = () => {
   }>({});
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isModalVisible, setIsModalVisible] = useState(false); // Confirmation Modal visibility
-  const [checkoutItems, setCheckoutItems] = useState<any[]>([]); // Items for checkout modal
-  const [isOrderModalVisible, setIsOrderModalVisible] = useState(false); // Order details modal visibility
-  const [isBillingCompleted, setIsBillingCompleted] = useState(true); // Check if billing details are complete
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [checkoutItems, setCheckoutItems] = useState<any[]>([]);
+  const [isOrderModalVisible, setIsOrderModalVisible] = useState(false);
+  const [isBillingCompleted, setIsBillingCompleted] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [localFinalTotal, setLocalFinalTotal] = useState(0); // add at the top of your component
-  // State to control the visibility of BillingDetailsModal
+  const [localFinalTotal, setLocalFinalTotal] = useState(0);
   const [isBillingModalVisible, setBillingModalVisible] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
-  const selectedItemCount = Object.values(selectedItemsByCategory).reduce(
-    (sum, ids) => sum + ids.length,
+
+  // ✅ Calculate total quantity of selected items
+  const selectedItemCount = Object.entries(selectedItemsByCategory).reduce(
+    (sum, [category, ids]) => {
+      const selectedProducts = cart.filter(
+        (item) => ids.includes(item.id) && item.categories_name === category
+      );
+      return sum + selectedProducts.reduce((acc, p) => acc + p.quantity, 0);
+    },
     0
   );
 
@@ -51,7 +56,6 @@ const Cart = () => {
     return () => clearTimeout(timeout);
   }, [selectedItemsByCategory]);
 
-  // Group cart items by category
   const groupedByCategory = cart.reduce((acc, product) => {
     const category = product.categories_name || "Other";
     if (!acc[category]) acc[category] = [];
@@ -59,7 +63,6 @@ const Cart = () => {
     return acc;
   }, {} as { [key: string]: any[] });
 
-  // Fetch billing data to check if it's complete
   const fetchBillingData = async () => {
     const userId = sessionStorage.getItem("user_id");
     if (!userId) return;
@@ -72,8 +75,7 @@ const Cart = () => {
         setIsBillingCompleted(false);
       } else {
         setIsBillingCompleted(true);
-        // Close the modal after completing the billing details
-        setBillingModalVisible(false); // Close the modal
+        setBillingModalVisible(false);
       }
     } catch (error) {
       console.error("Error fetching billing data:", error);
@@ -85,6 +87,7 @@ const Cart = () => {
     fetchBillingData();
   }, []);
 
+  // ✅ Keep checkbox checked when quantity changes
   const handleCheckboxChange = (
     category: string,
     productId: number,
@@ -93,10 +96,10 @@ const Cart = () => {
     setSelectedItemsByCategory((prevSelectedItems) => {
       const updatedSelectedItems = { ...prevSelectedItems };
       if (checked) {
-        if (!updatedSelectedItems[category]) {
+        if (!updatedSelectedItems[category])
           updatedSelectedItems[category] = [];
-        }
-        updatedSelectedItems[category].push(productId);
+        if (!updatedSelectedItems[category].includes(productId))
+          updatedSelectedItems[category].push(productId);
       } else {
         updatedSelectedItems[category] = updatedSelectedItems[category].filter(
           (id) => id !== productId
@@ -106,26 +109,41 @@ const Cart = () => {
     });
   };
 
+  // ✅ Auto-select item when incrementing
+  const handleIncrement = (
+    category: string,
+    productId: number,
+    itemName: string
+  ) => {
+    incrementCartItem(productId, itemName);
+
+    // Auto-check the item if it wasn't selected
+    setSelectedItemsByCategory((prev) => {
+      const updated = { ...prev };
+      if (!updated[category]) updated[category] = [];
+      if (!updated[category].includes(productId))
+        updated[category].push(productId);
+      return updated;
+    });
+  };
+
+  const handleDecrement = (productId: number, itemName: string) => {
+    decrementCartItem(productId, itemName);
+  };
+
   const handleCheckout = () => {
-    // If billing details are incomplete, show error notification and stop checkout
     if (!isBillingCompleted) {
       notification.error({
         message: "Billing Incomplete",
         description:
           "Please complete your billing details (city and country) before proceeding with payment.",
       });
-
-      // Open the modal for billing details
-      setBillingModalVisible(true); // Show BillingDetailsModal
-      return; // Do not proceed to checkout if billing is incomplete
+      setBillingModalVisible(true);
+      return;
     }
 
     const userId = sessionStorage.getItem("user_id");
-
-    if (!userId) {
-      console.error("User not logged in");
-      return;
-    }
+    if (!userId) return;
 
     if (selectedItemCount === 0) {
       message.error("Please check the box first before clicking Checkout.");
@@ -147,20 +165,16 @@ const Cart = () => {
 
     setCheckoutItems(checkoutData);
 
-    // ✅ Calculate and store the local total for the modal
     const localTotal = checkoutData.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0
     );
     setLocalFinalTotal(localTotal);
 
-    setIsModalVisible(true); // Show confirmation modal with cart details
+    setIsModalVisible(true);
   };
 
-  const handleCancel = () => {
-    setIsModalVisible(false); // Hide modal if user cancels
-  };
-
+  const handleCancel = () => setIsModalVisible(false);
   const handleContinue = async () => {
     const userId = sessionStorage.getItem("user_id");
     const selectedItems = cart.filter((item) =>
@@ -178,28 +192,22 @@ const Cart = () => {
       price: item.price,
       menu_img: item.menu_img,
       finalTotal: item.price * item.quantity,
-      size: item.size || "Normals ize",
+      size: item.size || "Normal size",
     }));
 
     try {
-      await axios.post(`${apiUrl}/add_to_cart/${userId}`, {
-        items: data,
-      });
+      await axios.post(`${apiUrl}/add_to_cart/${userId}`, { items: data });
 
-      // ✅ Clear the selected checkboxes so they don't revert
       setSelectedItemsByCategory({});
-
       setIsModalVisible(false);
-      setIsOrderModalVisible(true); // Show order details modal after adding to cart
+      setIsOrderModalVisible(true);
     } catch (error) {
       message.error("Failed to add items to cart.");
       console.error(error);
     }
   };
 
-  const handleOrderModalClose = () => {
-    setIsOrderModalVisible(false); // Close the order details modal
-  };
+  const handleOrderModalClose = () => setIsOrderModalVisible(false);
 
   return (
     <div className="container mx-auto flex flex-col scroll-smooth">
@@ -220,7 +228,7 @@ const Cart = () => {
           </div>
 
           <div className="flex-1 w-full flex flex-col lg:flex-row gap-6">
-            {/* Cart Items List */}
+            {/* Cart Items */}
             <div className="flex-1 flex flex-col gap-6 w-full pr-2 pb-24 lg:pb-6 lg:ml-8 overflow-y-auto scroll-smooth">
               {Object.keys(groupedByCategory).map((category) => (
                 <div
@@ -235,7 +243,6 @@ const Cart = () => {
                       key={product.id}
                       className="flex flex-col md:flex-row items-start md:items-center justify-between py-3 sm:py-4 border-b last:border-none w-full"
                     >
-                      {/* Left Section */}
                       <div className="flex items-start md:items-center w-full md:w-auto mb-2 md:mb-0">
                         <Checkbox
                           checked={selectedItemsByCategory[category]?.includes(
@@ -274,7 +281,6 @@ const Cart = () => {
                         </div>
                       </div>
 
-                      {/* Right Section */}
                       <div className="flex flex-col md:flex-col-reverse items-end space-y-1 sm:space-y-2 md:space-y-1 w-full md:w-auto mt-2 md:mt-0">
                         <p className="font-core text-sm sm:text-lg font-bold text-red-600">
                           ₱{product.price * product.quantity}
@@ -282,7 +288,7 @@ const Cart = () => {
                         <div className="flex space-x-2 sm:space-x-3 mt-1 md:mt-0">
                           <button
                             onClick={() =>
-                              decrementCartItem(product.id, product.item_name)
+                              handleDecrement(product.id, product.item_name)
                             }
                             className="font-core px-2 py-1 sm:px-2.5 sm:py-1.5 border rounded text-gray-500 hover:bg-gray-100 text-sm sm:text-base"
                           >
@@ -293,7 +299,11 @@ const Cart = () => {
                           </span>
                           <button
                             onClick={() =>
-                              incrementCartItem(product.id, product.item_name)
+                              handleIncrement(
+                                category,
+                                product.id,
+                                product.item_name
+                              )
                             }
                             className="font-core px-2 py-1 sm:px-2.5 sm:py-1.5 border rounded text-gray-500 hover:bg-gray-100 text-sm sm:text-base"
                           >
@@ -325,8 +335,8 @@ const Cart = () => {
             {/* Final Total Section */}
             <div
               className="bg-white p-4 sm:p-6 rounded-none lg:rounded-2xl shadow-none lg:shadow-lg h-fit flex flex-col gap-3 sm:gap-4
-          w-full fixed left-0 right-0 bottom-0 z-50
-          lg:w-80 lg:ml-8 lg:sticky lg:top-48 lg:bottom-auto lg:left-auto lg:right-auto"
+            w-full fixed left-0 right-0 bottom-0 z-50
+            lg:w-80 lg:ml-8 lg:sticky lg:top-48 lg:bottom-auto lg:left-auto lg:right-auto"
             >
               <p className="font-core text-base sm:text-xl font-bold flex items-center gap-2">
                 Total:
@@ -357,7 +367,7 @@ const Cart = () => {
         </div>
       )}
 
-      {/* Confirmation Modal */}
+      {/* Modals */}
       <ConfirmationModal
         visible={isModalVisible}
         onCancel={handleCancel}
@@ -367,11 +377,10 @@ const Cart = () => {
       <OrderDetailsModal
         visible={isOrderModalVisible}
         checkoutItems={checkoutItems}
-        finalTotal={localFinalTotal} // use local total instead of live cart total
+        finalTotal={localFinalTotal}
         onCancel={handleOrderModalClose}
       />
 
-      {/* Billing Details Modal */}
       <BillingDetailsModal
         isVisible={isBillingModalVisible}
         onClose={() => setBillingModalVisible(false)}

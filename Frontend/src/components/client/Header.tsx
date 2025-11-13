@@ -232,13 +232,13 @@ export const ClientHeader = () => {
         style={{ fontSize: "18px" }}
         onClick={() => setIsMenuOpen(false)}
       >
-        <Link to="/Menus">Our Menu</Link>
+        <Link to="/Menus"> Menu</Link>
       </Menu.Item>
       <Menu.Item
         style={{ fontSize: "18px" }}
         onClick={() => setIsMenuOpen(false)}
       >
-        <Link to="/Bestseller">Our Bestseller</Link>
+        <Link to="/Bestseller"> Bestseller</Link>
       </Menu.Item>
     </Menu>
   );

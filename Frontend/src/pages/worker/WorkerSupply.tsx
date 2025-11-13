@@ -11,7 +11,7 @@ import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import SupplyModal from "../WorkerModals/AddSupplyModal";
-import EditInventoryModal from "../WorkerModals/EditSupplyModal";
+import EditSupplyModal from "../WorkerModals/EditSupplyModal";
 import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 import WorkerHistoryInventoryModal from "./WorkerHistoryInventory";
 
@@ -307,7 +307,7 @@ const WorkerSupply = () => {
         }}
       />
 
-      <EditInventoryModal
+      <EditSupplyModal
         visible={editModalVisible}
         selectedItem={selectedItem}
         onClose={() => {

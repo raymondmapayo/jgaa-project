@@ -154,20 +154,28 @@ const MyFavourites: React.FC = () => {
 
                 {/* Buttons */}
                 <div className="mt-auto pt-4 flex items-center gap-4">
-                  <button
-                    onClick={() => handleViewMenuClick(item)}
-                    className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
-                  >
-                    View Menu
-                  </button>
+                  {item.availability?.trim().toLowerCase() === "available" ? (
+                    <>
+                      <button
+                        onClick={() => handleViewMenuClick(item)}
+                        className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                      >
+                        View Menu
+                      </button>
 
-                  <button
-                    onClick={() => addToCart(item)}
-                    className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
-                  >
-                    <FaShoppingBag className="text-sm sm:text-base" />
-                    Add to Cart
-                  </button>
+                      <button
+                        onClick={() => addToCart(item)}
+                        className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                      >
+                        <FaShoppingBag className="text-sm sm:text-base" />
+                        Add to Cart
+                      </button>
+                    </>
+                  ) : (
+                    <span className="font-core flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 text-sm font-semibold text-red-500 border border-red-500 rounded-full bg-red-100">
+                      Ops! Sorry, We're not Available today.
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
