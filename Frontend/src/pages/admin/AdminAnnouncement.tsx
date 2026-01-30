@@ -18,14 +18,30 @@ type Worker = {
   name: string;
   profile_pic: string;
 };
+interface Announcement {
+  announcement_id: number;
+  title: string;
+  message: string;
+  sender_id: number;
+  recipient_ids: number[];
+  created_at?: string; // optional if backend doesn’t send
+  status: string; // "read" | "unread"
+  sender_profile_pic?: string;
+  sender_name?: string;
+}
 
 type AnnouncementFormData = {
   title: string;
   message: string;
   audience: string;
 };
+interface AdminAnnouncementProps {
+  onNewAnnouncement?: (announcement: Announcement) => void;
+}
 
-const AdminAnnouncement: React.FC = () => {
+const AdminAnnouncement: React.FC<AdminAnnouncementProps> = ({
+  onNewAnnouncement,
+}) => {
   // Fetch adminUserId internally from sessionStorage
   const adminUserId = Number(sessionStorage.getItem("user_id"));
 
@@ -222,7 +238,9 @@ const AdminAnnouncement: React.FC = () => {
         "http://localhost:8081/send_announcement_to_worker",
         announcementData
       );
+      const newAnnouncement = response.data; // this should be the created announcement
 
+      onNewAnnouncement?.(newAnnouncement); // <-- this updates the list & badge immediately
       socket.current.emit("send_announcement", announcementData);
 
       notification.open({

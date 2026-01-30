@@ -18,7 +18,7 @@ const initialState: AdminState = {
   info: null,
   isAuthenticated: false,
 };
-
+const apiUrl = import.meta.env.VITE_API_URL;
 const createAdminSlice: StateCreator<AdminSlice> = (set) => ({
   admin: initialState,
 
@@ -58,13 +58,39 @@ const createAdminSlice: StateCreator<AdminSlice> = (set) => ({
 
   logoutadmin: async () => {
     try {
+      // ✅ Prefer sessionStorage for current logged-in admin ID
+      const user_id =
+        sessionStorage.getItem("user_id") || localStorage.getItem("userId");
+
+      if (!user_id) {
+        throw new Error("No user ID found. Cannot log out.");
+      }
+
+      console.log("Logging out user_id:", user_id);
+
+      // ✅ Call backend to update status and last_active_time
+      const response = await fetch(`${apiUrl}/admin/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id }),
+      });
+
+      const data = await response.json();
+      console.log("Logout response from backend:", data);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to log out on server.");
+      }
+
+      // ✅ Clear frontend state
       localStorage.removeItem("token");
       localStorage.removeItem("userRole");
       localStorage.removeItem("fname");
       localStorage.removeItem("email");
-      set(() => ({
-        admin: initialState,
-      }));
+      localStorage.removeItem("userId");
+      sessionStorage.removeItem("user_id");
+
+      set(() => ({ admin: initialState }));
 
       notification.success({
         message: "Logout Successful",
@@ -74,9 +100,7 @@ const createAdminSlice: StateCreator<AdminSlice> = (set) => ({
       console.error("Logout error:", error);
 
       let errorMessage = "An error occurred while logging out.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
+      if (error instanceof Error) errorMessage = error.message;
 
       notification.error({
         message: "Logout Failed",
@@ -85,5 +109,4 @@ const createAdminSlice: StateCreator<AdminSlice> = (set) => ({
     }
   },
 });
-
 export default createAdminSlice;

@@ -31,7 +31,7 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
   const [form] = Form.useForm();
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-
+  const user_id = sessionStorage.getItem("user_id"); // 👈 ADD THIS
   // Temporary queue (list of menu items)
   const [menuList, setMenuList] = useState<any[]>([]);
   const [existingMenus, setExistingMenus] = useState<any[]>([]); // ✅ DB menus
@@ -136,6 +136,7 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
     formData.append("description", values.description || "");
     formData.append("categories_id", values.categories_id);
     formData.append("quantity", values.quantity);
+    formData.append("created_by", user_id || "");
     formData.append("menu_img", file);
 
     try {
@@ -144,8 +145,16 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
       });
 
       notification.success({
-        message: "Menu Added",
-        description: "Menu item has been added successfully!",
+        message: "Menu Added Successfully",
+        description: (
+          <>
+            Menu has been added.
+            <br />
+            <strong>Next step:</strong> Assign ingredients to make this menu
+            available to customers.
+          </>
+        ),
+        duration: 6,
       });
 
       form.resetFields();
@@ -168,7 +177,7 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
       formData.append("price", item.price);
       formData.append("description", item.description || "");
       formData.append("categories_id", item.categories_id);
-
+      formData.append("created_by", user_id || ""); // 👈 ADD THIS
       formData.append("menu_img", item.menu_img);
 
       try {
@@ -228,6 +237,15 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
       footer={null}
       width={500}
     >
+      <div className="mb-4 p-3 rounded-md bg-blue-50 border border-blue-200 text-sm text-blue-700">
+        <strong>Important:</strong> After adding a menu, please go to
+        <span className="font-semibold"> Ingredients Management </span>
+        and assign ingredients.
+        <br />
+        Menus <strong>without ingredients</strong> will not be displayed on the
+        client side.
+      </div>
+
       <Form layout="vertical" form={form}>
         {/* First Row: Food Name & Category */}
         <Row gutter={16}>

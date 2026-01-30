@@ -27,6 +27,8 @@ export const ClientHeader = () => {
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const userName = sessionStorage.getItem("fname");
   const userEmail = sessionStorage.getItem("email");
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
   const apiUrl = import.meta.env.VITE_API_URL;
   // Get the user profile picture from the backend
   useEffect(() => {
@@ -69,8 +71,8 @@ export const ClientHeader = () => {
               profilePic?.startsWith("http")
                 ? profilePic
                 : profilePic
-                ? `${apiUrl}/uploads/images/${profilePic}`
-                : "/avatar.jpg"
+                  ? `${apiUrl}/uploads/images/${profilePic}`
+                  : "/avatar.jpg"
             }
             alt="User Avatar"
             className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover"
@@ -89,6 +91,7 @@ export const ClientHeader = () => {
       </div>
 
       <div className="py-2">
+        {/* Account Settings */}
         <button
           onClick={() => {
             const isAuthenticated =
@@ -102,19 +105,19 @@ export const ClientHeader = () => {
                 placement: "topRight",
                 duration: 2,
               });
-              return; // 🔹 Don't open the modal
+              return;
             }
 
-            setIsAccountSettingVisible(true); // 🔹 Only open if authenticated
-
-            setIsMenuOpen(false); // close dropdown/menu if any
-            document.body.click();
+            setIsAccountSettingVisible(true); // open modal
+            setIsPopoverOpen(false); // close popover
+            setIsMenuOpen(false);
           }}
           className="flex items-center p-3 hover:bg-gray-100 text-gray-700 w-full text-left"
         >
           <span className="flex-grow">Account Setting</span>
         </button>
 
+        {/* My Purchase */}
         <Link
           to="/MyPurchase"
           onClick={(e) => {
@@ -122,7 +125,7 @@ export const ClientHeader = () => {
               sessionStorage.getItem("isAuthenticated") === "true";
 
             if (!isAuthenticated) {
-              e.preventDefault(); // prevent navigation
+              e.preventDefault();
               notification.info({
                 message: "Authentication Required",
                 description: "Please login first to view your purchases.",
@@ -130,7 +133,8 @@ export const ClientHeader = () => {
                 duration: 2,
               });
             } else {
-              setIsMenuOpen(false); // close the menu if authenticated
+              setIsPopoverOpen(false); // ✅ close popover
+              setIsMenuOpen(false);
             }
           }}
           className="flex items-center p-3 hover:bg-gray-100 text-gray-700"
@@ -138,12 +142,15 @@ export const ClientHeader = () => {
           <span className="flex-grow">My Purchase</span>
         </Link>
 
+        {/* My Favourites */}
         <Link
           to="/MyFavourates"
-          onClick={() => {
+          onClick={(e) => {
             const isAuthenticated =
               sessionStorage.getItem("isAuthenticated") === "true";
+
             if (!isAuthenticated) {
+              e.preventDefault();
               notification.info({
                 message: "Authentication Required",
                 description: "Please login first to view your favourites.",
@@ -151,7 +158,8 @@ export const ClientHeader = () => {
                 duration: 2,
               });
             } else {
-              setIsMenuOpen(false); // Close the menu if authenticated
+              setIsPopoverOpen(false); // ✅ close popover
+              setIsMenuOpen(false);
             }
           }}
           className="flex items-center p-3 hover:bg-gray-100 text-gray-700"
@@ -159,6 +167,7 @@ export const ClientHeader = () => {
           <span className="flex-grow">My Favourites</span>
         </Link>
 
+        {/* Activity Log */}
         <button
           onClick={() => {
             const isAuthenticated =
@@ -171,17 +180,19 @@ export const ClientHeader = () => {
                 placement: "topRight",
                 duration: 2,
               });
-              return; // stop here if not authenticated
+              return;
             }
 
-            setIsLogVisible(true); // show modal
-            setIsMenuOpen(false); // close dropdown/menu if any
-            document.body.click(); // optional: close dropdowns or other overlays
+            setIsLogVisible(true); // open modal
+            setIsPopoverOpen(false); // close popover
+            setIsMenuOpen(false);
           }}
           className="flex items-center p-3 hover:bg-gray-100 text-gray-700 w-full text-left"
         >
           <span className="flex-grow">Activity Log</span>
         </button>
+
+        {/* Comment Us */}
         <button
           onClick={() => {
             const isAuthenticated =
@@ -194,21 +205,24 @@ export const ClientHeader = () => {
                 placement: "topRight",
                 duration: 2,
               });
-              return; // stop here if not authenticated
+              return;
             }
 
-            setIsCommentUsVisible(true); // show the modal if authenticated
-
-            setIsMenuOpen(false); // close dropdown/menu if any
-            document.body.click(); // optional: close dropdowns or other overlays
+            setIsCommentUsVisible(true); // open modal
+            setIsPopoverOpen(false); // close popover
+            setIsMenuOpen(false);
           }}
           className="flex items-center p-3 hover:bg-gray-100 text-gray-700 w-full text-left"
         >
           <span className="flex-grow">Comment Us</span>
         </button>
 
+        {/* Sign Out */}
         <button
-          onClick={handleLogout}
+          onClick={() => {
+            handleLogout();
+            setIsPopoverOpen(false); // close popover
+          }}
           className="flex w-full items-center p-3 hover:bg-gray-100 text-red-500 text-left"
         >
           Sign Out
@@ -222,7 +236,7 @@ export const ClientHeader = () => {
   const cartItemCount = Array.isArray(client?.cart)
     ? client.cart.reduce(
         (sum: number, item: { quantity: number }) => sum + item.quantity,
-        0
+        0,
       )
     : 0; // Ensure client.cart is an array before calling reduce
   // Dropdown Menu for Products
@@ -349,6 +363,8 @@ export const ClientHeader = () => {
                   content={userPopoverContent}
                   trigger="click"
                   placement="bottomRight"
+                  open={isPopoverOpen}
+                  onOpenChange={(open) => setIsPopoverOpen(open)} // This keeps it in sync
                 >
                   <button className="text-orange-500 hover:text-orange-600 transform hover:scale-110 transition">
                     <FaUser size={24} />

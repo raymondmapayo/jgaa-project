@@ -10,7 +10,7 @@ type Announcement = {
   announcement_id: string; // Unique ID for the announcement
 };
 const apiUrl = import.meta.env.VITE_API_URL;
-const WorkerAnnouncementView: React.FC = () => {
+const WorkerAnnouncement: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [readAnnouncements, setReadAnnouncements] = useState<Set<string>>(
     new Set()
@@ -233,4 +233,4 @@ const WorkerAnnouncementView: React.FC = () => {
   );
 };
 
-export default WorkerAnnouncementView;
+export default WorkerAnnouncement;

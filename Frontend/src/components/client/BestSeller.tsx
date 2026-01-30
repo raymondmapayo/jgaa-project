@@ -87,7 +87,7 @@ const Bestseller: React.FC = () => {
         const sortedProducts = response.data
           .sort(
             (a, b) =>
-              parseFloat(b.total_avg_rating) - parseFloat(a.total_avg_rating)
+              parseFloat(b.total_avg_rating) - parseFloat(a.total_avg_rating),
           )
           .slice(0, 6);
         setBestselling(sortedProducts); // Set the sorted and limited data to the state
@@ -190,7 +190,7 @@ const Bestseller: React.FC = () => {
                             "Opening modal for:",
                             product.item_name,
                             "ID:",
-                            product.bestseller_id
+                            product.bestseller_id,
                           );
 
                           setSelectedMenuName(product.item_name);
@@ -235,13 +235,13 @@ const Bestseller: React.FC = () => {
                           })
                         }
                       >
-                        <FaShoppingBag className="text-sm sm:text-base md:text-base" />{" "}
+                        <FaShoppingBag className="text-sm sm:text-base md:text-base" />
                         Add to Cart
                       </motion.button>
                     </div>
                   ) : (
                     <span className="font-core flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 text-sm font-semibold text-red-500 border border-red-500 rounded-full bg-red-100">
-                      Ops! Sorry, We're not Available today.
+                      We're not Available today.
                     </span>
                   )}
                 </div>

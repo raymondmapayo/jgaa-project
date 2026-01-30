@@ -1,6 +1,6 @@
 import { Modal, Tabs } from "antd";
-import EditValidationModal from "./EditValidationModal";
-import ValidationModal from "./ValidationModal";
+import EditValidationModal from "../../WorkerModals/EditValidationModal";
+import ValidationModal from "../../WorkerModals/ValidationModal";
 
 interface ValidationEditTabsModalProps {
   isVisible: boolean;

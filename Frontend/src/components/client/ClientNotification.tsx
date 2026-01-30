@@ -29,7 +29,7 @@ const ClientNotification: React.FC<ClientNotificationProps> = ({
   const fetchNotifications = async () => {
     if (!userId) return;
     try {
-      const res = await axios.get(`${apiUrl}/notifications/${userId}`);
+      const res = await axios.get(`${apiUrl}/client_notifications/${userId}`);
       setNotifications(res.data || []); // ✅ Array of notifications
     } catch (err) {
       console.error("Error fetching notifications:", err);
@@ -55,7 +55,7 @@ const ClientNotification: React.FC<ClientNotificationProps> = ({
       )
     );
     axios
-      .post(`${apiUrl}/notifications/read/${id}`)
+      .post(`${apiUrl}/client_notifications/read/${id}`)
       .catch((err) => console.error(err));
   };
 

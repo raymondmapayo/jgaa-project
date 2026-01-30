@@ -5,14 +5,13 @@ import axios from "axios";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
-import InventoryModal from "../WorkerModals/AddSupplyModal";
+import InventoryModal from "../WorkerModals/AddSupplyIngredientsModal";
 import EditInventoryModal from "../WorkerModals/EditSupplyModal";
 import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  max-width: 1200px;
   background-color: #fff;
   border-radius: 12px;
   padding: 24px;
@@ -102,12 +101,12 @@ interface InventoryItem {
   stock_in: number;
   stock_out: number;
   unit: string;
-
+  batch_no: string; // <-- Add batch_no here
   status: string;
   created_at: string;
 }
 
-const WorkerManageInventory = () => {
+const WorkerManageIngredientsInventory = () => {
   const [dataSource, setDataSource] = useState<InventoryItem[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -155,6 +154,12 @@ const WorkerManageInventory = () => {
 
     { title: "Stock In", dataIndex: "stock_in", key: "stock_in" },
     { title: "Stock Out", dataIndex: "stock_out", key: "stock_out" },
+    {
+      title: "Batch",
+      dataIndex: "batch_no",
+      key: "batch_no",
+      render: (batch: string) => <Tag color="blue">{batch}</Tag>,
+    },
     { title: "Unit", dataIndex: "unit", key: "unit" },
 
     {
@@ -176,7 +181,7 @@ const WorkerManageInventory = () => {
       dataIndex: "created_at",
       key: "created_at",
       render: (createdAt: string) =>
-        dayjs(createdAt).format("YYYY-MM-DD h:mm A"), // ✅ format like 2025-09-03 8:10 PM
+        dayjs(createdAt).format("MM-DD-YYYY h:mm A"), // ✅ format like 2025-09-03 8:10 PM
     },
   ];
 
@@ -185,8 +190,10 @@ const WorkerManageInventory = () => {
       {/* Header Section */}
       <div className="flex flex-col gap-4 mb-6">
         <div>
-          <h2 className="text-lg font-bold">Food Inventory</h2>
-          <p className="text-gray-500 text-sm">Manage your food inventory</p>
+          <h2 className="text-lg font-bold">Ingredients Inventory</h2>
+          <p className="text-gray-500 text-sm">
+            Manage your ingredients inventory
+          </p>
         </div>
       </div>
 
@@ -214,15 +221,20 @@ const WorkerManageInventory = () => {
           </Button>
         </Dropdown>
       </div>
-
       {/* Table */}
-      <StyledTable
-        dataSource={dataSource}
-        columns={columns}
-        rowKey="inventory_id"
-        pagination={{ pageSize: 5, showSizeChanger: false }}
-        loading={isLoading}
-      />
+      <div className="mt-6 overflow-x-auto lg:overflow-x-hidden">
+        {isLoading ? (
+          <p className="text-center text-gray-500 py-6">Loading...</p>
+        ) : (
+          <StyledTable
+            dataSource={dataSource}
+            columns={columns}
+            rowKey="inventory_id"
+            pagination={{ pageSize: 5, showSizeChanger: false }}
+            scroll={{ x: true }}
+          />
+        )}
+      </div>
 
       {/* Add Inventory Modal */}
       <InventoryModal
@@ -255,4 +267,4 @@ const WorkerManageInventory = () => {
   );
 };
 
-export default WorkerManageInventory;
+export default WorkerManageIngredientsInventory;

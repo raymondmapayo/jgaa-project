@@ -13,11 +13,12 @@ import {
 import axios from "axios";
 import dayjs from "dayjs";
 import React, { useState } from "react";
-
+import { FaArrowRight } from "react-icons/fa6";
 interface GCashButtonProps {
   amount: number;
   orderId: number;
   menuImg: string;
+  finalTotal: number;
   orderQuantity: number;
   onPaymentSuccess: () => void;
   onPaymentError: (error: any) => void;
@@ -28,6 +29,7 @@ const GCashButton: React.FC<GCashButtonProps> = ({
   menuImg,
   orderId,
   orderQuantity,
+  finalTotal,
   onPaymentSuccess,
   onPaymentError,
 }) => {
@@ -68,7 +70,7 @@ const GCashButton: React.FC<GCashButtonProps> = ({
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
-        }
+        },
       );
 
       // Store uploaded proof URL from backend
@@ -97,13 +99,28 @@ const GCashButton: React.FC<GCashButtonProps> = ({
     <div className="mt-5 flex flex-col items-center space-y-4 w-full">
       {step === "qr" && (
         <>
-          <p className="text-sm text-gray-600 mb-2 text-center font-medium">
+          <p className="text-sm text-red-600 mb-2 text-center font-medium">
             Note: Screenshot the Receipt payment
           </p>
+
           <img src="/qr.jpg" alt="GCash QR Code" className="w-60 h-60 mb-4" />
-          <Button type="primary" onClick={() => setStep("form")}>
-            Next
-          </Button>
+
+          <div className="w-full flex justify-center">
+            <div className="flex items-center bg-gray-200 dark:bg-[#1e293b] rounded-full w-[280px] px-3 py-1.5 border border-gray-300 dark:border-gray-600">
+              {/* LEFT SECTION - GRAND TOTAL */}
+              <span className="flex-1 text-sm font-semibold text-gray-700 dark:text-gray-100">
+                Grand Total: ₱{finalTotal}
+              </span>
+
+              {/* RIGHT SECTION - CIRCLE BUTTON */}
+              <button
+                onClick={() => setStep("form")}
+                className="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center text-white"
+              >
+                <FaArrowRight size={16} />
+              </button>
+            </div>
+          </div>
         </>
       )}
 

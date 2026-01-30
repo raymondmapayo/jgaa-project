@@ -6,19 +6,28 @@ import {
   PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Dropdown, Input, Menu, Modal, Table, Tooltip } from "antd";
+import {
+  Button,
+  Dropdown,
+  Input,
+  Menu,
+  Modal,
+  Table,
+  Tag,
+  Tooltip,
+} from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 
 import dayjs from "dayjs"; // ✅ import dayjs
 import AddSupplyCategories from "../WorkerModals/AddSupplyCategories";
-import Archive from "../WorkerModals/Archive";
+
 import EditSupplyCategories from "../WorkerModals/EditSupplyCategories";
+import ArchiveSupplyCategoriesModal from "./Archive/ArchiveSupplyCategoriesModal";
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  max-width: 1200px;
   background-color: #fff;
   border-radius: 12px;
   padding: 24px;
@@ -115,6 +124,7 @@ interface SupplyCategoryItem {
   cat_supply_id: number;
   supply_cat_name: string;
   created_at: string;
+  status: string;
 }
 
 const WorkerManageSupplyCategories = () => {
@@ -131,18 +141,18 @@ const WorkerManageSupplyCategories = () => {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const apiUrl = import.meta.env.VITE_API_URL;
   // ✅ Fetch supply categories
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await axios.get(`${apiUrl}/get_supply_categories`);
-        setDataSource(response.data); // replaces old data
-      } catch (error) {
-        console.error("Error fetching supply categories:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/get_supply_categories`);
+      setDataSource(response.data); // replaces old data
+    } catch (error) {
+      console.error("Error fetching supply categories:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchCategories(); // fetch only once
   }, [apiUrl]);
 
@@ -162,14 +172,18 @@ const WorkerManageSupplyCategories = () => {
       cancelText: "Cancel",
       onOk: async () => {
         try {
+          // 1️⃣ Call backend first
+          await axios.delete(
+            `${apiUrl}/categories_supply_delete/${cat_supply_id}`
+          );
+
+          // 2️⃣ Update frontend state only after success
           setDataSource((prevData) =>
             prevData.filter((item) => item.cat_supply_id !== cat_supply_id)
           );
-          await axios.delete(
-            `${apiUrl}/delete_supply_category/${cat_supply_id}`
-          );
         } catch (error) {
           console.error("Error deleting supply category:", error);
+          // Optionally refetch categories
           const response = await axios.get(`${apiUrl}/get_supply_categories`);
           setDataSource(response.data);
         }
@@ -193,12 +207,24 @@ const WorkerManageSupplyCategories = () => {
       dataIndex: "supply_cat_name",
       key: "supply_cat_name",
     },
+
     {
       title: "Created At",
       dataIndex: "created_at",
       key: "created_at",
       render: (createdAt: string) =>
-        dayjs(createdAt).format("YYYY-MM-DD h:mm A"), // ✅ format like 2025-09-03 8:10 PM
+        dayjs(createdAt).format("MM-DD-YYYY h:mm A"), // ✅ format like 2025-09-03 8:10 PM
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      render: (text: string) => {
+        const colors: { [key: string]: string } = {
+          Available: "green",
+          "Not Available": "red",
+        };
+        return <Tag color={colors[text] || "default"}>{text}</Tag>;
+      },
     },
     {
       title: "Action",
@@ -306,9 +332,10 @@ const WorkerManageSupplyCategories = () => {
       </div>
 
       {/* Archived Modal */}
-      <Archive
+      <ArchiveSupplyCategoriesModal
         isArchivedModalVisible={isArchivedModalVisible}
         onClose={() => setIsArchivedModalVisible(false)}
+        onRestore={() => fetchCategories()} // Add this callback
       />
       <EditSupplyCategories
         isEditModalVisible={isEditModalVisible}

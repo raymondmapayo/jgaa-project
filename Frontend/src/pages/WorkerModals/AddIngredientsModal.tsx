@@ -3,7 +3,7 @@ import { Button, Col, Form, Input, message, Modal, Row, Select } from "antd";
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 
-interface WorkerIngredientsModalProps {
+interface AddIngredientsModalProps {
   visible: boolean;
   onClose: () => void;
   onIngredientAdded?: (newIngredients: any[], category: string) => void;
@@ -14,19 +14,19 @@ interface MenuItem {
   item_name: string;
 }
 const apiUrl = import.meta.env.VITE_API_URL;
-const WorkerIngredientsModal: React.FC<WorkerIngredientsModalProps> = ({
+const AddIngredientsModal: React.FC<AddIngredientsModalProps> = ({
   visible,
   onClose,
   onIngredientAdded, // <-- destructure here
 }) => {
   const [form] = Form.useForm();
   const [categories, setCategories] = useState<MenuItem[]>([]);
-
-  const unitOptions = ["kg", "g", "ml", "liters"];
+  const user_id = sessionStorage.getItem("user_id");
+  const unitOptions = ["kg", "g", "pcs", "ml", "liters"];
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get(`${apiUrl}/menu_items`);
+      const res = await axios.get(`${apiUrl}/ingredients_items`);
       setCategories(res.data);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -46,6 +46,7 @@ const WorkerIngredientsModal: React.FC<WorkerIngredientsModalProps> = ({
           measurement: ing.measurement,
           unit: ing.unit,
           category: values.category,
+          created_by: user_id,
         });
         addedIngredients.push(res.data.ingredient); // <-- push inserted ingredient
       }
@@ -199,4 +200,4 @@ const WorkerIngredientsModal: React.FC<WorkerIngredientsModalProps> = ({
   );
 };
 
-export default WorkerIngredientsModal;
+export default AddIngredientsModal;

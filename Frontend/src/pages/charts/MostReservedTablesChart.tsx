@@ -81,8 +81,11 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
       // 🧠 CASE 1: No reservation data
       if (validTables.length === 0) {
         setDescription(
-          "📊 No table reservation data available for the selected date range."
+          `📊 No table reservation data available as of ${dayjs().format(
+            "MMMM DD, YYYY"
+          )}.`
         );
+
         setLoading(false);
         return;
       }

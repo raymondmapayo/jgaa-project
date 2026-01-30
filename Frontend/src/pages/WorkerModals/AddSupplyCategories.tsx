@@ -27,15 +27,16 @@ const AddSupplyCategories: React.FC<AddSupplyCategoriesProps> = ({
   const [form] = Form.useForm();
   const [categoryList, setCategoryList] = useState<any[]>([]); // queue
   const [existingCategories, setExistingCategories] = useState<any[]>([]); // already in DB
+  const user_id = sessionStorage.getItem("user_id"); // 👈 ADD THIS
   const apiUrl = import.meta.env.VITE_API_URL;
   // Fetch categories when modal opens
   useEffect(() => {
     if (isAddModalVisible) {
-      fetchCategories();
+      fetchSupplyCategories();
     }
   }, [isAddModalVisible]);
 
-  const fetchCategories = async () => {
+  const fetchSupplyCategories = async () => {
     try {
       const response = await axios.get(`${apiUrl}/get_supply_categories`);
       setExistingCategories(response.data);
@@ -50,7 +51,6 @@ const AddSupplyCategories: React.FC<AddSupplyCategoriesProps> = ({
 
   // Add category directly to DB
   const handleSubmitOne = async (values: any) => {
-    // ✅ Prevent duplicate (check DB categories)
     const isDuplicate = existingCategories.some(
       (cat) =>
         cat.supply_cat_name.toLowerCase().trim() ===
@@ -66,10 +66,11 @@ const AddSupplyCategories: React.FC<AddSupplyCategoriesProps> = ({
     }
 
     try {
-      const response = await axios.post(
-        `${apiUrl}/add_supply_category`,
-        values
-      );
+      // ✅ Make sure to send correct field name
+      const response = await axios.post(`${apiUrl}/add_supply_category`, {
+        supply_cat_name: values.supply_cat_name,
+        created_by: user_id, // 👈 include created_by
+      });
 
       notification.success({
         message: "Supply Category Added",
@@ -77,7 +78,7 @@ const AddSupplyCategories: React.FC<AddSupplyCategoriesProps> = ({
       });
 
       form.resetFields();
-      fetchCategories();
+      fetchSupplyCategories();
       onAddCategory(response.data);
     } catch (error) {
       console.error("Error adding supply category:", error);
@@ -127,14 +128,17 @@ const AddSupplyCategories: React.FC<AddSupplyCategoriesProps> = ({
   const handleSubmitAll = async () => {
     try {
       for (const item of categoryList) {
-        await axios.post(`${apiUrl}/add_supply_category`, item);
+        await axios.post(`${apiUrl}/add_supply_category`, {
+          supply_cat_name: item.supply_cat_name,
+          created_by: user_id,
+        });
       }
       notification.success({
         message: "Supply Categories Added",
         description: "All queued categories have been added successfully!",
       });
       setCategoryList([]);
-      fetchCategories();
+      fetchSupplyCategories();
     } catch (error) {
       console.error("Error inserting queued categories:", error);
       notification.error({

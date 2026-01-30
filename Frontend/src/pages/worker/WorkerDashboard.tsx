@@ -211,24 +211,31 @@ const WorkerDashboard = () => {
   return (
     <div
       className="space-y-6 
-bg-white dark:bg-[rgb(0,51,102)] text-black dark:text-white
-p-0 rounded-none w-full"
+  bg-white dark:bg-[rgb(0,51,102)] text-black dark:text-white
+  p-0 rounded-none w-full"
     >
       {/* 🔸 Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        {/* LEFT SIDE - Title */}
         <h1 className="text-lg font-semibold">Dashboard</h1>
 
-        {/* 🔸 Unified Filter Modal Button */}
-        <Button
-          type="default"
-          onClick={showModal}
-          className="flex items-center gap-2"
-        >
-          <FiFilter className="text-orange-500" />
-          <span className="font-medium">Filter - </span>
-          {dates[0]?.format("MMM DD, YYYY")} →{" "}
-          {dates[1]?.format("MMM DD, YYYY")}
-        </Button>
+        {/* RIGHT SIDE - Filter + Reset (STACK ON MOBILE) */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <Button
+            type="default"
+            onClick={showModal}
+            className="flex items-center gap-2 w-full"
+          >
+            <FiFilter className="text-orange-500" />
+            <span className="font-medium">Filter - </span>
+            {dates[0]?.format("MMM DD, YYYY")} →{" "}
+            {dates[1]?.format("MMM DD, YYYY")}
+          </Button>
+
+          <Button className="w-full sm:w-auto" onClick={handleReset}>
+            Reset
+          </Button>
+        </div>
 
         <Modal
           open={isModalOpen}
@@ -288,7 +295,6 @@ p-0 rounded-none w-full"
             <Button type="primary" onClick={handleApply}>
               Apply
             </Button>
-            <Button onClick={handleReset}>Reset</Button>
           </div>
         </Modal>
       </div>

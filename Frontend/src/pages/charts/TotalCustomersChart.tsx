@@ -140,8 +140,12 @@ const TotalCustomersChart: React.FC<TotalCustomersChartProps> = ({ dates }) => {
               <div className="w-4 h-4 rounded-full bg-[#C3EBFA] animate-bounce [animation-delay:-.4s]" />
             </div>
           ) : data.every((d) => d.customers === 0) ? (
-            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
-              No customer data available yet.
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium text-center">
+              No customer data available as of{" "}
+              <span className="font-semibold">
+                {dayjs().format("MMMM DD, YYYY")}
+              </span>
+              .
             </p>
           ) : (
             <ResponsiveContainer width="100%" height="90%">

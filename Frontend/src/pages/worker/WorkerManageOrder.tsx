@@ -3,6 +3,7 @@ import {
   CheckCircleOutlined,
   FilterOutlined,
   FolderOutlined,
+  PrinterOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
 import {
@@ -18,12 +19,12 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import OrderDetailsModal from "../WorkerModals/OrderDetailsModal";
-import ValidationEditTabsModal from "../WorkerModals/ValidationEditModalTabs";
+import ValidationEditTabsModal from "./Tabs/ValidationEditModalTabs";
+import OrdersPdfModal from "./Pdf/OrdersPdfModal";
 
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  max-width: 1200px;
   background-color: #fff;
   border-radius: 12px;
   padding: 24px;
@@ -114,12 +115,40 @@ const ActionButton = styled(Button)`
     transform: scale(1.05);
   }
 `;
+interface Order {
+  order_id: number;
+  user_id: number;
+
+  fname: string;
+  lname: string;
+  profile_pic: string | null;
+
+  order_date: string;
+  payment_status: "pending" | "paid";
+
+  created_by: number | null;
+
+  worker_fname?: string | null;
+  worker_lname?: string | null;
+  worker_profile_pic?: string | null;
+}
+interface OrderItem {
+  order_item_id: number;
+  product_name: string;
+  quantity: number;
+  price: number;
+  final_total: number;
+}
 
 const WorkerManageOrder = () => {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [ordersPdfVisible, setOrdersPdfVisible] = useState(false);
+  const [selectedOrderForPdf, setSelectedOrderForPdf] = useState<Order | null>(
+    null
+  );
 
   // ✅ States for combined Validation & Edit tab modal
   const [isValidationEditVisible, setIsValidationEditVisible] = useState(false);
@@ -127,8 +156,31 @@ const WorkerManageOrder = () => {
     useState<any>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const apiUrl = import.meta.env.VITE_API_URL;
+  // 🔽 Sort by Order Date (Newest → Oldest)
+  const sortByDate = () => {
+    setOrders((prev) =>
+      [...prev].sort(
+        (a, b) =>
+          new Date(b.order_date).getTime() - new Date(a.order_date).getTime()
+      )
+    );
+  };
+
+  const sortByStatus = () => {
+    setOrders((prev) => {
+      const hasPending = prev.some((o) => o.payment_status === "pending");
+      if (!hasPending) return prev;
+
+      return [...prev].sort((a, b) => {
+        // Pending first, Paid last
+        const priority = { pending: 0, paid: 1 };
+        return priority[a.payment_status] - priority[b.payment_status];
+      });
+    });
+  };
+
   // Handler to fetch transaction and open combined Validate & Edit modal
-  const handleValidateEdit = (record: any) => {
+  const handleValidateEdit = (record: Order) => {
     axios
       .get(`${apiUrl}/fetch_transaction/${record.user_id}`)
       .then((res) => {
@@ -184,7 +236,7 @@ const WorkerManageOrder = () => {
       });
   }, []);
 
-  const handleViewDetails = (record: any) => {
+  const handleViewDetails = (record: Order) => {
     setSelectedOrder(record);
     axios
       .get(`${apiUrl}/fetch_order_items/${record.order_id}`)
@@ -332,6 +384,17 @@ const WorkerManageOrder = () => {
               onClick={() => handleValidateEdit(record)}
             />
           </Tooltip>
+          {/* ✅ NEW — Print Receipt Button */}
+          <Tooltip title="Print Receipt">
+            <ActionButton
+              type="default"
+              icon={<PrinterOutlined />}
+              onClick={() => {
+                setSelectedOrderForPdf(record);
+                setOrdersPdfVisible(true);
+              }}
+            />
+          </Tooltip>
         </div>
       ),
     },
@@ -374,8 +437,12 @@ const WorkerManageOrder = () => {
             <Dropdown
               overlay={
                 <Menu>
-                  <Menu.Item key="1">Sort by Date</Menu.Item>
-                  <Menu.Item key="2">Sort by Status</Menu.Item>
+                  <Menu.Item key="date" onClick={sortByDate}>
+                    Sort by Date
+                  </Menu.Item>
+                  <Menu.Item key="status" onClick={sortByStatus}>
+                    Sort by Status
+                  </Menu.Item>
                 </Menu>
               }
               trigger={["click"]}
@@ -410,7 +477,9 @@ const WorkerManageOrder = () => {
         onUpdateOrder={(updatedOrder) => {
           setOrders((prevOrders) =>
             prevOrders.map((o) =>
-              o.order_id === updatedOrder.order_id ? updatedOrder : o
+              o.order_id === updatedOrder.order_id
+                ? { ...o, ...updatedOrder }
+                : o
             )
           );
         }}
@@ -425,6 +494,14 @@ const WorkerManageOrder = () => {
         formatDateWithTime={formatDateWithTime}
         calculateTotal={calculateTotal}
       />
+
+      {ordersPdfVisible && (
+        <OrdersPdfModal
+          isVisible={ordersPdfVisible}
+          onClose={() => setOrdersPdfVisible(false)}
+          order={selectedOrderForPdf}
+        />
+      )}
     </StyledContainer>
   );
 };

@@ -1,6 +1,5 @@
 import { Avatar, Badge, Dropdown, Layout, Menu, Spin } from "antd";
 import axios from "axios";
-
 import { useEffect, useState } from "react";
 import { CiMenuFries } from "react-icons/ci";
 import { FaBell, FaSun } from "react-icons/fa";
@@ -8,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { useTheme } from "../../contexts/ThemeContext";
 import { logoutworker } from "../../zustand/store/store.provider";
-import WorkerNotification from "../../pages/WorkerModals/WorkerNotificationModal";
+import AllNotifications from "../../pages/WorkerModals/AllNotifications";
 // Define the Notification type
 interface Notification {
   id: number; // For both message_id or announcement_id
@@ -127,8 +126,11 @@ const MenuButton = styled.button`
 const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
   const navigate = useNavigate();
   const [isNotificationVisible, setIsNotificationVisible] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]); // Use the Notification type here
+
+  useState(false);
+
   const [unreadCount, setUnreadCount] = useState(0);
+
   const workerId = sessionStorage.getItem("user_id"); // Assuming worker's ID is stored in sessionStorage
   const { isDarkMode, toggleTheme } = useTheme();
   const [loading, setLoading] = useState(false);
@@ -149,7 +151,6 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
         const data = response.data;
 
         if (isMounted) {
-          setNotifications(data);
           setUnreadCount(
             data.filter((n: Notification) => n.status === "unread").length
           );
@@ -230,11 +231,13 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
             title="Switch to dark mode"
           />
         )}
-
         <Dropdown
           menu={{ items: [] }} // placeholder
           dropdownRender={() => (
-            <WorkerNotification notifications={notifications} apiUrl={apiUrl} />
+            <AllNotifications
+              apiUrl={apiUrl}
+              onCloseDropdown={() => setIsNotificationVisible(false)}
+            />
           )}
           trigger={["click"]}
           open={isNotificationVisible}

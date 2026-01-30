@@ -3,7 +3,7 @@ import axios from "axios";
 import { useState } from "react";
 import Swal from "sweetalert2";
 
-const WorkerReservationModal = ({
+const WorkerViewReservationModal = ({
   visible,
   reservation,
   client,
@@ -147,4 +147,4 @@ const WorkerReservationModal = ({
   );
 };
 
-export default WorkerReservationModal;
+export default WorkerViewReservationModal;

@@ -42,7 +42,7 @@ const AdminChat = () => {
     const fetchWorkers = async () => {
       try {
         const workersResponse = await axios.get(
-          "http://localhost:8081/get_workers_info"
+          `http://localhost:8081/get_workers_info/${adminId}`
         );
         setWorkers(workersResponse.data);
       } catch (error) {

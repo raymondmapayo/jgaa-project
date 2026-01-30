@@ -134,12 +134,10 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
 
   addToCart: async (product: any) => {
     const userId = sessionStorage.getItem("user_id");
-
     if (!userId) {
       notification.warning({
         message: "Login Required",
-        description:
-          "You need to login or register before adding items to the cart.",
+        description: "You need to login before adding items to the cart.",
       });
       return;
     }
@@ -148,56 +146,52 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
       item_name: product.item_name,
       quantity: 1,
       availability: "true",
-      categories_name: product.categories_name || "Unknown Category", // Fallback for missing categories_name
+      categories_name: product.categories_name || "Unknown Category",
       price: product.price,
       menu_img: product.menu_img,
       menu_name: product.item_name,
-      size: product.size || "Normals ize", // Include the size field (default to "Regular" if not provided)
+      size: product.size || "Normal size",
     };
 
     try {
-      const response = await fetch(`${apiUrl}/add_to_cart/${userId}`, {
+      // Send to backend
+      await fetch(`${apiUrl}/add_to_cart/${userId}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: [itemToSend] }),
       });
 
-      const data = await response.json();
-      console.log("Item inserted to backend:", data);
+      set((state) => {
+        const currentCart = state.client?.cart || [];
+
+        const index = currentCart.findIndex(
+          (item) =>
+            item.item_name === product.item_name &&
+            (item.size || "Normal size") === (product.size || "Normal size")
+        );
+
+        if (index > -1) {
+          // Item exists, increment quantity
+          const updatedCart = [...currentCart];
+          updatedCart[index].quantity += 1;
+          return { ...state, client: { ...state.client, cart: updatedCart } };
+        } else {
+          // New item
+          return {
+            ...state,
+            client: {
+              ...state.client,
+              cart: [...currentCart, { ...itemToSend }],
+            },
+          };
+        }
+      });
 
       notification.success({
         message: `${product.item_name} added to cart!`,
         description: `${product.item_name} (${
           product.size || "Normal size"
-        }) successfully added to your cart.`,
-      });
-
-      // 🛠️ Update the cart safely: check if item exists first
-      set((state) => {
-        const currentCart = state.client?.cart || [];
-
-        const updatedCart = currentCart.map((item) => {
-          if (item.item_name === product.item_name) {
-            return { ...item, quantity: item.quantity + 1 };
-          }
-          return item;
-        });
-
-        const itemExists = currentCart.some(
-          (item) => item.item_name === product.item_name
-        );
-
-        return {
-          ...state,
-          client: {
-            ...state.client,
-            cart: itemExists
-              ? updatedCart
-              : [...currentCart, { ...product, quantity: 1 }],
-          },
-        };
+        }) added successfully.`,
       });
     } catch (error) {
       console.error("Add to cart failed:", error);
@@ -210,31 +204,44 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
 
   logoutClient: async () => {
     try {
-      // ✅ Remove only selected session storage keys
-      sessionStorage.removeItem("token");
-      sessionStorage.removeItem("userRole");
-      sessionStorage.removeItem("fname");
-      sessionStorage.removeItem("email");
+      const userId = sessionStorage.getItem("user_id");
+      if (!userId) throw new Error("User ID not found.");
 
-      // ✅ Stop the cart refresh interval if it exists
-      set((state) => {
-        if ((state as any).cartRefreshInterval) {
-          clearInterval((state as any).cartRefreshInterval);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/client/logout/${userId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
         }
+      );
+
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Failed to log out on server.");
+
+      console.log("Client logout response:", data);
+
+      sessionStorage.clear();
+      localStorage.removeItem("userId");
+
+      set((state) => {
+        if ((state as any).cartRefreshInterval)
+          clearInterval((state as any).cartRefreshInterval);
         return { client: initialState };
       });
 
-      // ✅ Notify user
       notification.success({
         message: "Logout Successful",
         description: "You have been logged out successfully.",
       });
     } catch (error) {
-      console.error("Logout error:", error);
-
+      console.error("Client Logout error:", error);
       notification.error({
         message: "Logout Failed",
-        description: "An error occurred while logging out.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An error occurred while logging out.",
       });
     }
   },
@@ -288,31 +295,30 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
     });
   },
 
-  incrementCartItem: async (productId: any, itemName: string) => {
+  incrementCartItem: async (
+    productId: any,
+    itemName: string,
+    size?: string
+  ) => {
     const userId = sessionStorage.getItem("user_id");
     if (!userId) return;
 
     set((state) => {
-      const existingCart = state.client?.cart || [];
-      const updatedCart = existingCart.map((item) =>
-        item.id === productId && item.item_name === itemName
+      const cart = state.client?.cart || [];
+      const updatedCart = cart.map((item) =>
+        item.id === productId &&
+        item.item_name === itemName &&
+        (item.size || "Normal size") === (size || "Normal size")
           ? { ...item, quantity: item.quantity + 1 }
           : item
       );
-
-      return {
-        ...state,
-        client: {
-          ...state.client,
-          cart: updatedCart,
-        },
-      };
+      return { ...state, client: { ...state.client, cart: updatedCart } };
     });
 
-    // Update backend
     try {
       await axios.post(`${apiUrl}/update_cart_quantity/${userId}`, {
         item_name: itemName,
+        size: size || "Normal size",
         action: "increment",
       });
     } catch (err) {
@@ -320,35 +326,30 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
     }
   },
 
-  decrementCartItem: async (productId: any, itemName: string) => {
+  decrementCartItem: async (
+    productId: any,
+    itemName: string,
+    size?: string
+  ) => {
     const userId = sessionStorage.getItem("user_id");
     if (!userId) return;
 
     set((state) => {
-      const existingCart = state.client?.cart || [];
-      const updatedCart = existingCart.map((item) => {
-        if (item.id === productId && item.item_name === itemName) {
-          // Only decrement if not paid
-          if (item.status !== "paid") {
-            return { ...item, quantity: Math.max(item.quantity - 1, 0) }; // <-- keep 0, don’t remove
-          }
-        }
-        return item;
-      });
-
-      return {
-        ...state,
-        client: {
-          ...state.client,
-          cart: updatedCart,
-        },
-      };
+      const cart = state.client?.cart || [];
+      const updatedCart = cart.map((item) =>
+        item.id === productId &&
+        item.item_name === itemName &&
+        (item.size || "Normal size") === (size || "Normal size")
+          ? { ...item, quantity: Math.max(item.quantity - 1, 0) }
+          : item
+      );
+      return { ...state, client: { ...state.client, cart: updatedCart } };
     });
 
-    // Update backend
     try {
       await axios.post(`${apiUrl}/update_cart_quantity/${userId}`, {
         item_name: itemName,
+        size: size || "Normal size",
         action: "decrement",
       });
     } catch (err) {
@@ -358,64 +359,37 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
 
   deleteCartItem: async (product: any) => {
     const userId = sessionStorage.getItem("user_id");
-    if (!userId) {
-      notification.warning({
-        message: "Login Required",
-        description: "Please login before modifying the cart.",
-      });
-      return;
-    }
-
-    console.log("Attempting to delete product from backend:", product);
+    if (!userId) return;
 
     try {
-      const response = await axios.delete(
-        `${apiUrl}/remove_from_carts/${userId}`,
-        {
-          data: {
-            item_name: product.item_name,
-          },
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      await axios.delete(`${apiUrl}/remove_from_carts/${userId}`, {
+        data: {
+          item_name: product.item_name,
+          size: product.size || "Normal size",
+        },
+      });
 
-      if (response.status === 200) {
-        console.log("Removed from backend cart:", response.data);
+      set((state) => {
+        const cart = state.client?.cart || [];
+        const updatedCart = cart.filter(
+          (item) =>
+            !(
+              item.item_name === product.item_name &&
+              (item.size || "Normal size") === (product.size || "Normal size")
+            )
+        );
 
-        set((state) => {
-          const existingCart = state.client?.cart || [];
-          const updatedCart = existingCart.filter(
-            (item) => item.item_name !== product.item_name // ✅ no size check
-          );
-
-          notification.info({
-            message: `${product.item_name} removed from the cart.`,
-          });
-
-          return {
-            ...state,
-            client: {
-              ...state.client,
-              cart: updatedCart,
-            },
-          };
+        notification.info({
+          message: `${product.item_name} removed from the cart.`,
         });
-      } else {
-        notification.error({
-          message: "Delete Failed",
-          description: response.data.message || "Item was not deleted.",
-        });
-      }
+
+        return { ...state, client: { ...state.client, cart: updatedCart } };
+      });
     } catch (error: any) {
-      console.error("Failed to remove item from backend:", error);
-
+      console.error("Failed to remove item:", error);
       notification.error({
-        message: "Server Error",
-        description:
-          error?.response?.data?.message ||
-          "Something went wrong while deleting the item.",
+        message: "Delete Failed",
+        description: error?.response?.data?.message || "Something went wrong.",
       });
     }
   },

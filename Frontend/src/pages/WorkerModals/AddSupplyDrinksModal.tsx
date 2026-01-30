@@ -16,50 +16,36 @@ import {
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 
-interface SupplyModalProps {
+interface AddSupplyDrinksModalProps {
   visible: boolean;
   onClose: () => void;
   onFinish: (values: any) => void;
 }
 
-const SupplyModal: React.FC<SupplyModalProps> = ({
+const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
   visible,
   onClose,
   onFinish,
 }) => {
   const [form] = Form.useForm();
-  const [categories, setCategories] = useState<
-    { cat_supply_id: number; supply_cat_name: string }[]
-  >([]);
+  const [drinks, setDrinks] = useState<any[]>([]); // ✅ NEW: drinks list
   const [supplyList, setSupplyList] = useState<any[]>([]);
   const apiUrl = import.meta.env.VITE_API_URL;
-  // ✅ Fetch categories only
+  const user_id = sessionStorage.getItem("user_id");
+  // ✅ Fetch drinks only
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await axios.get(`${apiUrl}/get_supply_categories`);
-        setCategories(res.data);
-      } catch (err) {
-        console.error("Error fetching categories:", err);
-      }
-    };
     if (visible) {
-      fetchCategories();
+      const fetchDrinks = async () => {
+        try {
+          const res = await axios.get(`${apiUrl}/menu_items_drinks`);
+          setDrinks(res.data);
+        } catch (err) {
+          console.error("Error fetching drinks:", err);
+        }
+      };
+      fetchDrinks();
     }
   }, [visible]);
-
-  const fetchSupplies = async () => {
-    try {
-      const res = await axios.get(`${apiUrl}/get_supply`);
-      console.log("Supplies:", res.data);
-    } catch (err) {
-      console.error("Error fetching supplies:", err);
-    }
-  };
-
-  if (visible) {
-    fetchSupplies(); // ✅ add this line
-  }
 
   // ✅ Reset when closing
   const handleCancel = () => {
@@ -73,13 +59,9 @@ const SupplyModal: React.FC<SupplyModalProps> = ({
     try {
       const values = await form.validateFields();
 
-      const selectedCategory = categories.find(
-        (cat) => cat.cat_supply_id === values.cat_supply_id
-      )?.supply_cat_name;
-
       const newSupply = {
         ...values,
-        category: selectedCategory,
+        category: "Drinks", // ✅ fixed category
       };
 
       setSupplyList((prev) => [...prev, newSupply]);
@@ -94,19 +76,14 @@ const SupplyModal: React.FC<SupplyModalProps> = ({
     try {
       const values = await form.validateFields();
 
-      const selectedCategory = categories.find(
-        (cat) => cat.cat_supply_id === values.cat_supply_id
-      )?.supply_cat_name;
-
-      const response = await axios.post(`${apiUrl}/add_supply`, {
-        inventoryId: values.inventory_id || "",
-        productName: values.product_name,
-        category: selectedCategory,
-        stockIn: values.stock_in,
+      const response = await axios.post(`${apiUrl}/add_supply_drinks`, {
+        drinks_inventory_id: values.drinks_inventory_id || "",
+        product_name: values.product_name, // <-- use underscore
+        stock_in: values.stock_in, // <-- use underscore
         unit: values.unit,
         price: values.price,
         status: values.stock_in === 0 ? "Unavailable" : "Available",
-        cat_supply_id: values.cat_supply_id,
+        created_by: user_id,
       });
 
       if (response.data.success) {
@@ -137,15 +114,14 @@ const SupplyModal: React.FC<SupplyModalProps> = ({
 
     try {
       for (const supply of supplyList) {
-        const response = await axios.post(`${apiUrl}/add_supply`, {
-          inventoryId: supply.inventory_id || "",
-          productName: supply.product_name,
-          category: supply.category,
-          stockIn: supply.stock_in,
+        const response = await axios.post(`${apiUrl}/add_supply_drinks`, {
+          drinks_inventory_id: supply.inventory_id || "",
+          product_name: supply.product_name,
+          stock_in: supply.stock_in,
           unit: supply.unit,
           price: supply.price,
           status: supply.stock_in === 0 ? "Unavailable" : "Available",
-          cat_supply_id: supply.cat_supply_id,
+          created_by: user_id,
         });
 
         onFinish(response.data);
@@ -164,7 +140,6 @@ const SupplyModal: React.FC<SupplyModalProps> = ({
   // ✅ Table columns
   const columns = [
     { title: "Product Name", dataIndex: "product_name", key: "product_name" },
-    { title: "Category", dataIndex: "category", key: "category" },
     { title: "Stock In", dataIndex: "stock_in", key: "stock_in" },
     { title: "Unit", dataIndex: "unit", key: "unit" },
     { title: "Price", dataIndex: "price", key: "price" },
@@ -184,7 +159,7 @@ const SupplyModal: React.FC<SupplyModalProps> = ({
 
   return (
     <Modal
-      title="Add Supply"
+      title="Add Drinks Supply"
       open={visible}
       onCancel={handleCancel}
       footer={null}
@@ -196,33 +171,20 @@ const SupplyModal: React.FC<SupplyModalProps> = ({
             <Form.Item
               label="Product Name"
               name="product_name"
-              rules={[{ required: true, message: "Please enter product name" }]}
+              rules={[
+                { required: true, message: "Please select product name" },
+              ]}
             >
-              <Input />
-            </Form.Item>
-          </Col>
-
-          <Col span={12}>
-            <Form.Item
-              label="Category"
-              name="cat_supply_id"
-              rules={[{ required: true, message: "Please select category" }]}
-            >
-              <Select placeholder="Select a category">
-                {categories.map((cat) => (
-                  <Select.Option
-                    key={cat.cat_supply_id}
-                    value={cat.cat_supply_id}
-                  >
-                    {cat.supply_cat_name}
+              <Select placeholder="Select a product name">
+                {drinks.map((drink) => (
+                  <Select.Option key={drink.menu_id} value={drink.item_name}>
+                    {drink.item_name}
                   </Select.Option>
                 ))}
               </Select>
             </Form.Item>
           </Col>
-        </Row>
 
-        <Row gutter={16}>
           <Col span={12}>
             <Form.Item
               label="Stock In"
@@ -230,16 +192,6 @@ const SupplyModal: React.FC<SupplyModalProps> = ({
               rules={[{ required: true, message: "Please enter stock in" }]}
             >
               <InputNumber min={0} style={{ width: "100%" }} />
-            </Form.Item>
-          </Col>
-
-          <Col span={12}>
-            <Form.Item
-              label="Unit"
-              name="unit"
-              rules={[{ required: true, message: "Please enter unit" }]}
-            >
-              <Input style={{ width: "100%" }} />
             </Form.Item>
           </Col>
         </Row>
@@ -252,6 +204,16 @@ const SupplyModal: React.FC<SupplyModalProps> = ({
               rules={[{ required: true, message: "Please enter price" }]}
             >
               <InputNumber min={0} style={{ width: "100%" }} />
+            </Form.Item>
+          </Col>
+
+          <Col span={12}>
+            <Form.Item
+              label="Unit"
+              name="unit"
+              rules={[{ required: true, message: "Please enter unit" }]}
+            >
+              <Input style={{ width: "100%" }} />
             </Form.Item>
           </Col>
         </Row>
@@ -281,7 +243,7 @@ const SupplyModal: React.FC<SupplyModalProps> = ({
             }))}
             columns={columns}
             pagination={false}
-            scroll={{ x: 500 }} // ✅ scrollable horizontally & vertically
+            scroll={{ x: 500 }}
             bordered
           />
 
@@ -301,4 +263,4 @@ const SupplyModal: React.FC<SupplyModalProps> = ({
   );
 };
 
-export default SupplyModal;
+export default AddSupplyDrinksModal;

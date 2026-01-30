@@ -16,7 +16,7 @@ interface Reservation {
   [key: string]: any;
 }
 
-interface ReservationDissolveModalProps {
+interface ReservationCanceledModalProps {
   visible: boolean;
   onClose: () => void;
   reservation: Reservation | null;
@@ -27,7 +27,7 @@ interface ReservationDissolveModalProps {
 const globalCountdowns: Record<number, number> = {};
 let globalInterval: number | null = null;
 
-const ReservationDissolveModal: React.FC<ReservationDissolveModalProps> = ({
+const ReservationCanceledModal: React.FC<ReservationCanceledModalProps> = ({
   visible,
   onClose,
   reservation,
@@ -63,7 +63,7 @@ const ReservationDissolveModal: React.FC<ReservationDissolveModalProps> = ({
           if (globalCountdowns[k] <= 0) {
             delete globalCountdowns[k];
             sessionStorage.removeItem(`countdown_${k}`);
-            dissolveNow(k);
+            canceledNow(k);
           }
         });
 
@@ -79,8 +79,8 @@ const ReservationDissolveModal: React.FC<ReservationDissolveModalProps> = ({
     }
   };
 
-  // Dissolve reservation immediately
-  const dissolveNow = async (id: number) => {
+  // Canceled reservation immediately
+  const canceledNow = async (id: number) => {
     if (!reservation || reservation.reservation_id !== id) return;
 
     const full_name =
@@ -90,18 +90,17 @@ const ReservationDissolveModal: React.FC<ReservationDissolveModalProps> = ({
       setIsProcessing(true);
 
       await axios.put(
-        `${apiUrl}/update_reservation_dissolve_status/${id}`,
-        { table_status: "Dissolve", full_name },
+        `${apiUrl}/update_reservation_canceled_status/${id}`,
+        { table_status: "Canceled", full_name },
         { headers: { "Content-Type": "application/json" } }
       );
 
       notification.success({
-        message: "Reservation Dissolved",
-        description: `Reservation #${id} for ${full_name} marked as Dissolve.`,
+        message: "Reservation Canceled",
+        description: `Reservation #${id} for ${full_name} marked as Canceled.`,
       });
 
-      onUpdateReservation?.({ ...reservation, table_status: "Dissolve" });
-
+      onUpdateReservation?.({ ...reservation, table_status: "Canceled" });
       setTimeLeftSeconds(0);
       setIsProcessing(false);
       onClose();
@@ -111,7 +110,7 @@ const ReservationDissolveModal: React.FC<ReservationDissolveModalProps> = ({
         message: "Failed",
         description:
           err.response?.data?.message ||
-          "Could not mark reservation as Dissolve. Please try again.",
+          "Could not mark reservation as Canceled. Please try again.",
       });
       setIsProcessing(false);
     }
@@ -121,7 +120,7 @@ const ReservationDissolveModal: React.FC<ReservationDissolveModalProps> = ({
   useEffect(() => {
     if (!reservation || !visible) return;
 
-    if (reservation.table_status === "Dissolve") {
+    if (reservation.table_status === "Canceled") {
       setTimeLeftSeconds(0);
       return;
     }
@@ -148,7 +147,7 @@ const ReservationDissolveModal: React.FC<ReservationDissolveModalProps> = ({
 
   return (
     <Modal
-      title="Reservation Dissolve"
+      title="Reservation Cancellation"
       open={visible}
       onCancel={onClose}
       footer={null}
@@ -178,7 +177,7 @@ const ReservationDissolveModal: React.FC<ReservationDissolveModalProps> = ({
               </Text>
               <div style={{ marginTop: 8 }}>
                 <Text type="secondary">
-                  Countdown running — reservation will automatically dissolve at
+                  Countdown running — reservation will automatically cancel at
                   00:00
                 </Text>
               </div>
@@ -208,4 +207,4 @@ const ReservationDissolveModal: React.FC<ReservationDissolveModalProps> = ({
   );
 };
 
-export default ReservationDissolveModal;
+export default ReservationCanceledModal;

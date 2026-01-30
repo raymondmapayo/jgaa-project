@@ -1,6 +1,6 @@
 // ChatWindow.tsx
 import { Button, Tooltip } from "antd";
-import { useEffect, useState } from "react";
+
 import { FaPaperPlane } from "react-icons/fa";
 import { IoEllipsisHorizontal } from "react-icons/io5";
 
@@ -32,21 +32,20 @@ const ChatWindow = ({
   isMobile = false,
   onBack,
 }: ChatWindowProps) => {
-  const [autoScroll, setAutoScroll] = useState(true);
+  const formatRelativeTime = (timestamp: string) => {
+    if (!timestamp) return "";
 
-  const handleScroll = () => {
-    const container = chatEndRef.current?.parentElement;
-    if (!container) return;
-    const scrollOffset =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    setAutoScroll(scrollOffset < 20);
+    const diff = new Date().getTime() - new Date(timestamp).getTime();
+
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
   };
-
-  useEffect(() => {
-    if (autoScroll) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, autoScroll]);
 
   return (
     <div className="flex flex-col h-full bg-white border-l shadow-md rounded-lg">
@@ -74,9 +73,20 @@ const ChatWindow = ({
                 className="w-10 h-10 rounded-full"
               />
 
-              <h2 className="text-lg font-bold truncate sm:truncate md:overflow-visible max-w-[120px] md:max-w-full">
-                {selectedUser.fname} {selectedUser.lname}
-              </h2>
+              <div className="flex flex-col">
+                <h2 className="text-lg font-bold truncate sm:truncate md:overflow-visible max-w-[120px] md:max-w-full">
+                  {selectedUser.fname} {selectedUser.lname}
+                </h2>
+                <span className="text-sm text-gray-400">
+                  {selectedUser.user_login_time
+                    ? "Active" // user is currently logged in
+                    : selectedUser.last_active_time
+                    ? `Active ${formatRelativeTime(
+                        selectedUser.last_active_time
+                      )}`
+                    : "No activity"}
+                </span>
+              </div>
             </>
           )}
         </div>
@@ -93,10 +103,7 @@ const ChatWindow = ({
       </div>
 
       {/* Messages */}
-      <div
-        className="flex-1 overflow-y-auto p-4 bg-gray-50 h-[448px]"
-        onScroll={handleScroll}
-      >
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50 h-[448px]">
         {messages?.length > 0 ? (
           messages.map((msg) => (
             <div

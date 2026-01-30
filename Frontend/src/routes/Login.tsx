@@ -54,7 +54,7 @@ const Login = () => {
         console.log("Logged in user:", user);
         console.log("Phone number:", user.pnum); // Log the phone number separately
         console.log("Full name:", user.fname, user.lname); // Log full name
-        // Save user data based on role
+
         if (user.role === "admin") {
           saveadminInfo(user);
         } else if (user.role === "client") {

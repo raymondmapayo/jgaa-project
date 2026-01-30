@@ -6,19 +6,18 @@ import {
   PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Dropdown, Input, Modal, Table, Tooltip } from "antd";
+import { Button, Dropdown, Input, Modal, Table, Tag, Tooltip } from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import AddCategories from "../../components/form/AddCategories";
 
-import Archive from "../WorkerModals/Archive";
+import Archive from "./Archive/Archive";
 import CategoriesEdit from "../WorkerModals/CategoriesEditModal";
 
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  max-width: 1200px;
   background-color: #fff;
   border-radius: 12px;
   padding: 24px;
@@ -273,18 +272,16 @@ const WorkerManageCategories = () => {
       render: (status: string) => {
         const formattedStatus =
           status.charAt(0).toUpperCase() + status.slice(1);
-        const statusColors: Record<string, string> = {
-          Active: "text-green-500",
-          Inactive: "text-red-500",
+
+        const colors: Record<string, string> = {
+          Active: "green",
+          Inactive: "red",
         };
+
         return (
-          <span
-            className={`${
-              statusColors[formattedStatus] || "text-gray-500"
-            } font-bold`}
-          >
+          <Tag color={colors[formattedStatus] || "default"}>
             {formattedStatus}
-          </span>
+          </Tag>
         );
       },
     },

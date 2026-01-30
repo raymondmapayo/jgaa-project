@@ -19,7 +19,7 @@ export const WorkerRoutes = [
   },
   {
     path: "/Worker/Manage/Inventory",
-    component: lazy(() => import("../pages/worker/WorkerManageInventory")),
+    component: lazy(() => import("../pages/worker/Tabs/InventoryTabs")),
   },
   {
     path: "/Worker/AnalyticsReports",
@@ -32,7 +32,7 @@ export const WorkerRoutes = [
 
   {
     path: "/Worker/Manage/Categories",
-    component: lazy(() => import("../pages/worker/WorkerManageCategories")),
+    component: lazy(() => import("../pages/worker/Tabs/CategoriesTabs")),
   },
   {
     path: "/Worker/Manage/MyProfile",
@@ -40,16 +40,25 @@ export const WorkerRoutes = [
   },
   {
     path: "/Worker/Manage/Supply",
-    component: lazy(() => import("../pages/worker/WorkerSupply")),
+    component: lazy(() => import("../pages/worker/Tabs/SupplyTabs")),
   },
   {
     path: "/Worker/Manage/Ingredients",
-    component: lazy(() => import("../pages/worker/WorkerIngredients")),
+    component: lazy(
+      () => import("../pages/worker/Tabs/Drinks&IngredientsTabs")
+    ),
   },
   {
-    path: "/Worker/Manage/SupplyCategories",
-    component: lazy(
-      () => import("../pages/worker/WorkerManageSupplyCategories")
-    ),
+    path: "/worker-announcement",
+    component: lazy(() => import("../pages/worker/WorkerAnnouncement")),
+  },
+
+  {
+    path: "/Worker/Manage/Sales_Summary",
+    component: lazy(() => import("../pages/worker/WorkerManageSalesSummary")),
+  },
+  {
+    path: "/Worker/Manage/Expenses",
+    component: lazy(() => import("../pages/worker/WorkerManageExpenses")),
   },
 ];

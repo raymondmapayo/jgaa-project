@@ -13,10 +13,9 @@ import styled from "styled-components";
 import AddMenuForm from "../../components/form/AddMenu";
 import MenuEditModal from "../WorkerModals/MenuEditModal";
 import ViewDetailsModal from "../WorkerModals/ViewDetailsModal";
-
+import dayjs from "dayjs";
 const StyledContainer = styled.div`
   width: 100%;
-  max-width: 1200px;
   background-color: #fff;
   border-radius: 12px;
   padding: 24px;
@@ -206,10 +205,18 @@ const WorkerManageMenu = () => {
       render: (text: string) => {
         const colors: Record<string, string> = {
           Available: "green",
-          Unavailable: "red",
+          "Not Available": "red",
+          Pending: "orange",
         };
         return <Tag color={colors[text] || "default"}>{text}</Tag>;
       },
+    },
+    {
+      title: "Created At",
+      dataIndex: "created_at",
+      key: "created_at",
+      render: (createdAt: string) =>
+        dayjs(createdAt).format("MM-DD-YYYY h:mm A"),
     },
     {
       title: "Action",
@@ -248,59 +255,61 @@ const WorkerManageMenu = () => {
   return (
     <StyledContainer>
       {/* Header Section */}
+      <div className="w-full mb-6">
+        <div className="flex flex-col gap-4 w-full">
+          {/* Title */}
+          <div>
+            <h2 className="text-xl font-bold">Menu List</h2>
+            <p className="text-gray-500 text-sm">Manage your food menu</p>
+          </div>
 
-      <div className="flex flex-col gap-4 w-full">
-        {/* Title */}
-        <div>
-          <h2 className="text-xl font-bold">Menu List</h2>
-          <p className="text-gray-500 text-sm">Manage your food menu</p>
-        </div>
+          {/* Search + Actions Row */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 w-full">
+            {/* Search */}
+            <Input
+              placeholder="Search categories"
+              prefix={<SearchOutlined />}
+              className="w-full md:w-1/3 bg-gray-100 dark:bg-[#1f2937] dark:text-white custom-placeholder"
+            />
 
-        {/* Search + Actions Row */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 w-full">
-          {/* Search */}
-          <Input
-            placeholder="Search categories"
-            prefix={<SearchOutlined />}
-            className="w-full md:w-1/3 bg-gray-100 dark:bg-[#1f2937] dark:text-white custom-placeholder"
-          />
-
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              className="w-full sm:w-[140px]"
-            >
-              Add Menu
-            </Button>
-            <Button
-              type="default"
-              icon={<UploadOutlined />}
-              className="w-full sm:w-[140px]"
-            >
-              Import Menu
-            </Button>
-            <Dropdown
-              overlay={
-                <Menu>
-                  <Menu.Item key="1">Sort by Date</Menu.Item>
-                  <Menu.Item key="2">Sort by Availability</Menu.Item>
-                </Menu>
-              }
-              trigger={["click"]}
-            >
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               <Button
-                icon={<FilterOutlined />} // <-- add this
+                type="primary"
+                icon={<PlusOutlined />}
+                className="w-full sm:w-[140px]"
+                onClick={() => setIsAddModalVisible(true)}
+              >
+                Add Menu
+              </Button>
+
+              <Button
+                type="default"
+                icon={<UploadOutlined />}
                 className="w-full sm:w-[140px]"
               >
-                Sort
+                Import Menu
               </Button>
-            </Dropdown>
+              <Dropdown
+                overlay={
+                  <Menu>
+                    <Menu.Item key="1">Sort by Date</Menu.Item>
+                    <Menu.Item key="2">Sort by Availability</Menu.Item>
+                  </Menu>
+                }
+                trigger={["click"]}
+              >
+                <Button
+                  icon={<FilterOutlined />} // <-- add this
+                  className="w-full sm:w-[140px]"
+                >
+                  Sort
+                </Button>
+              </Dropdown>
+            </div>
           </div>
         </div>
       </div>
-
       {/* Menu Table - scrolls on small screens */}
       <div className="overflow-x-auto lg:overflow-x-hidden">
         {isLoading ? (

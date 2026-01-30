@@ -56,7 +56,6 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({
 
   const handleFinish = async (values: any) => {
     console.log("Form Submitted:", values);
-
     const formData = new FormData();
     formData.append("item_name", values.item_name || selectedItem?.item_name);
     formData.append("price", values.price || selectedItem?.price);

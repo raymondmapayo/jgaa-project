@@ -21,69 +21,6 @@ const MessageClient = () => {
 
   const apiUrl = import.meta.env.VITE_API_URL;
 
-  useEffect(() => {
-    const storedUserRole = sessionStorage.getItem("userRole");
-    const storedUserId = sessionStorage.getItem("user_id");
-    if (!storedUserRole || !storedUserId) return;
-
-    setUserId(storedUserId);
-
-    // Join socket room
-    socket.emit(
-      storedUserRole === "client" ? "joinClientRoom" : "joinWorkerRoom",
-      storedUserId
-    );
-
-    const handleNewMessage = (data: any) => {
-      if (data.receiver_id === storedUserId) {
-        setMessages((prev) => {
-          const exists = prev.some(
-            (m) =>
-              m.message === data.message &&
-              new Date(m.timestamp).getTime() ===
-                new Date(data.timestamp).getTime()
-          );
-          if (exists) return prev;
-          return [...prev, data];
-        });
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }
-    };
-
-    socket.on("newMessage", handleNewMessage);
-
-    const fetchMessages = async () => {
-      try {
-        const res = await axios.get(
-          `${apiUrl}/getClientMessages/${storedUserId}`
-        );
-
-        // ✅ Filter duplicate messages by text + timestamp
-        const uniqueMessages = res.data.filter(
-          (msg: Message, index: number, self: Message[]) =>
-            index ===
-            self.findIndex(
-              (m) =>
-                m.message === msg.message &&
-                new Date(m.timestamp).getTime() ===
-                  new Date(msg.timestamp).getTime()
-            )
-        );
-
-        // ✅ Sort oldest → newest for better UI flow
-        setMessages(uniqueMessages.reverse());
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
-    fetchMessages();
-
-    return () => {
-      socket.off("newMessage", handleNewMessage);
-    };
-  }, []);
-
   // Greeting
   useEffect(() => {
     if (isOpen && !sentGreeting) {
@@ -134,6 +71,93 @@ const MessageClient = () => {
   };
 
   const toggleMessenger = () => setIsOpen(!isOpen);
+
+  const markMessagesReadClient = async (
+    sender_id: string,
+    receiver_id: string,
+    user_id: string
+  ) => {
+    try {
+      await axios.post(`${apiUrl}/markMessagesReadClient`, {
+        sender_id,
+        receiver_id,
+        read_by: user_id,
+      });
+    } catch (err) {
+      console.error("Failed to mark message as read:", err);
+    }
+  };
+
+  useEffect(() => {
+    const storedUserId = sessionStorage.getItem("user_id");
+    if (!storedUserId) return;
+
+    setUserId(storedUserId);
+
+    // Join the client room
+    socket.emit("joinClientRoom", storedUserId);
+
+    // Handle incoming messages from workers
+    const handleNewMessage = (data: any) => {
+      if (data.receiverId?.toString() === storedUserId) {
+        setMessages((prev) => {
+          const exists = prev.some(
+            (m) =>
+              m.message === data.message &&
+              new Date(m.timestamp).getTime() ===
+                new Date(data.timestamp).getTime()
+          );
+          if (exists) return prev;
+          return [...prev, data];
+        });
+
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+
+        // Mark as read (3 arguments: sender, receiver, current user)
+        markMessagesReadClient(data.senderId, storedUserId, storedUserId);
+      }
+    };
+
+    socket.on("send_message", handleNewMessage);
+
+    // Fetch messages initially AND every second
+    const fetchMessages = async () => {
+      try {
+        const res = await axios.get(
+          `${apiUrl}/getClientMessages/${storedUserId}`
+        );
+
+        const uniqueMessages = res.data.filter(
+          (msg: Message, index: number, self: Message[]) =>
+            index ===
+            self.findIndex(
+              (m) =>
+                m.message === msg.message &&
+                new Date(m.timestamp).getTime() ===
+                  new Date(msg.timestamp).getTime()
+            )
+        );
+
+        const sortedMessages = uniqueMessages.reverse();
+        setMessages(sortedMessages);
+
+        // Mark all fetched messages as read
+        sortedMessages.forEach((msg: any) => {
+          markMessagesReadClient(msg.sender_id, storedUserId, storedUserId);
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchMessages(); // initial load
+    const interval = setInterval(fetchMessages, 1000); // fetch every 1 second
+
+    return () => {
+      clearInterval(interval);
+      socket.off("send_message", handleNewMessage);
+    };
+  }, []);
 
   return (
     <div className="fixed z-50">

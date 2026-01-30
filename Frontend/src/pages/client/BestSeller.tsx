@@ -16,6 +16,7 @@ interface BestsellerProduct {
   price: number;
   total_avg_rating: string;
   rating_count: number;
+  availability?: string; // add this
   categories_name?: string | null;
 }
 interface MenuItem {
@@ -87,7 +88,7 @@ const Bestseller: React.FC = () => {
           setBestselling(response.data);
           sessionStorage.setItem(
             "bestsellingData",
-            JSON.stringify(response.data)
+            JSON.stringify(response.data),
           );
         })
         .catch((error) => {
@@ -203,33 +204,38 @@ const Bestseller: React.FC = () => {
                   </h4>
                 </div>
 
-                {/* Buttons Section */}
-                <div className="mt-4 flex flex-wrap justify-between gap-4">
-                  <motion.button
-                    className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handleBuyNowClick(product)}
-                  >
-                    Buy now
-                  </motion.button>
+                {(product.availability ?? "available").trim().toLowerCase() ===
+                "available" ? (
+                  <div className="mt-4 flex flex-wrap justify-between gap-4">
+                    <motion.button
+                      className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleBuyNowClick(product)}
+                    >
+                      Buy now
+                    </motion.button>
 
-                  <motion.button
-                    className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() =>
-                      addToCart({
-                        ...product,
-                        categories_name: product.categories_name || null,
-                      })
-                    }
-                  >
-                    {/* Always visible, scalable icon */}
-                    <FaShoppingBag className="text-sm sm:text-base md:text-base" />{" "}
-                    Add to Cart
-                  </motion.button>
-                </div>
+                    <motion.button
+                      className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() =>
+                        addToCart({
+                          ...product,
+                          categories_name: product.categories_name || null,
+                        })
+                      }
+                    >
+                      <FaShoppingBag className="text-sm sm:text-base md:text-base" />
+                      Add to Cart
+                    </motion.button>
+                  </div>
+                ) : (
+                  <span className="font-core flex-1 min-w-[120px] flex items-center  justify-center px-3 py-2 text-sm font-semibold text-red-500 border border-red-500 rounded-full bg-red-100">
+                    We're not Available today.
+                  </span>
+                )}
               </div>
             </motion.div>
           ))}

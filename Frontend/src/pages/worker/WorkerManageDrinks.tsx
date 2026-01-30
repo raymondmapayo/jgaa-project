@@ -3,7 +3,7 @@ import { Button, Input, Pagination } from "antd";
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import WorkerIngredientsEditModal from "../WorkerModals/WorkerIngredientsEditModal";
-import WorkerIngredientsModal from "../WorkerModals/WorkerIngredientsModal";
+import WorkerDrinksModal from "../WorkerModals/WorkerDrinksModal";
 
 const { Search } = Input;
 
@@ -22,7 +22,7 @@ interface Ingredient {
   unit: string;
 }
 
-const WorkerIngredients: React.FC = () => {
+const WorkerManageDrinks: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [ingredientsMap, setIngredientsMap] = useState<
@@ -44,7 +44,7 @@ const WorkerIngredients: React.FC = () => {
   // Fetch menu items
   useEffect(() => {
     axios
-      .get(`${apiUrl}/menu_items`)
+      .get(`${apiUrl}/menu_items_drinks`)
       .then((res) => setMenuItems(res.data))
       .catch((error) => console.error("Error fetching menu items:", error));
   }, []);
@@ -88,7 +88,7 @@ const WorkerIngredients: React.FC = () => {
         <header className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 w-full">
           {/* Title */}
           <h1 className="text-3xl sm:text-4xl font-bold text-orange-500 flex-1 text-center sm:text-left">
-            Ingredients &amp; Drinks
+            Drinks
           </h1>
 
           {/* Search + Button */}
@@ -105,7 +105,7 @@ const WorkerIngredients: React.FC = () => {
               className="bg-orange-500 hover:!bg-orange-600 w-full sm:w-auto"
               onClick={() => setIsModalVisible(true)}
             >
-              Add Ingredients
+              Add Drinks pcs
             </Button>
           </div>
         </header>
@@ -213,7 +213,7 @@ const WorkerIngredients: React.FC = () => {
         </div>
 
         {/* Add Modal */}
-        <WorkerIngredientsModal
+        <WorkerDrinksModal
           visible={isModalVisible}
           onClose={() => setIsModalVisible(false)}
           onIngredientAdded={(newIngredients, categoryName) => {
@@ -251,4 +251,4 @@ const WorkerIngredients: React.FC = () => {
   );
 };
 
-export default WorkerIngredients;
+export default WorkerManageDrinks;

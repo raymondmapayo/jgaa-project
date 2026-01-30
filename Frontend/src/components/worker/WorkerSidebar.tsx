@@ -1,12 +1,14 @@
 import { Menu } from "antd";
 import { useEffect } from "react";
-import { FaReceipt } from "react-icons/fa6";
-import { IoChatboxSharp } from "react-icons/io5";
-import { MdInventory2, MdMenuBook } from "react-icons/md";
-import { RiDashboardFill } from "react-icons/ri";
+import { LuNotebookPen } from "react-icons/lu";
+import { AiOutlineMessage } from "react-icons/ai";
+import { RiMenuSearchLine } from "react-icons/ri";
+import { MdOutlineInventory } from "react-icons/md";
+import { RxDashboard } from "react-icons/rx";
 import { useNavigate } from "react-router-dom";
 import { StyledSider } from "../../styled/worker";
-
+import { LuChartLine } from "react-icons/lu";
+import { TbCategoryPlus } from "react-icons/tb";
 interface SidebarProps {
   collapsed: boolean;
   setCollapsed: (value: boolean) => void;
@@ -34,7 +36,7 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
     {
       key: "dashboard",
       label: "Dashboard",
-      icon: <RiDashboardFill size={25} />,
+      icon: <RxDashboard size={25} />,
       children: [
         {
           key: "overview",
@@ -46,18 +48,14 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
     {
       key: "menu_management",
       label: "Menu Management",
-      icon: <MdMenuBook size={25} />,
+      icon: <RiMenuSearchLine size={25} />,
       children: [
         {
           key: "menu",
           label: "Menu Items",
           link: "/Worker/Manage/Menu",
         },
-        {
-          key: "categories",
-          label: "Categories",
-          link: "/Worker/Manage/Categories",
-        },
+
         {
           key: "recipe",
           label: "Ingredients & Drinks",
@@ -68,18 +66,14 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
     {
       key: "inventory_supplies",
       label: "Inventory & Supplies",
-      icon: <MdInventory2 size={25} />,
+      icon: <MdOutlineInventory size={25} />,
       children: [
         {
           key: "inventory",
           label: "Inventory & Supplies",
           link: "/Worker/Manage/Inventory",
         },
-        {
-          key: "supply_categories",
-          label: "Supply Categories",
-          link: "/Worker/Manage/SupplyCategories",
-        },
+
         {
           key: "supply",
           label: "Supply",
@@ -90,7 +84,7 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
     {
       key: "orders_reservations",
       label: "Orders & Reservations",
-      icon: <FaReceipt size={25} />,
+      icon: <LuNotebookPen size={25} />,
       children: [
         {
           key: "orders",
@@ -105,9 +99,32 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
       ],
     },
     {
+      key: "finacial_report",
+      label: "Financal Report",
+      icon: <LuChartLine size={25} />,
+      children: [
+        {
+          key: "sales_summary",
+          label: "Sales Summary",
+          link: "/Worker/Manage/Sales_Summary",
+        },
+        {
+          key: "expenses",
+          label: "Expenses",
+          link: "/Worker/Manage/Expenses",
+        },
+      ],
+    },
+    {
+      key: "categories",
+      label: "Categories",
+      icon: <TbCategoryPlus size={25} />,
+      link: "/Worker/Manage/Categories",
+    },
+    {
       key: "chats",
       label: "Manage Chats",
-      icon: <IoChatboxSharp size={25} />,
+      icon: <AiOutlineMessage size={25} />,
       link: "/Worker/Manage/Chats",
     },
   ];

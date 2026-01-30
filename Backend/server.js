@@ -112,7 +112,7 @@ db.connect((err) => {
 //==========================MENUS INSERT ===============================================
 //========================== MENUS INSERT (Cloudinary) ===============================================
 app.post("/add_menu", upload.single("menu_img"), (req, res) => {
-  const { item_name, price, description, categories_id } = req.body;
+  const { item_name, price, description, categories_id, created_by } = req.body;
 
   // ✅ Get Cloudinary URL
   const menu_img = req.file?.path || "";
@@ -134,11 +134,19 @@ app.post("/add_menu", upload.single("menu_img"), (req, res) => {
     const categories_name = results[0].categories_name;
 
     const sql =
-      'INSERT INTO menu_tbl (item_name, menu_img, description, price, availability, categories_id, categories_name) VALUES (?, ?, ?, ?, "Available", ?, ?)';
+      'INSERT INTO menu_tbl (item_name, menu_img, description, price, availability, categories_id, categories_name, created_by) VALUES (?, ?, ?, ?, "Pending", ?, ?, ?)';
 
     db.query(
       sql,
-      [item_name, menu_img, description, price, categories_id, categories_name],
+      [
+        item_name,
+        menu_img,
+        description,
+        price,
+        categories_id,
+        categories_name,
+        created_by,
+      ],
       (err, result) => {
         if (err) {
           console.error(err);
@@ -243,6 +251,7 @@ app.get("/menu_items", (request, response) => {
       menu_img,
       description,
       price,
+      created_at,
       TRIM(availability) AS availability
     FROM menu_tbl
   `;
@@ -258,7 +267,92 @@ app.get("/menu_items", (request, response) => {
   });
 });
 
+// @ts-ignore
+app.get("/ingredients_items", (request, response) => {
+  const sql = `
+    SELECT 
+      menu_id,
+      categories_name,
+      item_name,
+      menu_img,
+      description,
+      price,
+      TRIM(availability) AS availability
+    FROM menu_tbl
+    WHERE categories_name != 'Drinks'
+  `;
+
+  db.query(sql, (error, data) => {
+    if (error) {
+      console.error("Error fetching items:", error);
+      return response.status(500).json({ error: "Internal Server Error" });
+    }
+
+    console.log("Fetched items (excluding Drinks):", data);
+    return response.json(data);
+  });
+});
+
+// @ts-ignore
+app.get("/menu_items_drinks", (request, response) => {
+  const sql = `
+    SELECT 
+      menu_id,
+      categories_name,
+      item_name,
+      menu_img,
+      description,
+      price,
+      TRIM(availability) AS availability
+    FROM menu_tbl
+    WHERE TRIM(categories_name) = 'Drinks'
+  `;
+
+  db.query(sql, (error, data) => {
+    if (error) {
+      console.error("Error fetching drinks:", error);
+      return response.status(500).json({ error: "Internal Server Error" });
+    }
+
+    console.log("Fetched drinks:", data);
+    return response.json(data);
+  });
+});
+
 //========================== MENUS ITEM END GET =======================================
+
+// ====================== Fetch low/out-of-stock notifications ======================
+app.get("/notifications", (req, res) => {
+  const sql = `
+    SELECT notification_id, message, status, created_at
+    FROM notifications_tbl
+    WHERE message LIKE '%low on stock%' OR message LIKE '%out of stock%'
+    ORDER BY created_at DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching notifications:", err);
+      return res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+    res.json(results);
+  });
+});
+
+// ====================== Mark notification as read ======================
+app.post("/notifications/read/:id", (req, res) => {
+  const id = req.params.id;
+
+  const sql = `UPDATE notifications_tbl SET status='read' WHERE notification_id=?`;
+
+  db.query(sql, [id], (err) => {
+    if (err) {
+      console.error("Error updating notification status:", err);
+      return res.status(500).json({ error: "Failed to mark as read" });
+    }
+    res.json({ message: "Notification marked as read" });
+  });
+});
 
 //========================== ADD CATEGORIES ===============================================
 
@@ -288,57 +382,71 @@ app.post("/add_categories", upload.single("categories_img"), (req, res) => {
 });
 
 app.post("/add_ingredients", (req, res) => {
-  const { ingredients_name, unit, category, measurement } = req.body; // measurement is varchar now
+  const { ingredients_name, unit, category, measurement, created_by } =
+    req.body;
 
-  if (!ingredients_name || !unit || !category || !measurement) {
+  if (!ingredients_name || !unit || !category || !measurement || !created_by) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
-  // Get menu_id
-  const getMenuIdSql = "SELECT menu_id FROM menu_tbl WHERE item_name = ?";
-  db.query(getMenuIdSql, [category], (err, results) => {
-    if (err) {
-      console.error("Error checking menu:", err);
-      return res.status(500).json({ message: "Database error" });
-    }
+  db.query(
+    "SELECT menu_id FROM menu_tbl WHERE item_name = ?",
+    [category],
+    (err, menu) => {
+      if (err) return res.status(500).json({ message: "Database error" });
+      if (!menu.length)
+        return res
+          .status(400)
+          .json({ message: "Selected category/item does not exist" });
 
-    if (results.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "Selected category/item does not exist" });
-    }
+      const menu_id = menu[0].menu_id;
+      const date_created = new Date();
 
-    const menu_id = results[0].menu_id;
-    const date_created = new Date();
+      db.query(
+        `INSERT INTO ingredients_tbl
+        (ingredients_name, unit, measurement, date_created, item_name, menu_id, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          ingredients_name,
+          unit,
+          measurement,
+          date_created,
+          category,
+          menu_id,
+          created_by,
+        ],
+        (err2, result) => {
+          if (err2) return res.status(500).json({ message: "Database error" });
 
-    // Insert into ingredients_tbl with measurement as VARCHAR
-    const insertSql =
-      "INSERT INTO ingredients_tbl (ingredients_name, unit, measurement, date_created, item_name, menu_id) VALUES (?, ?, ?, ?, ?, ?)";
+          db.query(
+            "UPDATE menu_tbl SET availability = 'Available' WHERE menu_id = ?",
+            [menu_id],
+            (err3) => {
+              if (err3)
+                return res.status(500).json({
+                  message: "Ingredient added but menu update failed",
+                });
 
-    db.query(
-      insertSql,
-      [ingredients_name, unit, measurement, date_created, category, menu_id],
-      (err2, result) => {
-        if (err2) {
-          console.error("Error inserting ingredient:", err2);
-          return res.status(500).json({ message: "Database error" });
+              // ✅ KEPT RESPONSE (UNCHANGED)
+              res.status(200).json({
+                message: "Ingredient added successfully",
+                id: result.insertId,
+                ingredient: {
+                  ingredients_name,
+                  unit,
+                  measurement,
+                  item_name: category,
+                  menu_id,
+                  date_created,
+                  created_by,
+                },
+              });
+            }
+          );
         }
-
-        res.status(200).json({
-          message: "Ingredient added successfully",
-          id: result.insertId,
-          ingredient: {
-            ingredients_name,
-            unit,
-            measurement, // now string
-            item_name: category,
-            menu_id,
-            date_created,
-          },
-        });
-      }
-    );
-  });
+      );
+    }
+  );
 });
 
 // Get ingredient name by ID
@@ -384,6 +492,420 @@ app.get("/ingredients_by_category/:menu_id", (req, res) => {
   });
 });
 
+// --- Add new expense category ---
+app.post("/add_expenses_category", (req, res) => {
+  const { category, created_by, status = "Active" } = req.body; // default to 'Active'
+
+  if (!category) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Category is required" });
+  }
+
+  const query =
+    "INSERT INTO expenses_category_tbl (category, created_by, status) VALUES (?, ?, ?)";
+  db.query(query, [category, created_by, status], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err });
+    res.json({
+      success: true,
+      message: "Expense category added",
+      id: result.insertId,
+    });
+  });
+});
+
+// --- Get all expense categories ---
+app.get("/get_expenses_categories", (req, res) => {
+  const query =
+    "SELECT * FROM expenses_category_tbl WHERE status='Active'   AND status != 'deleted'";
+  db.query(query, (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err });
+    res.json(results);
+  });
+});
+app.delete("/categories_expenses_delete/:id", (req, res) => {
+  const serveId = req.params.id;
+
+  console.log("Marking category as Used with ID:", serveId);
+
+  const sql =
+    "UPDATE expenses_category_tbl SET status = 'deleted' WHERE expenses_category_id = ?";
+
+  db.query(sql, [serveId], (error) => {
+    if (error) {
+      console.error("Error updating category status:", error);
+      return res.status(500).send("Error updating category status");
+    }
+    console.log("Category marked as deleted successfully");
+    res.send("Category marked as deleted successfully");
+  });
+});
+// Get all supply categories with status = 'deleted'
+app.get("/get_archive_expenses_categories", (req, res) => {
+  const sql = `
+    SELECT expenses_category_id, category, created_at, status
+    FROM expenses_category_tbl
+    WHERE status = 'deleted'
+    ORDER BY created_at DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching deleted categories:", err);
+      return res
+        .status(500)
+        .json({ error: "Failed to fetch deleted categories" });
+    }
+
+    res.json(results);
+  });
+});
+
+app.post("/restore_category_expenses/:id", (req, res) => {
+  const serveId = req.params.id;
+
+  const sql =
+    "UPDATE expenses_category_tbl SET status = 'Active' WHERE expenses_category_id = ?";
+
+  db.query(sql, [serveId], (error) => {
+    if (error) {
+      console.error("Error restoring category:", error);
+      return res.status(500).send("Error restoring category");
+    }
+    res.send("Category restored successfully");
+  });
+});
+
+// --- Add new expense subcategory ---
+app.post("/add_expenses_subcategory", (req, res) => {
+  const { subcategory, created_by, status = "Active" } = req.body;
+
+  if (!subcategory) {
+    return res
+      .status(400)
+      .json({ success: false, message: "SubCategory is required" });
+  }
+
+  const query =
+    "INSERT INTO expenses_subcategory_tbl (subcategory, created_by, status) VALUES (?, ?, ?)";
+  db.query(query, [subcategory, created_by, status], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err });
+    res.json({
+      success: true,
+      message: "Expense subcategory added",
+      id: result.insertId,
+    });
+  });
+});
+
+// --- Get all expense subcategories ---
+app.get("/get_expenses_subcategories", (req, res) => {
+  const query =
+    "SELECT * FROM expenses_subcategory_tbl WHERE status='Active' AND status != 'deleted'";
+  db.query(query, (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err });
+    res.json(results);
+  });
+});
+
+app.delete("/subcategories_expenses_delete/:id", (req, res) => {
+  const serveId = req.params.id;
+
+  console.log("Marking subcategory as Used with ID:", serveId);
+
+  const sql =
+    "UPDATE expenses_subcategory_tbl SET status = 'deleted' WHERE expenses_subcategory_id = ?";
+
+  db.query(sql, [serveId], (error) => {
+    if (error) {
+      console.error("Error updating subcategory status:", error);
+      return res.status(500).send("Error updating subcategory status");
+    }
+    console.log("Subcategory marked as deleted successfully");
+    res.send("Subcategory marked as deleted successfully");
+  });
+});
+app.get("/get_archive_expenses_subcategories", (req, res) => {
+  const sql = `
+    SELECT expenses_subcategory_id, subcategory, created_at, status
+    FROM expenses_subcategory_tbl
+    WHERE status = 'deleted'
+    ORDER BY created_at DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching deleted categories:", err);
+      return res
+        .status(500)
+        .json({ error: "Failed to fetch deleted categories" });
+    }
+
+    res.json(results);
+  });
+});
+app.post("/restore_subcategory_expenses/:id", (req, res) => {
+  const serveId = req.params.id;
+
+  const sql =
+    "UPDATE expenses_subcategory_tbl SET status = 'Active' WHERE expenses_subcategory_id = ?";
+
+  db.query(sql, [serveId], (error) => {
+    if (error) {
+      console.error("Error restoring category:", error);
+      return res.status(500).send("Error restoring category");
+    }
+    res.send("Category restored successfully");
+  });
+});
+
+// Add new expense
+app.post("/add_expenses", (req, res) => {
+  const {
+    expense_date,
+    category,
+    subcategory,
+    description,
+    amount,
+    method,
+    receipt_no,
+    remarks,
+    created_by,
+  } = req.body;
+
+  if (
+    !expense_date ||
+    !category ||
+    !subcategory ||
+    !description ||
+    !amount ||
+    !method ||
+    !created_by
+  ) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Missing required fields" });
+  }
+
+  const sql = `
+    INSERT INTO expenses_tbl 
+      (expense_date, category, subcategory, description, amount, method, receipt_no, remarks, created_by) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  const values = [
+    expense_date,
+    category,
+    subcategory,
+    description,
+    amount,
+    method,
+    receipt_no || null,
+    remarks || null,
+    created_by,
+  ];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Error inserting expense:", err);
+      return res.status(500).json({ success: false, error: err });
+    }
+
+    // Return the newly created expense record
+    const newExpense = {
+      expenses_id: result.insertId,
+      expense_date,
+      category,
+      subcategory,
+      description,
+      amount,
+      method,
+      receipt_no: receipt_no || "",
+      remarks: remarks || "",
+      created_by,
+    };
+
+    res.json(newExpense);
+  });
+});
+app.get("/expenses", (req, res) => {
+  const { start, end } = req.query; // dates from frontend
+
+  let sql = "SELECT * FROM expenses_tbl";
+  const params = []; // <-- remove : any[]
+
+  if (start && end) {
+    sql += " WHERE expense_date BETWEEN ? AND ?";
+    params.push(start, end);
+  }
+
+  sql += " ORDER BY expenses_id DESC";
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error("Error fetching expenses:", err);
+      return res.status(500).json({ success: false, error: err });
+    }
+    res.json(results); // return array of objects
+  });
+});
+
+// ================== UPDATE EXPENSE ==================
+app.put("/expenses/:expenses_id", (req, res) => {
+  const { expenses_id } = req.params;
+  const {
+    expense_date,
+    category,
+    subcategory,
+    description,
+    amount,
+    method,
+    receipt_no,
+    remarks,
+  } = req.body;
+
+  // Validation
+  if (
+    !expense_date ||
+    !category ||
+    !subcategory ||
+    !description ||
+    !amount ||
+    !method
+  ) {
+    return res.status(400).json({ message: "Required fields missing." });
+  }
+
+  const sql = `
+    UPDATE expenses_tbl
+    SET expense_date = ?, category = ?, subcategory = ?, description = ?, amount = ?, method = ?, receipt_no = ?, remarks = ?
+    WHERE expenses_id = ?
+  `;
+
+  db.query(
+    sql,
+    [
+      expense_date,
+      category,
+      subcategory,
+      description,
+      amount,
+      method,
+      receipt_no,
+      remarks,
+      expenses_id,
+    ],
+    (err, result) => {
+      if (err) {
+        console.error("Error updating expense:", err);
+        return res.status(500).json({ message: "Failed to update expense." });
+      }
+      res.json({ message: "Expense updated successfully." });
+    }
+  );
+});
+
+// ======================= FINANCIAL SALES SUMMARY ROUTE ======================= //
+app.get("/financial_summary", (req, res) => {
+  const { start, end } = req.query; // Expect YYYY-MM-DD
+  // ===== TOTAL SALES =====
+  db.execute(
+    `SELECT SUM(amount) AS total_sales 
+     FROM transaction_tbl 
+     WHERE status='Completed' 
+    AND DATE(created_at) BETWEEN ? AND ?`,
+    [start, end],
+    (err, salesRows) => {
+      if (err) return res.status(500).json({ message: "Error fetching sales" });
+      const totalSales = Number(salesRows[0]?.total_sales) || 0;
+
+      // ===== TOTAL EXPENSES =====
+      db.execute(
+        `SELECT SUM(amount) AS total_expenses 
+         FROM expenses_tbl 
+        WHERE DATE(expense_date) BETWEEN ? AND ?`,
+        [start, end],
+        (err, expenseRows) => {
+          if (err)
+            return res.status(500).json({ message: "Error fetching expenses" });
+          const totalExpenses = Number(expenseRows[0]?.total_expenses) || 0;
+
+          // ===== TOTAL SUPPLY COST =====
+          db.execute(
+            `SELECT SUM(price) AS supply_cost 
+             FROM supply_tbl 
+          WHERE DATE(created_at) BETWEEN ? AND ?`,
+            [start, end],
+            (err, supplyRows) => {
+              if (err)
+                return res
+                  .status(500)
+                  .json({ message: "Error fetching supply cost" });
+              const supplyCost = Number(supplyRows[0]?.supply_cost) || 0;
+
+              // ===== TOTAL DRINKS SUPPLY COST =====
+              db.execute(
+                `SELECT SUM(price) AS supply_drinks_cost
+FROM supply_drinks_tbl
+      WHERE DATE(created_at) BETWEEN ? AND ?`,
+                [start, end],
+                (err, supplyRows) => {
+                  if (err)
+                    return res
+                      .status(500)
+                      .json({ message: "Error fetching drinks supply cost" });
+
+                  const supplyDrinksCost =
+                    Number(supplyRows[0]?.supply_drinks_cost) || 0;
+
+                  // ===== TOTAL ORDERS =====
+                  db.execute(
+                    `SELECT COUNT(*) AS total_orders 
+                 FROM transaction_tbl 
+                 WHERE status='Completed' 
+                      AND DATE(created_at) BETWEEN ? AND ?`,
+                    [start, end],
+                    (err, orderRows) => {
+                      if (err)
+                        return res
+                          .status(500)
+                          .json({ message: "Error fetching orders" });
+                      const totalOrders =
+                        Number(orderRows[0]?.total_orders) || 0;
+
+                      // ===== CALCULATIONS =====
+                      const totalCost =
+                        totalExpenses + supplyCost + supplyDrinksCost;
+                      const grossProfit = Math.abs(totalSales - totalCost);
+                      const profitMargin =
+                        totalSales > 0
+                          ? Math.abs((grossProfit / totalSales) * 100)
+                          : 0;
+                      const averageOrderValue =
+                        totalOrders > 0 ? totalSales / totalOrders : 0;
+
+                      res.json({
+                        total_sales: totalSales,
+                        total_expenses: totalExpenses,
+                        supply_cost: supplyCost,
+                        supply_cost_drinks: supplyDrinksCost,
+                        total_cost: totalCost,
+                        gross_profit: grossProfit,
+                        profit_margin: profitMargin,
+                        total_orders: totalOrders,
+                        average_order_value: averageOrderValue,
+                      });
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
 // ✅ Update ingredient and fetch worker info
 app.put("/update_ingredient/:id", (req, res) => {
   const { id } = req.params;
@@ -648,6 +1170,24 @@ app.delete("/categories/:id", (req, res) => {
   });
 });
 
+app.delete("/categories_supply_delete/:id", (req, res) => {
+  const serveId = req.params.id;
+
+  console.log("Marking category as Used with ID:", serveId);
+
+  const sql =
+    "UPDATE supply_categories SET status = 'deleted' WHERE cat_supply_id = ?";
+
+  db.query(sql, [serveId], (error) => {
+    if (error) {
+      console.error("Error updating category status:", error);
+      return res.status(500).send("Error updating category status");
+    }
+    console.log("Category marked as deleted successfully");
+    res.send("Category marked as deleted successfully");
+  });
+});
+
 app.put("/category/:id", (request, response) => {
   const categoriesId = request.params.id;
   const { categories_name } = request.body;
@@ -689,6 +1229,83 @@ app.get("/get_archived", (req, res) => {
     return res.json(data); // Return archived categories
   });
 });
+
+// Get all supply categories with status = 'deleted'
+app.get("/get_archive_supply_categories", (req, res) => {
+  const sql = `
+    SELECT cat_supply_id, supply_cat_name, created_at, created_by, status
+    FROM supply_categories
+    WHERE status = 'deleted'
+    ORDER BY created_at DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching deleted categories:", err);
+      return res
+        .status(500)
+        .json({ error: "Failed to fetch deleted categories" });
+    }
+
+    res.json(results);
+  });
+});
+// ✅ Get all archived reservations
+
+app.get("/get_archive_reservation", (req, res) => {
+  const sql = `
+    SELECT 
+      r.reservation_id,
+      r.user_id,
+      r.email,
+      r.full_name,
+      r.reservation_time,
+      r.reservation_date,
+      r.pnum,
+      r.num_of_people,
+      r.status,
+      r.payment_status,
+      r.table_status,
+      r.special_request,
+      r.reservation_status,
+      GROUP_CONCAT(ut.table_id ORDER BY ut.table_id ASC) AS table_ids
+    FROM reservation_tbl r
+    LEFT JOIN usertable_list ut 
+      ON r.reservation_id = ut.reservation_id
+    WHERE r.reservation_status = 'Deleted'
+    GROUP BY r.reservation_id
+    ORDER BY r.reservation_date DESC, r.reservation_time DESC
+  `;
+
+  db.query(sql, (error, results) => {
+    if (error) {
+      console.error("Error fetching archived reservations:", error);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.json(results);
+  });
+});
+
+// ✅ Restore archived reservation
+app.put("/restore_reservation/:reservation_id", (req, res) => {
+  const { reservation_id } = req.params;
+
+  const sql = `
+    UPDATE reservation_tbl
+    SET reservation_status = 'Active'
+    WHERE reservation_id = ?
+  `;
+
+  db.query(sql, [reservation_id], (err) => {
+    if (err) {
+      console.error("Error restoring reservation:", err);
+      return res.status(500).json({ error: "Failed to restore reservation" });
+    }
+
+    res.json({ message: "Reservation restored successfully" });
+  });
+});
+
 app.post("/restore_category/:id", (req, res) => {
   const serveId = req.params.id;
 
@@ -704,200 +1321,368 @@ app.post("/restore_category/:id", (req, res) => {
   });
 });
 
-app.post("/add_supply", (req, res) => {
+app.post("/restore_category_supply/:id", (req, res) => {
+  const serveId = req.params.id;
+
+  const sql =
+    "UPDATE supply_categories SET status = 'Available' WHERE cat_supply_id = ?";
+
+  db.query(sql, [serveId], (error) => {
+    if (error) {
+      console.error("Error restoring category:", error);
+      return res.status(500).send("Error restoring category");
+    }
+    res.send("Category restored successfully");
+  });
+});
+
+app.post("/add_supply_ingredients", (req, res) => {
   const {
     inventoryId,
     productName,
-    category,
-
+    cat_supply_id,
     stockIn,
     unit,
     price,
     status,
-    cat_supply_id,
+    created_by,
   } = req.body;
 
+  // Validate required fields
   if (
     !productName ||
-    !category ||
-    stockIn === undefined ||
-    stockIn === null ||
+    !cat_supply_id ||
+    stockIn == null ||
     !unit ||
-    price === undefined ||
-    price === null ||
+    price == null ||
     !status ||
-    !cat_supply_id
+    !created_by
   ) {
     return res.status(400).json({ success: false, message: "Missing fields" });
   }
 
-  // Helper: insert supply and update inventory stock + created_at
-  const insertSupplyAndRecalc = (
-    /** @type {any} */ invId,
-    /** @type {any} */ categoryName
-  ) => {
-    const insertSupplySql = `
-      INSERT INTO supply_tbl
-      (inventory_id, cat_supply_id, product_name, category, stock_in, unit, price, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-    `;
+  // Helper: generate batch number based on existing supply count
+  // ✅ Changed from counting by inventory_id to counting by product_name
+  const generateBatchNo = (productName, callback) => {
     db.query(
-      insertSupplySql,
-      [
-        invId,
-        cat_supply_id,
-        productName,
-        categoryName, // ✅ Use category name
+      "SELECT COUNT(*) AS batch_count FROM supply_tbl WHERE product_name = ?",
+      [productName],
+      (err, rows) => {
+        if (err) return callback(err);
+        const batchCount = rows[0]?.batch_count || 0;
+        callback(null, `Stock ${batchCount + 1}`);
+      }
+    );
+  };
 
-        stockIn,
-        unit,
-        price,
-        status,
-      ],
-      (err) => {
-        if (err) {
-          console.error("❌ Insert Supply Error:", err);
-          return res
-            .status(500)
-            .json({ success: false, message: "DB insert supply error" });
-        }
+  // Insert supply and inventory
+  const insertSupplyAndInventory = (invId, categoryName) => {
+    generateBatchNo(productName, (err, batchNo) => {
+      // ✅ pass productName instead of invId
+      if (err)
+        return res
+          .status(500)
+          .json({ success: false, message: "Batch generation error" });
 
-        const calcSql = `
-          SELECT 
-            SUM(stock_in) AS total_stock,
-            MAX(created_at) AS latest_created
-          FROM supply_tbl
-          WHERE inventory_id = ?
-        `;
-        db.query(calcSql, [invId], (err2, rows) => {
-          if (err2) {
-            console.error("❌ Calc Totals Error:", err2);
+      const insertInventorySql = `
+        INSERT INTO inventory_tbl
+        (product_name, category, stock_in, stock_out, batch_no, unit, price, status, created_at, created_by)
+        VALUES (?, ?, ?, 0, ?, ?, ?, ?, NOW(), ?)
+      `;
+
+      db.query(
+        insertInventorySql,
+        [
+          productName,
+          categoryName,
+          stockIn,
+          batchNo,
+          unit,
+          price,
+          status,
+          created_by,
+        ],
+        (err2, result) => {
+          if (err2)
             return res
               .status(500)
-              .json({ success: false, message: "DB calc error" });
-          }
+              .json({ success: false, message: "DB insert inventory error" });
 
-          const total_stock = rows[0].total_stock || 0;
-          const latest_created = rows[0].latest_created;
+          const inventoryId = result.insertId;
 
-          const updateInventorySql = `
-            UPDATE inventory_tbl
-            SET stock_in = ?, created_at = ?, category = ?
-            WHERE inventory_id = ?
+          const insertSupplySql = `
+            INSERT INTO supply_tbl
+            (inventory_id, product_name, category, stock_in, batch_no, unit, price, status, created_at, cat_supply_id, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)
           `;
+
           db.query(
-            updateInventorySql,
-            [total_stock, latest_created, categoryName, invId], // ✅ Update category name
+            insertSupplySql,
+            [
+              inventoryId,
+              productName,
+              categoryName,
+              stockIn,
+              batchNo,
+              unit,
+              price,
+              status,
+              cat_supply_id,
+              created_by,
+            ],
             (err3) => {
-              if (err3) {
-                console.error("❌ Update Inventory Error:", err3);
-                return res.status(500).json({
-                  success: false,
-                  message: "DB update inventory error",
-                });
-              }
+              if (err3)
+                return res
+                  .status(500)
+                  .json({ success: false, message: "DB insert supply error" });
+
+              const updateMenuSQL = `
+      UPDATE menu_tbl m
+      JOIN ingredients_tbl i ON i.item_name = m.item_name
+      SET m.availability = 'Available'
+      WHERE i.ingredients_name = ?
+    `;
+              db.query(updateMenuSQL, [productName], (err) => {
+                if (err) console.error("Menu availability update error:", err);
+              });
+
               return res.json({
                 success: true,
-                message: "Supply added & inventory updated successfully",
-                inventory_id: invId,
+                message: `Supply added with ${batchNo}`,
+                inventory_id: inventoryId,
+              });
+            }
+          );
+        }
+      );
+    });
+  };
+
+  // Fetch category name
+  db.query(
+    "SELECT supply_cat_name FROM supply_categories WHERE cat_supply_id = ? LIMIT 1",
+    [cat_supply_id],
+    (err, rows) => {
+      if (err)
+        return res
+          .status(500)
+          .json({ success: false, message: "Failed to get category name" });
+
+      const categoryName = rows[0]?.supply_cat_name || "Uncategorized";
+
+      if (inventoryId) {
+        // Existing inventory → just add batch
+        insertSupplyAndInventory(inventoryId, categoryName);
+      } else {
+        // Check if inventory exists by product name & unit
+        db.query(
+          "SELECT * FROM inventory_tbl WHERE product_name = ? AND unit = ? LIMIT 1",
+          [productName, unit],
+          (err, rows) => {
+            if (err)
+              return res
+                .status(500)
+                .json({ success: false, message: "DB find inventory error" });
+
+            if (rows.length > 0) {
+              // Inventory exists → use its inventory_id
+              insertSupplyAndInventory(rows[0].inventory_id, categoryName);
+            } else {
+              // New inventory → insert actual batch directly
+              insertSupplyAndInventory(null, categoryName);
+            }
+          }
+        );
+      }
+    }
+  );
+});
+
+app.post("/add_supply_drinks", (req, res) => {
+  const {
+    drinks_inventory_id,
+    product_name,
+    stock_in,
+    unit,
+    price,
+    status,
+    created_by,
+  } = req.body;
+
+  // Validate required fields
+  if (
+    !product_name ||
+    stock_in == null ||
+    !unit ||
+    price == null ||
+    !status ||
+    !created_by
+  ) {
+    return res.status(400).json({ success: false, message: "Missing fields" });
+  }
+
+  const checkDrinkSQL = `
+  SELECT item_name 
+  FROM menu_tbl 
+  WHERE categories_name = 'Drinks'
+    AND item_name = ?
+  LIMIT 1
+`;
+
+  db.query(checkDrinkSQL, [product_name], (err, drinkRows) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        message: "DB error checking drinks",
+      });
+    }
+
+    if (drinkRows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid product_name. Only drinks are allowed.",
+      });
+    }
+
+    // =============================
+    // 2) BATCH NUMBER GENERATOR
+    // =============================
+    const generateBatchNo = (productName, callback) => {
+      db.query(
+        "SELECT COUNT(*) AS batch_count FROM supply_drinks_tbl WHERE product_name = ?",
+        [productName],
+        (err2, rows) => {
+          if (err2) return callback(err2);
+          const batchCount = rows[0]?.batch_count || 0;
+          callback(null, `Stock ${batchCount + 1}`);
+        }
+      );
+    };
+
+    // =============================
+    // 3) INSERT LOGIC
+    // =============================
+    const insertSupplyAndInventory = (invId) => {
+      generateBatchNo(product_name, (err3, batchNo) => {
+        if (err3)
+          return res
+            .status(500)
+            .json({ success: false, message: "Batch generation error" });
+
+        const insertIfNeeded = (callback) => {
+          const sql = `
+        INSERT INTO drinks_inventory_tbl
+        (product_name, stock_in, stock_out, batch_no, unit, status, created_at, created_by)
+        VALUES (?, ?, 0, ?, ?, ?, NOW(), ?)
+    `;
+          db.query(
+            sql,
+            [product_name, stock_in, batchNo, unit, status, created_by],
+            (err, result) => {
+              if (err) return callback(err);
+              callback(null, result.insertId);
+            }
+          );
+        };
+
+        insertIfNeeded((err5, newInvId) => {
+          if (err5)
+            return res.status(500).json({
+              success: false,
+              message: "Insert inventory error",
+            });
+
+          const sqlSupply = `
+            INSERT INTO supply_drinks_tbl
+            (drinks_inventory_id, product_name, stock_in, batch_no, unit, price, status, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+          `;
+
+          db.query(
+            sqlSupply,
+            [
+              newInvId,
+              product_name,
+              stock_in,
+              batchNo,
+              unit,
+              price,
+              status,
+              created_by,
+            ],
+            (err6) => {
+              if (err6)
+                return res.status(500).json({
+                  success: false,
+                  message: "Insert supply error",
+                });
+
+              const updateMenuSQL = `
+      UPDATE menu_tbl 
+      SET availability = 'Available'
+      WHERE item_name = ?
+    `;
+              db.query(updateMenuSQL, [product_name], (err) => {
+                if (err) console.error("Menu availability update error:", err);
+              });
+
+              return res.json({
+                success: true,
+                message: `Drink supply added with ${batchNo}`,
+                drinks_inventory_id: newInvId,
               });
             }
           );
         });
-      }
-    );
-  };
+      });
+    };
 
-  // Main Flow
-  const fetchCategoryName = (callback) => {
-    db.query(
-      "SELECT supply_cat_name FROM supply_categories WHERE cat_supply_id = ? LIMIT 1",
-      [cat_supply_id],
-      (err, rows) => {
-        if (err)
-          return res
-            .status(500)
-            .json({ success: false, message: "Failed to get category name" });
-        const categoryName = rows[0]?.supply_cat_name || "Uncategorized";
-        callback(categoryName);
-      }
-    );
-  };
+    // =============================
+    // 4) CHECK IF INVENTORY EXISTS
+    // =============================
+    if (drinks_inventory_id) {
+      insertSupplyAndInventory(drinks_inventory_id);
+    } else {
+      db.query(
+        "SELECT * FROM drinks_inventory_tbl WHERE product_name = ? AND unit = ? LIMIT 1",
+        [product_name, unit],
+        (err7, rows) => {
+          if (err7)
+            return res.status(500).json({
+              success: false,
+              message: "Find inventory error",
+            });
 
-  if (inventoryId) {
-    db.query(
-      "SELECT * FROM inventory_tbl WHERE inventory_id = ? LIMIT 1",
-      [inventoryId],
-      (err, rows) => {
-        if (err)
-          return res
-            .status(500)
-            .json({ success: false, message: "DB check error" });
-        fetchCategoryName((categoryName) => {
           if (rows.length > 0) {
-            insertSupplyAndRecalc(inventoryId, categoryName);
+            insertSupplyAndInventory(rows[0].drinks_inventory_id);
           } else {
-            const createInvSql = `
-              INSERT INTO inventory_tbl
-              (product_name, category, stock_in, stock_out, unit, status, created_at)
-              VALUES (?, ?, 0, 0, ?, ?, NOW())
-            `;
-            db.query(
-              createInvSql,
-              [productName, categoryName, unit, status],
-              (err2, result2) => {
-                if (err2)
-                  return res.status(500).json({
-                    success: false,
-                    message: "DB insert inventory error",
-                  });
-                insertSupplyAndRecalc(result2.insertId, categoryName);
-              }
-            );
+            insertSupplyAndInventory(null);
           }
-        });
-      }
-    );
-  } else {
-    db.query(
-      "SELECT * FROM inventory_tbl WHERE product_name = ? AND unit = ? LIMIT 1",
-      [productName, unit],
-      (err, rows) => {
-        if (err)
-          return res
-            .status(500)
-            .json({ success: false, message: "DB find inventory error" });
-        fetchCategoryName((categoryName) => {
-          if (rows.length > 0) {
-            insertSupplyAndRecalc(rows[0].inventory_id, categoryName);
-          } else {
-            const createInvSql = `
-              INSERT INTO inventory_tbl
-              (product_name, category, stock_in, stock_out, unit, status, created_at)
-              VALUES (?, ?, 0, 0, ?, ?, NOW())
-            `;
-            db.query(
-              createInvSql,
-              [productName, categoryName, unit, status],
-              (err2, result2) => {
-                if (err2)
-                  return res.status(500).json({
-                    success: false,
-                    message: "DB insert inventory error",
-                  });
-                insertSupplyAndRecalc(result2.insertId, categoryName);
-              }
-            );
-          }
-        });
-      }
-    );
-  }
+        }
+      );
+    }
+  });
 });
 
-// ✅ API to get all inventory
+// ✅ API to get all drinks supply
+app.get("/get_supply_drinks", (req, res) => {
+  const sql =
+    "SELECT * FROM supply_drinks_tbl ORDER BY drinks_inventory_id, batch_no ASC";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ MySQL Get Supply Drinks Error:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Database error (get Supply Drinks)",
+      });
+    }
+    res.json({ success: true, data: results });
+  });
+});
+
+// ✅ API to get all supply
 app.get("/get_supply", (req, res) => {
-  const sql = "SELECT * FROM supply_tbl";
+  const sql = "SELECT * FROM supply_tbl ORDER BY inventory_id, batch_no ASC";
   db.query(sql, (err, results) => {
     if (err) {
       console.error("❌ MySQL Get Supply Error:", err);
@@ -911,7 +1696,22 @@ app.get("/get_supply", (req, res) => {
 
 // ✅ API to get all inventory
 app.get("/get_inventory", (req, res) => {
-  const sql = "SELECT * FROM inventory_tbl";
+  const sql = "SELECT * FROM inventory_tbl ORDER BY inventory_id, batch_no ASC";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ MySQL Get Inventory Error:", err);
+      return res
+        .status(500)
+        .json({ success: false, message: "Database error (get inventory)" });
+    }
+    res.json({ success: true, data: results });
+  });
+});
+
+// ✅ API to get all inventory
+app.get("/get_inventory_drinks", (req, res) => {
+  const sql =
+    "SELECT * FROM drinks_inventory_tbl ORDER BY drinks_inventory_id, batch_no ASC";
   db.query(sql, (err, results) => {
     if (err) {
       console.error("❌ MySQL Get Inventory Error:", err);
@@ -1041,14 +1841,14 @@ app.put("/update_supply/:supply_id", (req, res) => {
 
 // Insert category
 app.post("/add_supply_category", (req, res) => {
-  const { supply_cat_name } = req.body;
+  const { supply_cat_name, created_by } = req.body;
 
   const sql = `
-    INSERT INTO supply_categories (supply_cat_name, created_at)
-    VALUES (?, NOW())
+    INSERT INTO supply_categories (supply_cat_name, status, created_at, created_by)
+    VALUES (?,'Available', NOW(), ?)
   `;
 
-  db.query(sql, [supply_cat_name], (err, result) => {
+  db.query(sql, [supply_cat_name, created_by], (err, result) => {
     if (err) {
       console.error("Error inserting supply category:", err);
       return res.status(500).json({ error: "Failed to add supply category" });
@@ -1056,7 +1856,7 @@ app.post("/add_supply_category", (req, res) => {
 
     // Fetch the inserted row to return full data
     const fetchSql = `
-      SELECT cat_supply_id, supply_cat_name, created_at
+      SELECT cat_supply_id, supply_cat_name, created_at, status
       FROM supply_categories
       WHERE cat_supply_id = ?
     `;
@@ -1076,8 +1876,9 @@ app.post("/add_supply_category", (req, res) => {
 // Get all categories
 app.get("/get_supply_categories", (req, res) => {
   const sql = `
-    SELECT cat_supply_id, supply_cat_name, created_at
+    SELECT cat_supply_id, supply_cat_name, created_at, status
     FROM supply_categories
+     WHERE status != 'deleted'      -- <--- ADD THIS LINE
     ORDER BY cat_supply_id ASC
   `;
 
@@ -1286,6 +2087,16 @@ app.post("/login", (req, res) => {
         message: "Please verify your email account in your email inbox",
       });
     }
+    // Set user_login_time
+    const updateLoginSql = `
+  UPDATE user_tbl 
+  SET user_login_time = NOW(),
+      last_active_time = NOW()
+  WHERE user_id = ?
+`;
+    db.query(updateLoginSql, [user.user_id], (err) => {
+      if (err) console.error("Error updating login times:", err);
+    });
 
     // Debug JWT_SECRET
     console.log("JWT Secret:", process.env.JWT_SECRET);
@@ -1316,6 +2127,81 @@ app.post("/login", (req, res) => {
       },
       token,
     });
+  });
+});
+// Node.js / Express
+
+app.post("/admin/logout", (req, res) => {
+  const { user_id } = req.body;
+
+  const sql = `
+   UPDATE user_tbl
+    SET last_active_time = NOW(), user_login_time = NULL
+    WHERE user_id = ?
+  `;
+
+  db.query(sql, [user_id], (err, result) => {
+    if (err) {
+      console.error("Logout error:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.json({ message: "Logout successful" });
+  });
+});
+app.post("/worker/logout", (req, res) => {
+  const { user_id } = req.body;
+
+  const sql = `
+    UPDATE user_tbl
+    SET last_active_time = NOW(), user_login_time = NULL
+    WHERE user_id = ?
+  `;
+
+  db.query(sql, [user_id], (err, result) => {
+    if (err) {
+      console.error("Logout error:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.json({ message: "Logout successful" });
+  });
+});
+
+// Backend route for logging out client using URL param
+
+app.post("/client/logout/:user_id", (req, res) => {
+  const { user_id } = req.params; // read from URL
+
+  const sql = `
+    UPDATE user_tbl
+    SET last_active_time = NOW(), user_login_time = NULL
+    WHERE user_id = ?
+  `;
+
+  db.query(sql, [user_id], (err, result) => {
+    if (err) {
+      console.error("Logout error:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.json({ message: "Logout successful" });
+  });
+});
+
+// Update last_active_time on LOGIN
+app.post("/users/login", (req, res) => {
+  const { user_id } = req.body;
+
+  const sql = `
+    UPDATE user_tbl
+    SET last_active_time = NOW()
+    WHERE user_id = ?
+  `;
+
+  db.query(sql, [user_id], (err) => {
+    if (err) {
+      console.error("Login error:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.json({ message: "Login activity updated" });
   });
 });
 
@@ -2001,7 +2887,6 @@ app.put("/update_user/:id", upload.single("profile_pic"), (req, res) => {
 //==========================  CHAT ADMIN TO WORKER ============================
 // Send message endpoint
 // @ts-ignore
-// Send message from admin to worker (no receiver logic needed since only admin sends messages)
 app.post("/sendMessageToWorkers", (req, res) => {
   const { message, sender_id, recipient_id } = req.body;
 
@@ -2015,8 +2900,8 @@ app.post("/sendMessageToWorkers", (req, res) => {
 
   // Insert the message with admin as sender and worker as recipient
   db.query(
-    "INSERT INTO message_tbl (message, sender_id, receiver_id, timestamp, is_read, status) VALUES (?, ?, ?, ?, ?, 'active')",
-    [message, sender_id, recipient_id, timestamp, false],
+    "INSERT INTO message_tbl (message, sender_id, receiver_id, timestamp, status, is_read, read_by) VALUES (?, ?, ?, ?, 'active', 'unread', '0')",
+    [message, sender_id, recipient_id, timestamp],
     (err) => {
       if (err) {
         console.error(
@@ -2031,23 +2916,40 @@ app.post("/sendMessageToWorkers", (req, res) => {
 });
 
 // Get workers endpoint
-app.get("/get_workers_info", (request, response) => {
-  const sql =
-    "SELECT user_id, fname, lname, profile_pic, status FROM user_tbl WHERE role = 'worker'";
+app.get("/get_workers_info/:user_id", (req, res) => {
+  const { user_id } = req.params;
 
-  db.query(sql, (error, data) => {
-    if (error) {
-      console.error("Error fetching workers:", error);
-      return response.status(500).json({ error: "Internal Server Error" });
+  const sql = `
+    SELECT u.user_id, u.fname, u.lname, u.profile_pic, u.status, u.last_active_time, u.user_login_time,
+           m.message AS last_message,
+           m.timestamp AS last_message_time,
+           m.sender_id AS last_sender_id
+    FROM user_tbl u
+    LEFT JOIN (
+        SELECT t.sender_id, t.receiver_id, t.message, t.timestamp
+        FROM message_tbl t
+        INNER JOIN (
+            SELECT 
+                LEAST(sender_id, receiver_id) AS user1,
+                GREATEST(sender_id, receiver_id) AS user2,
+                MAX(timestamp) AS latest
+            FROM message_tbl
+            WHERE sender_id = ? OR receiver_id = ?
+            GROUP BY LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id)
+        ) lt ON 
+            LEAST(t.sender_id, t.receiver_id) = lt.user1 AND
+            GREATEST(t.sender_id, t.receiver_id) = lt.user2 AND
+            t.timestamp = lt.latest
+    ) m ON u.user_id = (CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END)
+    WHERE u.role = 'worker'
+  `;
+
+  db.query(sql, [user_id, user_id, user_id], (err, results) => {
+    if (err) {
+      console.error("Error fetching workers:", err.message);
+      return res.status(500).json({ error: "Internal Server Error" });
     }
-
-    if (data.length === 0) {
-      console.log("No workers found in the database.");
-      return response.json([]);
-    }
-
-    console.log("Fetched workers:", data);
-    return response.json(data);
+    res.json(results);
   });
 });
 // Get messages for a specific worker (filtered by worker and admin only)
@@ -2123,25 +3025,43 @@ app.get("/get_worker_profile_pic/:workerId", (req, res) => {
 });
 
 // Get admins endpoint
-app.get("/get_admin_info", (req, res) => {
-  const sql =
-    "SELECT user_id, fname, lname, profile_pic, status FROM user_tbl WHERE role = 'admin'";
+app.get("/get_admin_info/:user_id", (req, res) => {
+  const { user_id } = req.params;
 
-  db.query(sql, (error, data) => {
-    if (error) {
-      console.error("Error fetching admins:", error);
+  const sql = `
+    SELECT u.user_id, u.fname, u.lname, u.profile_pic, u.status, u.last_active_time, u.user_login_time,
+           m.message AS last_message,
+           m.timestamp AS last_message_time,
+           m.sender_id AS last_sender_id
+    FROM user_tbl u
+    LEFT JOIN (
+        SELECT t.sender_id, t.receiver_id, t.message, t.timestamp
+        FROM message_tbl t
+        INNER JOIN (
+            SELECT 
+                LEAST(sender_id, receiver_id) AS user1,
+                GREATEST(sender_id, receiver_id) AS user2,
+                MAX(timestamp) AS latest
+            FROM message_tbl
+            WHERE sender_id = ? OR receiver_id = ?
+            GROUP BY LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id)
+        ) lt ON 
+            LEAST(t.sender_id, t.receiver_id) = lt.user1 AND
+            GREATEST(t.sender_id, t.receiver_id) = lt.user2 AND
+            t.timestamp = lt.latest
+    ) m ON u.user_id = (CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END)
+    WHERE u.role = 'admin'
+  `;
+
+  db.query(sql, [user_id, user_id, user_id], (err, results) => {
+    if (err) {
+      console.error("Error fetching admins:", err.message);
       return res.status(500).json({ error: "Internal Server Error" });
     }
-
-    if (data.length === 0) {
-      console.log("No admins found in the database.");
-      return res.json([]);
-    }
-
-    console.log("Fetched admins:", data);
-    return res.json(data); // Return admins list
+    res.json(results);
   });
 });
+
 // Get messages for a specific worker (filtered by worker and admin only)
 app.get("/getMessagesWorker/:workerId/:adminId", (req, res) => {
   const { workerId, adminId } = req.params;
@@ -2179,8 +3099,8 @@ app.post("/sendMessageToAdmin", (req, res) => {
 
   // Insert the message into the database
   db.query(
-    "INSERT INTO message_tbl (message, sender_id, receiver_id, timestamp, is_read, status) VALUES (?, ?, ?, ?, ?, 'active')",
-    [message, sender_id, recipient_id, timestamp, false],
+    "INSERT INTO message_tbl (message, sender_id, receiver_id, timestamp, status, is_read, read_by) VALUES (?, ?, ?, ?, 'Active', 'unread', '0')",
+    [message, sender_id, recipient_id, timestamp],
     (err, result) => {
       if (err) {
         console.error("Failed to send message:", err.message);
@@ -2229,8 +3149,8 @@ app.post("/sendMessageToClients", (req, res) => {
   const timestamp = new Date();
 
   db.query(
-    "INSERT INTO message_tbl (message, sender_id, receiver_id, timestamp, is_read, status) VALUES (?, ?, ?, ?, ?, 'active')",
-    [message, sender_id, recipient_id, timestamp, false],
+    "INSERT INTO message_tbl (message, sender_id, receiver_id, timestamp, status, is_read, read_by) VALUES (?, ?, ?, ?, 'Active', 'unread', '0')",
+    [message, sender_id, recipient_id, timestamp],
     (err, result) => {
       if (err) {
         console.error("Failed to send message:", err.message);
@@ -2273,23 +3193,74 @@ app.get("/get_clients_profile_pic/:clientsId", (req, res) => {
 });
 
 // Get clients endpoint
-app.get("/get_clients_info", (req, res) => {
-  const sql =
-    "SELECT user_id, fname, lname, profile_pic, status FROM user_tbl WHERE role = 'client'";
+app.get("/get_clients_info/:user_id", (req, res) => {
+  const { user_id } = req.params;
 
-  db.query(sql, (error, data) => {
-    if (error) {
-      console.error("Error fetching clients:", error);
+  const sql = `
+    SELECT u.user_id, u.fname, u.lname, u.profile_pic, u.status,  u.last_active_time, u.user_login_time,
+           m.message AS last_message,
+           m.timestamp AS last_message_time,
+           m.sender_id AS last_sender_id
+    FROM user_tbl u
+    LEFT JOIN (
+        SELECT t.sender_id, t.receiver_id, t.message, t.timestamp
+        FROM message_tbl t
+        INNER JOIN (
+            SELECT 
+                LEAST(sender_id, receiver_id) AS user1,
+                GREATEST(sender_id, receiver_id) AS user2,
+                MAX(timestamp) AS latest
+            FROM message_tbl
+            WHERE sender_id = ? OR receiver_id = ?
+            GROUP BY LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id)
+        ) lt ON 
+            LEAST(t.sender_id, t.receiver_id) = lt.user1 AND
+            GREATEST(t.sender_id, t.receiver_id) = lt.user2 AND
+            t.timestamp = lt.latest
+    ) m ON u.user_id = (CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END)
+    WHERE u.role = 'client'
+  `;
+
+  db.query(sql, [user_id, user_id, user_id], (err, results) => {
+    if (err) {
+      console.error("Error fetching clients:", err.message);
       return res.status(500).json({ error: "Internal Server Error" });
     }
+    res.json(results);
+  });
+});
 
-    if (data.length === 0) {
-      console.log("No clients found in the database.");
-      return res.json([]);
+// GET /worker_notifications/:user_id
+app.get("/worker_notifications/:user_id", (req, res) => {
+  const { user_id } = req.params;
+
+  const sql = `
+    SELECT 
+      m.sender_id AS id,
+      m.message AS description,
+      m.timestamp AS time,
+      m.is_read,
+      u.profile_pic, user_id,
+      'Message' AS title
+    FROM message_tbl m
+    LEFT JOIN user_tbl u ON u.user_id = m.sender_id
+    WHERE m.receiver_id = ?
+    ORDER BY m.timestamp DESC
+  `;
+
+  db.query(sql, [user_id], (err, results) => {
+    if (err) {
+      console.error("Error fetching notifications:", err);
+      return res.status(500).json({ error: "Database error" });
     }
 
-    console.log("Fetched clients:", data);
-    return res.json(data); // Return clients list
+    // ensure is_read is always lowercase
+    const formatted = results.map((r) => ({
+      ...r,
+      is_read: r.is_read?.toLowerCase() === "read" ? "read" : "unread",
+    }));
+
+    res.json(formatted);
   });
 });
 
@@ -2309,10 +3280,8 @@ app.post("/sendMessageToAllWorkers", (req, res) => {
   }
 
   const timestamp = new Date();
-  const sender_role = "client";
   const receiver_role = "worker";
 
-  // Fetch all workers
   db.query(
     "SELECT user_id FROM user_tbl WHERE role = ?",
     [receiver_role],
@@ -2333,27 +3302,26 @@ app.post("/sendMessageToAllWorkers", (req, res) => {
         const recipient_id = worker.user_id;
 
         const insertSQL = `
-        INSERT INTO message_tbl (message, sender_id, receiver_id, timestamp, is_read, status, role)
-        VALUES (?, ?, ?, ?, ?, 'active', ?)
-      `;
+          INSERT INTO message_tbl 
+          (message, sender_id, receiver_id, timestamp, status, is_read, read_by) 
+          VALUES (?, ?, ?, ?, 'active', 'unread', '0')
+        `;
 
         db.query(
           insertSQL,
-          [message, sender_id, recipient_id, timestamp, false, sender_role],
+          [message, sender_id, recipient_id, timestamp],
           (err) => {
             if (err) {
               console.error(
                 `❌ Failed to send message to worker ${recipient_id}:`,
                 err.message
               );
-              // Don't return here — continue processing others
             } else {
               console.log(`✅ Message sent to worker ID: ${recipient_id}`);
             }
 
             messagesSent++;
 
-            // Send response only after all are processed
             if (messagesSent === totalWorkers) {
               return res.status(200).json({
                 message: "Messages sent to all workers successfully!",
@@ -2563,9 +3531,9 @@ app.post("/update_completed_tables", (req, res) => {
   });
 });
 
-// ✅ Update reservation status to "Dissolve"
+// ✅ Update reservation status to "Canceled"
 
-app.put("/update_reservation_dissolve_status/:reservation_id", (req, res) => {
+app.put("/update_reservation_canceled_status/:reservation_id", (req, res) => {
   const { reservation_id } = req.params;
 
   if (!reservation_id) {
@@ -2578,8 +3546,8 @@ app.put("/update_reservation_dissolve_status/:reservation_id", (req, res) => {
 
   const updateQuery = `
     UPDATE reservation_tbl
-    SET table_status = 'Dissolve'
-    WHERE reservation_id = ?
+    SET table_status = 'Canceled'
+    WHERE reservation_id = ? AND table_status != 'Completed'
   `;
 
   db.query(updateQuery, [numericResId], (err, result) => {
@@ -2588,11 +3556,11 @@ app.put("/update_reservation_dissolve_status/:reservation_id", (req, res) => {
       return res.status(500).json({ success: false, error: err.message });
     }
 
-    console.log(`✅ Reservation ${numericResId} marked as 'Dissolve'.`);
+    console.log(`✅ Reservation ${numericResId} marked as 'Canceled'.`);
 
     res.status(200).json({
       success: true,
-      message: `Reservation ${numericResId} marked as 'Dissolve'.`,
+      message: `Reservation ${numericResId} marked as 'Canceled'.`,
     });
   });
 });
@@ -2632,54 +3600,54 @@ app.delete("/delete_reservation/:user_id/:reservation_id", (req, res) => {
       return res.status(500).json({ error: "Internal Server Error" });
     }
 
-    // Delete related reservation_activity_tbl entries for that user and reservation
-    const deleteActivitySql = `
-      DELETE FROM reservation_activity_tbl 
+    // 1️⃣ Update reservation status instead of deleting
+    const updateReservationSql = `
+      UPDATE reservation_tbl
+      SET reservation_status = 'Deleted'
       WHERE reservation_id = ? AND user_id = ?
     `;
-    db.query(deleteActivitySql, [reservation_id, user_id], (err, result) => {
+
+    db.query(updateReservationSql, [reservation_id, user_id], (err) => {
       if (err) {
         return db.rollback(() => {
-          console.error("Error deleting reservation activity:", err);
-          res
-            .status(500)
-            .json({ error: "Failed to delete reservation activity" });
+          console.error("Error archiving reservation:", err);
+          res.status(500).json({ error: "Failed to archive reservation" });
         });
       }
 
-      // Delete the reservation itself for that user
-      const deleteReservationSql = `
-        DELETE FROM reservation_tbl 
+      // 2️⃣ (Optional) also mark activities as deleted instead of deleting
+      const updateActivitySql = `
+        UPDATE reservation_activity_tbl
+        SET status = 'Deleted'
         WHERE reservation_id = ? AND user_id = ?
       `;
-      db.query(
-        deleteReservationSql,
-        [reservation_id, user_id],
-        (err, result) => {
+
+      db.query(updateActivitySql, [reservation_id, user_id], (err) => {
+        if (err) {
+          return db.rollback(() => {
+            console.error("Error archiving reservation activity:", err);
+            res
+              .status(500)
+              .json({ error: "Failed to archive reservation activity" });
+          });
+        }
+
+        db.commit((err) => {
           if (err) {
             return db.rollback(() => {
-              console.error("Error deleting reservation:", err);
-              res.status(500).json({ error: "Failed to delete reservation" });
+              console.error("Transaction commit failed:", err);
+              res.status(500).json({ error: "Transaction commit failed" });
             });
           }
 
-          db.commit((err) => {
-            if (err) {
-              return db.rollback(() => {
-                console.error("Transaction commit failed:", err);
-                res.status(500).json({ error: "Transaction commit failed" });
-              });
-            }
-
-            console.log(
-              `Deleted reservation ${reservation_id} for user ${user_id} and related activities`
-            );
-            res.json({
-              message: "Reservation and related activity deleted successfully",
-            });
+          console.log(
+            `Archived reservation ${reservation_id} for user ${user_id}`
+          );
+          res.json({
+            message: "Reservation archived successfully",
           });
-        }
-      );
+        });
+      });
     });
   });
 });
@@ -2765,6 +3733,7 @@ app.get("/get_reservation", (req, res) => {
     FROM reservation_tbl r
     LEFT JOIN usertable_list ut 
       ON r.reservation_id = ut.reservation_id
+        WHERE r.reservation_status != 'Deleted'  -- ✅ exclude deleted reservations
     GROUP BY r.reservation_id
   `;
 
@@ -3262,7 +4231,7 @@ app.post("/update_payment_status/:order_id", async (req, res) => {
 
     // 2️⃣ Get order items
     const orderItems = await new Promise((resolve, reject) => {
-      const sql = `SELECT item_name, order_quantity FROM orderitem_tbl WHERE order_id = ?`;
+      const sql = `SELECT item_name, order_quantity,  categories_name  FROM orderitem_tbl WHERE order_id = ?`;
       db.query(sql, [orderId], (err, results) => {
         if (err) reject(err);
         else resolve(results);
@@ -3310,162 +4279,216 @@ app.post("/update_payment_status/:order_id", async (req, res) => {
       }
     }
 
-    // 4️⃣ Update inventory and check stock level
-    for (const [ingredient, totalDeduction] of Object.entries(deductions)) {
-      await new Promise((resolve, reject) => {
-        const sql = `
-    UPDATE inventory_tbl
-    SET 
-      stock_out = stock_out + LEAST(?, stock_in),
-      stock_in = GREATEST(stock_in - ?, 0)
-    WHERE product_name = ?
-  `;
-        db.query(sql, [totalDeduction, totalDeduction, ingredient], (err) => {
-          if (err) reject(err);
-          else resolve(true);
-        });
-      });
+    // 4️⃣ Update inventory using FIFO batch system
+    for (const ingredient in deductions) {
+      let remainingToDeduct = deductions[ingredient];
 
-      // 🧮 Round values and prevent negative stock
-      await new Promise((resolve, reject) => {
+      // 4.1 Get all batches ordered by batch_no (FIFO)
+      const batches = await new Promise((resolve, reject) => {
         const sql = `
-          UPDATE inventory_tbl
-          SET 
-            stock_in = GREATEST(ROUND(stock_in, 3), 0),
-            stock_out = ROUND(stock_out, 3)
+          SELECT inventory_id, stock_in, stock_out, batch_no
+          FROM inventory_tbl
           WHERE product_name = ?
+          ORDER BY batch_no ASC
         `;
-        db.query(sql, [ingredient], (err) => {
-          if (err) reject(err);
-          else resolve(true);
-        });
-      });
-
-      // 5️⃣ Check updated stock
-      const stockInfo = await new Promise((resolve, reject) => {
-        const sql = `SELECT stock_in FROM inventory_tbl WHERE product_name = ?`;
         db.query(sql, [ingredient], (err, results) => {
           if (err) reject(err);
-          else resolve(results[0]);
+          else resolve(results);
         });
       });
 
-      // ✅ Convert string DECIMAL to number before using toFixed
-      const remainingStock = parseFloat(
-        parseFloat(stockInfo.stock_in).toFixed(3)
-      );
+      // 4.2 Deduct from batches one by one
+      for (const batch of batches) {
+        if (remainingToDeduct <= 0) break;
 
-      // ⚙️ 6️⃣ Determine stock status and take action
-      if (remainingStock <= 0.0) {
+        let available = parseFloat(batch.stock_in);
+        const deduction = Math.min(available, remainingToDeduct);
+
+        // Deduct from this batch
         await new Promise((resolve, reject) => {
-          const sql = `UPDATE inventory_tbl SET status = 'Not Available' WHERE product_name = ?`;
-          db.query(sql, [ingredient], (err) => {
+          const sql = `
+            UPDATE inventory_tbl
+            SET stock_in = GREATEST(stock_in - ?, 0),
+                stock_out = stock_out + ?
+            WHERE inventory_id = ?
+          `;
+          db.query(sql, [deduction, deduction, batch.inventory_id], (err) => {
             if (err) reject(err);
             else resolve(true);
           });
         });
 
-        // ✅ Update menu_tbl availability based on all ingredients
+        remainingToDeduct -= deduction;
+
+        // 4.3 Update batch status
+        const newStock = available - deduction;
+        let status = "Available";
+        if (newStock <= 0) status = "Not Available";
+        else if (newStock <= 2.0) status = "Low Stock";
+
         await new Promise((resolve, reject) => {
-          const sqlNotAvailable = `
-    UPDATE menu_tbl m
-    SET availability = 'Not Available'
-    WHERE EXISTS (
-      SELECT 1
-      FROM ingredients_tbl i
-      JOIN inventory_tbl inv ON i.ingredients_name = inv.product_name
-      WHERE i.item_name = m.item_name
-        AND inv.stock_in <= 0
-    )
-  `;
-          db.query(sqlNotAvailable, (err) => {
+          const sql = `UPDATE inventory_tbl SET status=? WHERE inventory_id=?`;
+          db.query(sql, [status, batch.inventory_id], (err) => {
             if (err) reject(err);
             else resolve(true);
           });
         });
 
-        const message = `${ingredient} is out of stock (0.000 left).`;
+        // 4.4 Notification
+        // Notification for low/out-of-stock (drinks)
+        if (newStock <= 2) {
+          const formattedStock = newStock.toFixed(3); // always 3 decimals
+          const message =
+            newStock <= 0
+              ? `${product} is out of stock (0.000 left).`
+              : `${product} is low on stock (${formattedStock} left).`;
 
-        await new Promise((resolve, reject) => {
-          const checkSql = `SELECT * FROM notifications_tbl WHERE message = ?`;
-          db.query(checkSql, [message], (err, results) => {
-            if (err) reject(err);
-            else if (results.length > 0) {
-              const updateSql = `UPDATE notifications_tbl SET status='unread', created_at=NOW() WHERE message=?`;
-              db.query(updateSql, [message], (updateErr) => {
-                if (updateErr) reject(updateErr);
-                else resolve(true);
-              });
-            } else {
-              const insertSql = `INSERT INTO notifications_tbl (message, status, created_at) VALUES (?, 'unread', NOW())`;
-              db.query(insertSql, [message], (insertErr) => {
-                if (insertErr) reject(insertErr);
-                else resolve(true);
-              });
-            }
-          });
-        });
-      } else if (remainingStock <= 2.0) {
-        // Only update inventory status for Low Stock; do NOT update menu_tbl
-        await new Promise((resolve, reject) => {
-          const sql = `UPDATE inventory_tbl SET status = 'Low Stock' WHERE product_name = ?`;
-          db.query(sql, [ingredient], (err) => {
-            if (err) reject(err);
-            else resolve(true);
-          });
-        });
+          await new Promise((resolve, reject) => {
+            const checkSql = `SELECT * FROM notifications_tbl WHERE message=?`;
+            db.query(checkSql, [message], (err, rows) => {
+              if (err) return reject(err);
 
-        const message = `${ingredient} is low on stock (${remainingStock.toFixed(
-          3
-        )} left).`;
-
-        await new Promise((resolve, reject) => {
-          const checkSql = `SELECT * FROM notifications_tbl WHERE message = ?`;
-          db.query(checkSql, [message], (err, results) => {
-            if (err) reject(err);
-            else if (results.length > 0) {
-              const updateSql = `UPDATE notifications_tbl SET status='unread', created_at=NOW() WHERE message=?`;
-              db.query(updateSql, [message], (updateErr) => {
-                if (updateErr) reject(updateErr);
-                else resolve(true);
-              });
-            } else {
-              const insertSql = `INSERT INTO notifications_tbl (message, status, created_at) VALUES (?, 'unread', NOW())`;
-              db.query(insertSql, [message], (insertErr) => {
-                if (insertErr) reject(insertErr);
-                else resolve(true);
-              });
-            }
+              if (rows.length > 0) {
+                const updateSql = `UPDATE notifications_tbl SET status='unread', created_at=NOW() WHERE message=?`;
+                db.query(updateSql, [message], (err2) =>
+                  err2 ? reject(err2) : resolve(true)
+                );
+              } else {
+                const insertSql = `INSERT INTO notifications_tbl (message, status, created_at) VALUES (?, 'unread', NOW())`;
+                db.query(insertSql, [message], (err3) =>
+                  err3 ? reject(err3) : resolve(true)
+                );
+              }
+            });
           });
-        });
-      } else {
-        await new Promise((resolve, reject) => {
-          const sql = `UPDATE inventory_tbl SET status = 'Available' WHERE product_name = ?`;
-          db.query(sql, [ingredient], (err) => {
-            if (err) reject(err);
-            else resolve(true);
-          });
-        });
-
-        await new Promise((resolve, reject) => {
-          const sqlAvailable = `
-    UPDATE menu_tbl m
-    SET availability = 'Available'
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM ingredients_tbl i
-      JOIN inventory_tbl inv ON i.ingredients_name = inv.product_name
-      WHERE i.item_name = m.item_name
-        AND inv.stock_in <= 0
-    )
-  `;
-          db.query(sqlAvailable, (err) => {
-            if (err) reject(err);
-            else resolve(true);
-          });
-        });
+        }
       }
     }
+    // 5️⃣ Deduct DRINKS FIFO (Correct location)
+    // 4️⃣ Deduct drinks inventory (FIFO)
+    const drinks = orderItems.filter(
+      (item) => item.categories_name === "Drinks"
+    );
+
+    for (const drink of drinks) {
+      let remaining = parseFloat(drink.order_quantity);
+      const product = drink.item_name;
+
+      const batches = await new Promise((resolve, reject) => {
+        const sql = `
+      SELECT drinks_inventory_id, stock_in, stock_out, batch_no
+      FROM drinks_inventory_tbl
+      WHERE product_name=?
+      ORDER BY batch_no ASC
+    `;
+        db.query(sql, [product], (err, results) =>
+          err ? reject(err) : resolve(results)
+        );
+      });
+
+      if (!batches || batches.length === 0) {
+        console.warn(`No inventory batches found for ${product}`);
+        continue;
+      }
+
+      for (const batch of batches) {
+        if (remaining <= 0) break;
+
+        // ensure stock_in is a number
+        const available = parseFloat(batch.stock_in) || 0;
+        if (available <= 0) continue;
+
+        const deduction = Math.min(available, remaining);
+        const newStock = available - deduction;
+        const status =
+          newStock <= 0
+            ? "Not Available"
+            : newStock <= 2
+            ? "Low Stock"
+            : "Available";
+
+        // Update stock and status
+        await new Promise((resolve, reject) => {
+          const sql = `
+        UPDATE drinks_inventory_tbl
+        SET stock_in = GREATEST(stock_in - ?, 0),
+            stock_out = stock_out + ?,
+            status = ?
+        WHERE drinks_inventory_id = ?
+      `;
+          db.query(
+            sql,
+            [deduction, deduction, status, batch.drinks_inventory_id],
+            (err) => (err ? reject(err) : resolve(true))
+          );
+        });
+
+        // Notification for low/out-of-stock
+        if (newStock <= 2) {
+          const message =
+            newStock <= 0
+              ? `${product} is out of stock.`
+              : `${product} is low on stock (${newStock} pcs left).`;
+
+          await new Promise((resolve, reject) => {
+            const checkSql = `SELECT * FROM notifications_tbl WHERE message=?`;
+            db.query(checkSql, [message], (err, rows) => {
+              if (err) return reject(err);
+
+              if (rows.length > 0) {
+                const updateSql = `UPDATE notifications_tbl SET status='unread', created_at=NOW() WHERE message=?`;
+                db.query(updateSql, [message], (err2) =>
+                  err2 ? reject(err2) : resolve(true)
+                );
+              } else {
+                const insertSql = `INSERT INTO notifications_tbl (message, status, created_at) VALUES (?, 'unread', NOW())`;
+                db.query(insertSql, [message], (err3) =>
+                  err3 ? reject(err3) : resolve(true)
+                );
+              }
+            });
+          });
+        }
+
+        remaining -= deduction;
+      }
+
+      if (remaining > 0)
+        console.warn(
+          `Not enough stock for drink ${product}. Remaining: ${remaining}`
+        );
+    }
+
+    // 5️⃣ Update menu_tbl availability based on BOTH ingredients + drinks stock
+    await new Promise((resolve, reject) => {
+      const sql = `
+    UPDATE menu_tbl m
+    LEFT JOIN (
+      /* INGREDIENTS total stock per item */
+      SELECT i.item_name, SUM(inv.stock_in) AS total_stock
+      FROM ingredients_tbl i
+      JOIN inventory_tbl inv ON i.ingredients_name = inv.product_name
+      GROUP BY i.item_name
+
+      UNION ALL
+
+      /* DRINKS total stock per drink item */
+      SELECT d.product_name AS item_name, SUM(d.stock_in) AS total_stock
+      FROM drinks_inventory_tbl d
+      GROUP BY d.product_name
+    ) AS t ON t.item_name = m.item_name
+
+    SET m.availability = CASE
+      WHEN COALESCE(t.total_stock, 0) > 0 THEN 'Available'
+      ELSE 'Not Available'
+    END
+  `;
+
+      db.query(sql, (err) => {
+        if (err) reject(err);
+        else resolve(true);
+      });
+    });
 
     res.status(200).json({
       message:
@@ -3477,6 +4500,7 @@ app.post("/update_payment_status/:order_id", async (req, res) => {
   }
 });
 
+// Unit conversion helper
 function convertUnit(measurement, fromUnit, toUnit) {
   const unitMap = { g: 0.001, kg: 1, ml: 0.001, liter: 1, l: 1, piece: 1 };
   const fromFactor = unitMap[fromUnit.toLowerCase()] ?? 1;
@@ -3660,6 +4684,77 @@ app.get("/fetch_order_items/:order_id", (req, res) => {
     }
 
     res.status(200).json({ orderItems: results });
+  });
+});
+
+app.get("/fetch_order_receipt/:order_id", (req, res) => {
+  const { order_id } = req.params;
+
+  // 1️⃣ Fetch order info
+  const fetchOrderSql = `
+    SELECT 
+      o.order_id,
+      o.user_id,
+      o.order_date,
+      o.payment_status,
+      o.order_status,
+      o.fname,
+      o.lname
+    FROM order_tbl o
+    WHERE o.order_id = ?
+  `;
+
+  db.query(fetchOrderSql, [order_id], (err, orders) => {
+    if (err) return res.status(500).json({ error: "DB Error", details: err });
+    if (orders.length === 0)
+      return res.status(404).json({ message: "Order not found" });
+
+    const order = orders[0];
+
+    // 2️⃣ Fetch transaction info (latest for user)
+    const fetchTransactionSql = `
+      SELECT payment_method, status
+      FROM transaction_tbl
+      WHERE user_id = ?
+      ORDER BY id DESC
+      LIMIT 1
+    `;
+    db.query(fetchTransactionSql, [order.user_id], (err2, transactions) => {
+      if (err2)
+        return res.status(500).json({ error: "DB Error", details: err2 });
+
+      const transaction = transactions[0] || {};
+
+      // 3️⃣ Fetch order items with final_total
+      const fetchItemsSql = `
+        SELECT 
+          order_item_id,
+          order_id,
+          menu_id,
+          size,
+          order_quantity,
+          price,
+          item_name,
+          final_total
+        FROM orderitem_tbl
+        WHERE order_id = ?
+      `;
+      db.query(fetchItemsSql, [order_id], (err3, items) => {
+        if (err3)
+          return res.status(500).json({ error: "DB Error", details: err3 });
+
+        const combined = {
+          ...order,
+          customer_name: `${order.fname || ""} ${order.lname || ""}`.trim(),
+          payment_method:
+            transaction.payment_method || order.payment_status || "N/A",
+          status: transaction.status || order.order_status || "N/A",
+          items: items || [],
+        };
+
+        res.json({ order: combined });
+      });
+    });
   });
 });
 
@@ -4861,14 +5956,30 @@ app.post("/send_announcement_to_worker", (req, res) => {
     .status(200)
     .json({ message: "Announcement sent to recipients successfully." });
 });
+// server.js or routes/announcement.js
+app.get("/get_notifications_announcement/:id", async (req, res) => {
+  const userId = req.params.id;
+  const query = `
+    SELECT a.*, u.profile_pic AS sender_profile_pic, u.fname AS sender_name
+    FROM announcement_tbl a
+    JOIN user_tbl u ON a.sender_id = u.user_id
+    WHERE a.recipient_id = ? OR a.recipient_id IS NULL
+    ORDER BY a.created_at DESC
+  `;
 
-// Fetch both messages and announcements for a specific worker
+  db.query(query, [userId], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+// Fetch only messages for a specific worker
 app.get("/get_notifications_for_worker/:workerId", (req, res) => {
   const { workerId } = req.params;
 
-  console.log("Worker ID:", workerId); // Log the worker ID to check if it's passed correctly.
+  console.log("Worker ID:", workerId); // Log the worker ID
 
-  // Query for messages
+  // Query for messages only
   const messageQuery = `
      SELECT 
       message_id AS id, 
@@ -4877,7 +5988,7 @@ app.get("/get_notifications_for_worker/:workerId", (req, res) => {
       receiver_id, 
       timestamp AS time, 
       'Message' AS type, 
-      m.status,  -- Explicitly reference 'status' from message_tbl
+      m.status,  
       u.profile_pic  
     FROM message_tbl m
     JOIN user_tbl u ON m.sender_id = u.user_id
@@ -4885,82 +5996,17 @@ app.get("/get_notifications_for_worker/:workerId", (req, res) => {
     ORDER BY timestamp DESC
   `;
 
-  // Query for announcements
-  const announcementQuery = `
-    SELECT 
-      announcement_id AS id, 
-      title, 
-      message AS description, 
-      sender_id, 
-      recipient_id, 
-      a.created_at AS time,  -- Explicitly reference 'created_at' from announcement_tbl
-      'Announcement' AS type, 
-      a.status,  -- Explicitly reference 'status' from announcement_tbl
-      u.profile_pic  
-    FROM announcement_tbl a
-    JOIN user_tbl u ON a.sender_id = u.user_id
-    WHERE recipient_id = ? 
-    ORDER BY a.created_at DESC  -- Explicitly reference 'created_at' from announcement_tbl
-  `;
+  db.query(messageQuery, [workerId], (err, messageResults) => {
+    if (err) {
+      console.error("Error fetching messages:", err);
+      return res.status(500).json({ error: "Failed to fetch messages" });
+    }
 
-  console.log("Executing queries..."); // Log before executing queries.
+    console.log("Messages fetched:", messageResults);
 
-  // Execute both queries in parallel
-  Promise.all([
-    new Promise((resolve, reject) => {
-      console.log("Executing message query..."); // Log when executing the message query
-      db.query(messageQuery, [workerId], (err, messageResults) => {
-        if (err) {
-          console.error("Error fetching messages:", err); // Log any errors during message fetch
-          return reject(err);
-        }
-        resolve(messageResults);
-      });
-    }),
-    new Promise((resolve, reject) => {
-      console.log("Executing announcement query..."); // Log when executing the announcement query
-      db.query(announcementQuery, [workerId], (err, announcementResults) => {
-        if (err) {
-          console.error("Error fetching announcements:", err); // Log any errors during announcement fetch
-          return reject(err);
-        }
-        resolve(announcementResults);
-      });
-    }),
-  ])
-    .then(([messages, announcements]) => {
-      console.log("Messages fetched:", messages); // Log fetched messages
-      console.log("Announcements fetched:", announcements); // Log fetched announcements
-
-      // Combine both messages and announcements into a single array
-      const notifications = [...messages, ...announcements];
-
-      // Log the combined notifications
-      console.log("Combined Notifications:", notifications);
-
-      // Sort by time (newest first)
-      notifications.sort((a, b) => {
-        const dateA = new Date(a.time); // Convert time to Date object
-        const dateB = new Date(b.time); // Convert time to Date object
-
-        if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
-          console.error("Invalid date format:", a.time, b.time);
-          return 0; // If invalid date, don't change order
-        }
-
-        return dateB.getTime() - dateA.getTime(); // Compare timestamps
-      });
-
-      // Log sorted notifications
-      console.log("Sorted Notifications:", notifications);
-
-      // Send combined notifications as response
-      res.json(notifications);
-    })
-    .catch((err) => {
-      console.error("Error fetching notifications:", err); // Log errors if the queries fail
-      res.status(500).json({ error: "Failed to fetch notifications" });
-    });
+    // Send only messages as response
+    res.json(messageResults);
+  });
 });
 
 // Get messages for admin
@@ -5043,6 +6089,57 @@ app.post("/mark_all_messages_read", (req, res) => {
       message: "All messages marked as read",
       affectedRows: result.affectedRows,
     });
+  });
+});
+
+app.post("/markMessagesRead", (req, res) => {
+  const { sender_id, read_by } = req.body;
+
+  if (!read_by) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  db.query(
+    `
+    UPDATE message_tbl
+    SET is_read = 'read',
+        read_by = ?
+    WHERE sender_id = ?
+      AND is_read = 'unread'
+    `,
+    [read_by, sender_id],
+    (err) => {
+      if (err) {
+        console.error("Mark read error:", err);
+        return res.status(500).json({ error: "Failed to mark messages read" });
+      }
+      res.json({ success: true });
+    }
+  );
+});
+
+app.post("/markMessagesReadClient", (req, res) => {
+  const { sender_id, receiver_id, read_by } = req.body;
+
+  if (!read_by || !receiver_id) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const sql = `
+    UPDATE message_tbl
+    SET is_read = 'read',
+        read_by = ?
+    WHERE sender_id = ?
+      AND receiver_id = ?
+      AND is_read = 'unread'
+  `;
+
+  db.query(sql, [read_by, sender_id, receiver_id], (err) => {
+    if (err) {
+      console.error("Mark read error:", err);
+      return res.status(500).json({ error: "Failed to mark messages read" });
+    }
+    res.json({ success: true });
   });
 });
 
@@ -5256,7 +6353,7 @@ app.get("/get_workers_read_and_unread", (req, res) => {
   });
 });
 // Get notifications for a specific client
-app.get("/notifications/:user_id", (req, res) => {
+app.get("/client_notifications/:user_id", (req, res) => {
   const { user_id } = req.params;
 
   const sql = `
@@ -5278,7 +6375,7 @@ app.get("/notifications/:user_id", (req, res) => {
 });
 
 // Mark a notification as read
-app.post("/notifications/read/:notificationId", (req, res) => {
+app.post("/client_notifications/read/:notificationId", (req, res) => {
   const { notificationId } = req.params;
 
   const updateQuery = `

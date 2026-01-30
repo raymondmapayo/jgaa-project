@@ -21,12 +21,13 @@ import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import Swal from "sweetalert2";
-import WorkerReservationModal from "../WorkerModals/WorkerReservationModal";
-import ReservationDissolveModal from "../WorkerModals/ReservationDissolveModal";
+import WorkerReservationModal from "../WorkerModals/WorkerViewReservationModal";
+import ReservationCanceledModal from "../WorkerModals/ReservationCanceledModal";
+import ArchiveReservationModal from "./Archive/ArchiveReservationModal";
+
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  max-width: 1200px;
   background-color: #fff;
   border-radius: 12px;
   padding: 24px;
@@ -143,6 +144,7 @@ const WorkerReservation = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isArchivedModalVisible, setIsArchivedModalVisible] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [currentReservation, setCurrentReservation] =
@@ -150,17 +152,12 @@ const WorkerReservation = () => {
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
   // In WorkerReservation component
   const [reservationEnabled, setReservationEnabled] = useState<boolean>(false);
-  const [dissolveModalVisible, setDissolveModalVisible] = useState(false); // ✅ added
+  const [canceledModalVisible, setCanceledModalVisible] = useState(false); // ✅ added
   const apiUrl = import.meta.env.VITE_API_URL;
 
   const handleEditReservation = (record: Reservation) => {
     setCurrentReservation(record);
-    setDissolveModalVisible(true); // ✅ open dissolve modal
-  };
-
-  const handleArchive = () => {
-    // Example: Open a modal or archive selected reservations
-    console.log("Archive button clicked");
+    setCanceledModalVisible(true); // ✅ open canceled modal
   };
 
   useEffect(() => {
@@ -201,21 +198,22 @@ const WorkerReservation = () => {
     fetchReservationStatus();
   }, [apiUrl]);
 
+  const fetchData = async () => {
+    try {
+      const [resReservations, resClients] = await Promise.all([
+        axios.get(`${apiUrl}/get_reservation`),
+        axios.get(`${apiUrl}/get_clients`),
+      ]);
+      setReservations(resReservations.data);
+      setClients(resClients.data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [resReservations, resClients] = await Promise.all([
-          axios.get(`${apiUrl}/get_reservation`),
-          axios.get(`${apiUrl}/get_clients`),
-        ]);
-        setReservations(resReservations.data);
-        setClients(resClients.data);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchData();
   }, []);
 
@@ -316,8 +314,8 @@ const WorkerReservation = () => {
           case "Reserved":
             color = "orange"; // Reserved → Orange
             break;
-          case "Dissolve":
-            color = "red"; // Dissolve → Red
+          case "Canceled":
+            color = "red"; // Canceled → Red
             break;
           case "Completed":
             color = "green"; // Completed → Green
@@ -346,7 +344,7 @@ const WorkerReservation = () => {
             <ActionButton
               type="primary"
               icon={<EditOutlined />}
-              onClick={() => handleEditReservation(record)} // ✅ opens dissolve modal
+              onClick={() => handleEditReservation(record)} // ✅ opens canceled modal
             />
           </Tooltip>
           <Tooltip title="Delete Reservation">
@@ -406,12 +404,14 @@ const WorkerReservation = () => {
           </Dropdown>
 
           {/* 🗂️ Archive Button */}
+          {/* Archived */}
           <Button
             className="bg-red-500 text-white hover:bg-red-600 focus:ring-4 focus:ring-red-300 rounded-md w-full sm:w-[170px]"
             icon={<FolderOutlined />}
-            onClick={handleArchive}
+            onClick={() => setIsArchivedModalVisible(true)}
+            size="middle"
           >
-            Archive
+            Archived
           </Button>
         </div>
       </div>
@@ -438,9 +438,16 @@ const WorkerReservation = () => {
         onClose={() => setModalVisible(false)}
       />
 
-      <ReservationDissolveModal
-        visible={dissolveModalVisible}
-        onClose={() => setDissolveModalVisible(false)}
+      {/* Archived Modal */}
+      <ArchiveReservationModal
+        isArchivedModalVisible={isArchivedModalVisible}
+        onClose={() => setIsArchivedModalVisible(false)}
+        onRestore={() => fetchData()} // Add this callback
+      />
+
+      <ReservationCanceledModal
+        visible={canceledModalVisible}
+        onClose={() => setCanceledModalVisible(false)}
         reservation={currentReservation}
         onUpdateReservation={(updated) => {
           setReservations((prev) =>

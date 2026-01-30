@@ -5,12 +5,12 @@ import {
   PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Dropdown, Input, Menu, Table, Tooltip } from "antd";
+import { Button, Dropdown, Input, Menu, Table, Tag, Tooltip } from "antd";
 import axios from "axios";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
-import SupplyModal from "../WorkerModals/AddSupplyModal";
+import SupplyModal from "../WorkerModals/AddSupplyIngredientsModal";
 import EditSupplyModal from "../WorkerModals/EditSupplyModal";
 import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 import WorkerHistoryInventoryModal from "./WorkerHistoryInventory";
@@ -18,7 +18,6 @@ import WorkerHistoryInventoryModal from "./WorkerHistoryInventory";
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  max-width: 1200px;
   background-color: #fff;
   border-radius: 12px;
   padding: 24px;
@@ -119,11 +118,12 @@ interface SupplyItem {
   stock_in: number;
   unit: string;
   price: string;
+  batch_no: string; // <-- Add batch_no here
   created_at: string;
 }
 
 // ====================== Component ======================
-const WorkerSupply = () => {
+const WorkerIngredientsSupply = () => {
   const [dataSource, setDataSource] = useState<SupplyItem[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -182,6 +182,12 @@ const WorkerSupply = () => {
       key: "stock_in",
     },
     {
+      title: "Batch",
+      dataIndex: "batch_no",
+      key: "batch_no",
+      render: (batch: string) => <Tag color="blue">{batch}</Tag>,
+    },
+    {
       title: "Unit",
       dataIndex: "unit",
       key: "unit",
@@ -196,7 +202,7 @@ const WorkerSupply = () => {
       dataIndex: "created_at",
       key: "created_at",
       render: (createdAt: string) =>
-        dayjs(createdAt).format("YYYY-MM-DD h:mm A"),
+        dayjs(createdAt).format("MM-DD-YYYY h:mm A"),
     },
     {
       title: "Action",
@@ -234,7 +240,7 @@ const WorkerSupply = () => {
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
           <div>
-            <h2 className="text-xl font-bold">Supply List</h2>
+            <h2 className="text-xl font-bold">Supply Ingredients List</h2>
             <p className="text-gray-500 text-sm">Manage and track supplies</p>
           </div>
         </div>
@@ -325,4 +331,4 @@ const WorkerSupply = () => {
   );
 };
 
-export default WorkerSupply;
+export default WorkerIngredientsSupply;
