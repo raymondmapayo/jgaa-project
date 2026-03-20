@@ -18,7 +18,7 @@ import {
 import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
-import OrderDetailsModal from "../WorkerModals/OrderDetailsModal";
+import OrderDetailsModal from "../WorkerModals/ViewOrderDetailsModal";
 import ValidationEditTabsModal from "./Tabs/ValidationEditModalTabs";
 import OrdersPdfModal from "./Pdf/OrdersPdfModal";
 
@@ -147,7 +147,7 @@ const WorkerManageOrder = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [ordersPdfVisible, setOrdersPdfVisible] = useState(false);
   const [selectedOrderForPdf, setSelectedOrderForPdf] = useState<Order | null>(
-    null
+    null,
   );
 
   // ✅ States for combined Validation & Edit tab modal
@@ -161,8 +161,8 @@ const WorkerManageOrder = () => {
     setOrders((prev) =>
       [...prev].sort(
         (a, b) =>
-          new Date(b.order_date).getTime() - new Date(a.order_date).getTime()
-      )
+          new Date(b.order_date).getTime() - new Date(a.order_date).getTime(),
+      ),
     );
   };
 
@@ -341,9 +341,9 @@ const WorkerManageOrder = () => {
                 record.worker_profile_pic?.startsWith("http")
                   ? record.worker_profile_pic
                   : record.worker_profile_pic &&
-                    record.worker_profile_pic !== ""
-                  ? `${apiUrl}/uploads/images/${record.worker_profile_pic}`
-                  : "/avatar.jpg"
+                      record.worker_profile_pic !== ""
+                    ? `${apiUrl}/uploads/images/${record.worker_profile_pic}`
+                    : "/avatar.jpg"
               }
               alt={
                 hasName
@@ -479,8 +479,8 @@ const WorkerManageOrder = () => {
             prevOrders.map((o) =>
               o.order_id === updatedOrder.order_id
                 ? { ...o, ...updatedOrder }
-                : o
-            )
+                : o,
+            ),
           );
         }}
       />

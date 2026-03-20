@@ -1,38 +1,72 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Button, Modal } from "antd";
+import { Button, Modal, Tag, Divider } from "antd";
 import React from "react";
 import styled from "styled-components";
+import { CalendarOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
 
 // Styled component
 const StyledModalContent = styled.div`
-  .details-row {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 8px;
-    font-size: 14px;
+    align-items: flex-start;
   }
-  .details-label {
+
+  .title {
+    font-size: 20px;
     font-weight: 600;
-    color: #4b5563;
+    color: #111827;
   }
-  .creator-info {
+
+  .category {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .meta {
     display: flex;
     align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 12px;
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid #e5e7eb;
   }
-  .creator-avatar {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid #4b5563;
+
+  .stat-card {
+    background: #f9fafb;
+    border-radius: 10px;
+    padding: 12px;
   }
-  .creator-name {
+
+  .stat-label {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .stat-value {
+    font-size: 18px;
     font-weight: 600;
-    font-size: 16px;
+    color: #111827;
+  }
+
+  .price {
+    color: #fa8c16;
+  }
+
+  @media (max-width: 640px) {
+    .stats {
+      grid-template-columns: 1fr;
+    }
   }
 `;
 
@@ -41,67 +75,67 @@ interface ViewInventoryModalProps {
   selectedItem?: any | null;
   onClose: () => void;
 }
-const apiUrl = import.meta.env.VITE_API_URL;
+
 const ViewInventoryModal: React.FC<ViewInventoryModalProps> = ({
   visible,
   selectedItem,
   onClose,
 }) => {
+  if (!selectedItem) return null;
+
   return (
     <Modal
-      title={`Inventory Details: ${selectedItem?.product_name || ""}`}
       open={visible}
       onCancel={onClose}
       footer={[
-        <Button key="close" onClick={onClose}>
+        <Button key="close" type="primary" onClick={onClose}>
           Close
         </Button>,
       ]}
-      width={600}
+      width={620}
+      centered
+      title="Inventory Details"
     >
-      {selectedItem && (
-        <StyledModalContent>
-          <div className="details-row">
-            <span className="details-label">Product Name:</span>
-            <span>{selectedItem.product_name}</span>
-          </div>
-          <div className="details-row">
-            <span className="details-label">Category:</span>
-            <span>{selectedItem.category}</span>
+      <StyledModalContent>
+        {/* Header */}
+        <div className="header">
+          <div>
+            <div className="title">{selectedItem.product_name}</div>
+            <div className="category">{selectedItem.category}</div>
           </div>
 
-          <div className="details-row">
-            <span className="details-label">Stock In:</span>
-            <span>{selectedItem.stock_in}</span>
-          </div>
-          <div className="details-row">
-            <span className="details-label">Stock Out:</span>
-            <span>{selectedItem.stock_out}</span>
-          </div>
-          <div className="details-row">
-            <span className="details-label">Unit:</span>
-            <span>{selectedItem.unit}</span>
-          </div>
-          <div className="details-row">
-            <span className="details-label">Price:</span>
-            <span>{selectedItem.price}</span>
-          </div>
-          <div className="details-row">
-            <span className="details-label">Status:</span>
-            <span>{selectedItem.status}</span>
+          <Tag color={selectedItem.status === "Available" ? "green" : "red"}>
+            {selectedItem.status}
+          </Tag>
+        </div>
+
+        {/* Created At */}
+        <div className="meta">
+          <CalendarOutlined />
+          Added on{" "}
+          {dayjs(selectedItem.created_at).format("MMMM D, YYYY • h:mm A")}
+        </div>
+
+        <Divider />
+
+        {/* Stats */}
+        <div className="stats">
+          <div className="stat-card">
+            <div className="stat-label">Stock In</div>
+            <div className="stat-value">{selectedItem.stock_in}</div>
           </div>
 
-          {/* Creator Info */}
-          <div className="creator-info">
-            <img
-              src={`${apiUrl}/uploads/images/${selectedItem.profile_pic}`}
-              alt={`${selectedItem.fname} ${selectedItem.lname}`}
-              className="creator-avatar"
-            />
-            <span className="creator-name">{`${selectedItem.fname} ${selectedItem.lname}`}</span>
+          <div className="stat-card">
+            <div className="stat-label">Unit</div>
+            <div className="stat-value">{selectedItem.unit}</div>
           </div>
-        </StyledModalContent>
-      )}
+
+          <div className="stat-card">
+            <div className="stat-label">Price</div>
+            <div className="stat-value price">₱{selectedItem.price}</div>
+          </div>
+        </div>
+      </StyledModalContent>
     </Modal>
   );
 };

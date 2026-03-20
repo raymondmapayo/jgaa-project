@@ -16,6 +16,41 @@ import Archive from "./Archive/Archive";
 import CategoriesEdit from "../WorkerModals/CategoriesEditModal";
 
 // ====================== Styled Components ======================
+
+const StyledModalContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  .card-item {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .meta-label {
+    color: #6b7280;
+    font-weight: 500;
+    font-size: 13px;
+  }
+
+  .meta-value {
+    font-weight: 600;
+    color: #111827;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 640px) {
+    .card-item {
+      padding: 12px;
+    }
+  }
+`;
+
 const StyledContainer = styled.div`
   width: 100%;
   background-color: #fff;
@@ -132,6 +167,7 @@ const WorkerManageCategories = () => {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentMenus = dataSource.slice(indexOfFirstItem, indexOfLastItem);
   const [isArchivedModalVisible, setIsArchivedModalVisible] = useState(false);
+
   const apiUrl = import.meta.env.VITE_API_URL;
   const sortMenuItems = [
     { key: "1", label: "Sort by Date" },
@@ -184,8 +220,8 @@ const WorkerManageCategories = () => {
       prevData.map((cat) =>
         cat.categories_id === updatedCategory.categories_id
           ? updatedCategory
-          : cat
-      )
+          : cat,
+      ),
     );
 
     // Optional: reset to first page to ensure updated item is visible
@@ -209,7 +245,7 @@ const WorkerManageCategories = () => {
         try {
           // Optimistic UI: Remove from state before actual deletion
           setDataSource((prevData) =>
-            prevData.filter((item) => item.categories_id !== categories_id)
+            prevData.filter((item) => item.categories_id !== categories_id),
           );
 
           // Perform actual archive operation
@@ -240,8 +276,8 @@ const WorkerManageCategories = () => {
           record.categories_img && record.categories_img.startsWith("http")
             ? record.categories_img // full Cloudinary URL
             : record.categories_img
-            ? `${apiUrl}/uploads/images/${record.categories_img}` // local fallback
-            : "https://via.placeholder.com/60x40?text=No+Image"; // placeholder
+              ? `${apiUrl}/uploads/images/${record.categories_img}` // local fallback
+              : "https://via.placeholder.com/60x40?text=No+Image"; // placeholder
 
         return (
           <div className="flex items-center gap-3">
@@ -398,26 +434,35 @@ const WorkerManageCategories = () => {
       {/* Category Detail Modal */}
       <Modal
         title="Category Details"
-        visible={isDetailModalVisible}
+        open={isDetailModalVisible}
         onCancel={() => setIsDetailModalVisible(false)}
         footer={[
           <Button key="close" onClick={() => setIsDetailModalVisible(false)}>
             Close
           </Button>,
         ]}
+        width={500}
+        centered
       >
         {selectedItem && (
-          <div>
-            <p>
-              <strong>Category Name:</strong> {selectedItem.categories_name}
-            </p>
-            <p>
-              <strong>Description:</strong> {selectedItem.description}
-            </p>
-            <p>
-              <strong>Status:</strong> {selectedItem.status}
-            </p>
-          </div>
+          <StyledModalContent>
+            <div className="meta-item">
+              <span>Category Name: </span>
+              <span>{selectedItem.categories_name}</span>
+            </div>
+
+            <div className="meta-item">
+              <span>Description:</span>
+              <span>{selectedItem.description || "N/A"}</span>
+            </div>
+
+            <div className="meta-item">
+              <span>Status:</span>
+              <Tag color="green" className="tag-status">
+                {selectedItem.status}
+              </Tag>
+            </div>
+          </StyledModalContent>
         )}
       </Modal>
 

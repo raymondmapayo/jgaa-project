@@ -60,7 +60,7 @@ const WorkerDashboard = () => {
   const previousTotalProducts: number = 10;
   const previousTotalCategories: number = 1400;
   const apiUrl = import.meta.env.VITE_API_URL;
-
+  const [fname, setFname] = useState<string>("");
   // --- 🔸 Fetch Data (Products) ---
   useEffect(() => {
     fetch(`${apiUrl}/total_products`)
@@ -126,6 +126,21 @@ const WorkerDashboard = () => {
     }
   }, [isCategoriesModalVisible]);
 
+  useEffect(() => {
+    if (!userId) return;
+
+    fetch(`${apiUrl}/get_user/${userId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.fname) {
+          setFname(data.fname);
+        }
+      })
+      .catch(() => {
+        setFname("User");
+      });
+  }, []);
+
   // --- 🔸 Filter Handlers ---
   const showModal = () => setIsModalOpen(true);
   const handleCancel = () => setIsModalOpen(false);
@@ -152,7 +167,7 @@ const WorkerDashboard = () => {
   const closeProductsModal = () => setIsProductsModalVisible(false);
   const openCategoriesModal = () => setIsCategoriesModalVisible(true);
   const closeCategoriesModal = () => setIsCategoriesModalVisible(false);
-
+  const userId = sessionStorage.getItem("user_id");
   const formattedTotalProducts =
     totalProducts !== null ? `${totalProducts.toLocaleString()}` : "...";
   const formattedTotalCategories =
@@ -217,7 +232,14 @@ const WorkerDashboard = () => {
       {/* 🔸 Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         {/* LEFT SIDE - Title */}
-        <h1 className="text-lg font-semibold">Dashboard</h1>
+        <div className="flex flex-col">
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+            Hi {fname} <span className="wave-hand">👋</span>
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-300">
+            Welcome to your dashboard
+          </p>
+        </div>
 
         {/* RIGHT SIDE - Filter + Reset (STACK ON MOBILE) */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">

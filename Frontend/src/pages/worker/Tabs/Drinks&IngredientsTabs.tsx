@@ -1,6 +1,6 @@
 import { Tabs } from "antd";
 import WorkerManageIngredients from "../WorkerManageIngredients";
-import WorkerManageDrinks from "../WorkerManageDrinks";
+//import WorkerManageDrinks from "../WorkerManageDrinks";
 
 const InventoryTabs = () => {
   return (
@@ -18,15 +18,15 @@ const InventoryTabs = () => {
               </div>
             ),
           },
-          {
-            key: "2",
-            label: "Drinks",
-            children: (
-              <div className="mt-4">
-                <WorkerManageDrinks />
-              </div>
-            ),
-          },
+          // {
+          //   key: "2",
+          //   label: "Drinks",
+          //   children: (
+          //     <div className="mt-4">
+          //       <WorkerManageDrinks />
+          //     </div>
+          //   ),
+          // },
         ]}
       />
     </div>

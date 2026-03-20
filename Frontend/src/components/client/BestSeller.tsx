@@ -1,4 +1,4 @@
-import { Modal, notification } from "antd";
+import { Divider, Modal, notification } from "antd";
 import axios from "axios";
 import { motion } from "framer-motion"; // Import motion for animation
 import { useEffect, useState } from "react";
@@ -148,99 +148,97 @@ const Bestseller: React.FC = () => {
             {bestselling.map((product) => (
               <motion.div
                 key={product.item_name + product.menu_img}
-                className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center sm:flex sm:flex-row sm:items-center sm:flex-wrap"
+                className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-xl shadow-lg overflow-hidden"
                 variants={cardVariants}
               >
-                {/* Product Image */}
-                <div className="relative w-32 h-32 mx-auto mt-4 flex-shrink-0">
+                {/* BIG SQUARE IMAGE - FULL WIDTH */}
+                <div className="w-full aspect-square">
                   <img
                     src={
                       product.menu_img
                         ? product.menu_img.startsWith("http")
-                          ? product.menu_img // Cloudinary URL
-                          : `${apiUrl}/uploads/images/${product.menu_img}` // local backend
-                        : "https://via.placeholder.com/128?text=No+Image" // fallback
+                          ? product.menu_img
+                          : `${apiUrl}/uploads/images/${product.menu_img}`
+                        : "https://via.placeholder.com/400?text=No+Image"
                     }
                     alt={product.item_name}
-                    className="h-32 w-32 object-cover rounded-full border-4 border-orange-500 shadow-lg"
+                    className="w-full h-full object-cover rounded-t-xl"
                   />
                 </div>
 
-                {/* Product Details */}
-                <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-1 min-w-0">
-                  <h5 className="font-core text-lg font-semibold text-gray-800">
-                    {product.item_name}
-                  </h5>
+                {/* CONTENT WITH PADDING */}
+                <div className="p-5">
+                  {/* ITEM NAME + REVIEWS */}
+                  <div className="flex items-start justify-between">
+                    <h5 className="font-core text-lg font-semibold text-gray-800">
+                      {product.item_name}
+                    </h5>
 
-                  {/* Display Rating */}
-                  <div className="mt-2 text-left">
-                    {/* Display Rating */}
-                    <div className="flex justify-start text-yellow-500">
-                      <CustomRate
-                        value={parseFloat(product.total_avg_rating)}
-                      />
-                    </div>
-
-                    {/* Rating and Review Count */}
                     <div
-                      className="font-core text-gray-600 mt-2 cursor-pointer hover:text-orange-500"
+                      className="flex items-center gap-2 cursor-pointer"
                       onClick={() => {
                         if (product.rating_count > 0) {
-                          console.log(
-                            "Opening modal for:",
-                            product.item_name,
-                            "ID:",
-                            product.bestseller_id,
-                          );
-
                           setSelectedMenuName(product.item_name);
                           setReviewsModalVisible(true);
                         }
                       }}
                     >
-                      <p>
-                        {product.rating_count > 0
-                          ? `${product.rating_count} reviews`
-                          : "No reviews yet"}
-                      </p>
+                      <CustomRate
+                        value={parseFloat(product.total_avg_rating)}
+                      />
+                      <span className="text-gray-600 text-sm whitespace-nowrap">
+                        {parseFloat(product.total_avg_rating).toFixed(1)} (
+                        {product.rating_count})
+                      </span>
                     </div>
-
-                    {/* Price */}
-                    <h4 className="text-xl font-bold text-gray-800 mt-2">
-                      ₱{product.price}
-                    </h4>
                   </div>
 
+                  {/* DIVIDER */}
+                  <Divider
+                    style={{
+                      margin: "14px 0", // extreme negative to ensure full width
+                      borderTopWidth: "2px",
+                      borderColor: "#e0d3c0",
+                    }}
+                  />
+
+                  {/* PRICE + BUTTONS */}
                   {(product.availability ?? "available")
                     .trim()
                     .toLowerCase() === "available" ? (
-                    <div className="mt-4 flex flex-wrap justify-between gap-4">
-                      <motion.button
-                        className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => handleBuyNowClick(product)}
-                      >
-                        Buy now
-                      </motion.button>
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-core text-xl font-bold text-gray-800">
+                        ₱{product.price}
+                      </h4>
 
-                      <motion.button
-                        className="font-core flex-1 min-w-[120px] flex items-center justify-center gap-2 px-3 py-2 text-sm sm:text-sm md:text-base font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition-colors duration-300 whitespace-nowrap"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() =>
-                          addToCart({
-                            ...product,
-                            categories_name: product.categories_name || null,
-                          })
-                        }
-                      >
-                        <FaShoppingBag className="text-sm sm:text-base md:text-base" />
-                        Add to Cart
-                      </motion.button>
+                      <div className="flex gap-3 ml-1">
+                        <motion.button
+                          className="font-core px-4 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition whitespace-nowrap"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleBuyNowClick(product)}
+                        >
+                          Buy Now
+                        </motion.button>
+
+                        <motion.button
+                          className="font-core flex items-center gap-2 px-4 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition whitespace-nowrap"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() =>
+                            addToCart({
+                              ...product,
+                              categories_name: product.categories_name || null,
+                            })
+                          }
+                        >
+                          <FaShoppingBag className="text-sm" />
+                          Add to Cart
+                        </motion.button>
+                      </div>
                     </div>
                   ) : (
-                    <span className="font-core flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 text-sm font-semibold text-red-500 border border-red-500 rounded-full bg-red-100">
+                    <span className="font-core flex items-center justify-center px-3 py-2 text-sm font-semibold text-red-500 border border-red-500 rounded-full bg-red-100">
                       We're not Available today.
                     </span>
                   )}

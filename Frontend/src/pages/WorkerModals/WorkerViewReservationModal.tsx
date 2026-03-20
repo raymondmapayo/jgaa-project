@@ -1,8 +1,8 @@
-import { Button, Card, Col, Form, Input, Modal, Row, Tabs } from "antd";
+import { Button, Form, Input, Modal, Tabs, Tag } from "antd";
 import axios from "axios";
 import { useState } from "react";
 import Swal from "sweetalert2";
-
+import styled from "styled-components";
 const WorkerViewReservationModal = ({
   visible,
   reservation,
@@ -50,53 +50,99 @@ const WorkerViewReservationModal = ({
       })
       .catch(() => Swal.fire("Error", "Failed to send email.", "error"));
   };
+  const StyledModalContent = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .customer-name {
+      font-size: 20px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .customer-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px;
+      border-radius: 10px;
+      background: #f9fafb;
+    }
+
+    .meta-item span:first-child {
+      font-weight: 500;
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    .meta-item span:last-child {
+      font-weight: 600;
+      color: #111827;
+      font-size: 14px;
+    }
+
+    @media (max-width: 640px) {
+      .customer-meta {
+        grid-template-columns: 1fr;
+      }
+    }
+  `;
 
   const tabItems = [
     {
       key: "1",
       label: "Customer Details",
       children: reservation && (
-        <div style={{ padding: 16 }}>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Card title="Name" bordered={false}>
-                {reservation.full_name}
-              </Card>
-            </Col>
-            <Col span={12}>
-              <Card title="Contact" bordered={false}>
-                {reservation.pnum}
-              </Card>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Card title="Email" bordered={false}>
-                {reservation.email}
-              </Card>
-            </Col>
-            <Col span={12}>
-              <Card title="Address" bordered={false}>
-                {client?.address || "N/A"}
-              </Card>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Card title="Reservation Time" bordered={false}>
+        <StyledModalContent>
+          <div className="header">
+            <div className="customer-name">{reservation.full_name}</div>
+            <div className="flex gap-2">
+              <Tag color="blue">{reservation.payment_status || "Pending"}</Tag>
+              <Tag color="green">{reservation.order_status || "Active"}</Tag>
+            </div>
+          </div>
+
+          <div className="customer-meta">
+            <div className="meta-item">
+              <span>Contact</span>
+              <span>{reservation.pnum}</span>
+            </div>
+            <div className="meta-item">
+              <span>Email</span>
+              <span>{reservation.email}</span>
+            </div>
+            <div className="meta-item">
+              <span>Address</span>
+              <span>{client?.address || "N/A"}</span>
+            </div>
+            <div className="meta-item">
+              <span>Reservation Time</span>
+              <span>
                 {formatDateTime(
                   reservation.reservation_date,
-                  reservation.reservation_time
+                  reservation.reservation_time,
                 )}
-              </Card>
-            </Col>
-            <Col span={12}>
-              <Card title="Special Requests" bordered={false}>
-                {reservation.special_request || "None"}
-              </Card>
-            </Col>
-          </Row>
-        </div>
+              </span>
+            </div>
+            <div className="meta-item">
+              <span>Special Requests</span>
+              <span>{reservation.special_request || "None"}</span>
+            </div>
+          </div>
+        </StyledModalContent>
       ),
     },
     {
