@@ -134,7 +134,7 @@ const ManageMenu = () => {
   // Updated Save Edit handler
   const handleSaveEdit = async (values: MenuItem) => {
     const updatedData = dataSource.map((item) =>
-      item.menu_id === selectedItem?.menu_id ? { ...item, ...values } : item
+      item.menu_id === selectedItem?.menu_id ? { ...item, ...values } : item,
     );
 
     setDataSource(updatedData); // update table
@@ -166,7 +166,6 @@ const ManageMenu = () => {
     { title: "Category", dataIndex: "categories_name", key: "categories_name" },
     { title: "Price", dataIndex: "price", key: "price" },
     { title: "Description", dataIndex: "description", key: "description" },
-
     {
       title: "Availability",
       dataIndex: "availability",
@@ -174,7 +173,8 @@ const ManageMenu = () => {
       render: (text: string) => {
         const colors: Record<string, string> = {
           Available: "green",
-          Unavailable: "red",
+          "Not Available": "red",
+          Pending: "orange",
         };
         return <Tag color={colors[text] || "default"}>{text}</Tag>;
       },

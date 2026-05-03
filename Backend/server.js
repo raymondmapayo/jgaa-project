@@ -34,7 +34,7 @@ app.use(
       return callback(new Error("CORS not allowed for " + origin));
     },
     credentials: true,
-  })
+  }),
 );
 
 // Preflight requests
@@ -61,9 +61,10 @@ io.on("connection", (socket) => {
     console.log(`👷 Worker ${workerId} joined room worker_${workerId}`);
   });
 
+  // ✅ ADMIN JOIN
   socket.on("joinAdminRoom", (adminId) => {
     socket.join(`admin_${adminId}`);
-    console.log(`🧑‍💼 Admin ${adminId} joined room admin_${adminId}`);
+    console.log(`Admin joined room admin_${adminId}`);
   });
 
   socket.on("joinClientRoom", (clientId) => {
@@ -79,10 +80,15 @@ io.on("connection", (socket) => {
     io.to(`client_${data.receiver_id}`).emit("newMessage", data);
   });
 
-  socket.on("newMessageToAdmin", (data) => {
-    io.to(`admin_${data.receiver_id}`).emit("newMessage", data);
-  });
+  // ✅ ADMIN SEND MESSAGE
+  socket.on("newMessageFromAdmin", (data) => {
+    const { receiver_id } = data;
 
+    console.log("Sending to worker:", receiver_id);
+
+    // 👉 SEND TO SPECIFIC WORKER ROOM
+    io.to(`worker_${receiver_id}`).emit("receiveMessageFromAdmin", data);
+  });
   socket.on("disconnect", () => {
     console.log("❌ Client disconnected:", socket.id);
   });
@@ -92,7 +98,7 @@ io.on("connection", (socket) => {
 app.use(express.json()); // Add this - crucial for parsing JSON bodies
 app.use(
   "/uploads/images",
-  express.static(path.join(__dirname, "uploads/images"))
+  express.static(path.join(__dirname, "uploads/images")),
 );
 
 // -------------------- MySQL Connection --------------------
@@ -153,7 +159,7 @@ app.post("/add_menu", upload.single("menu_img"), (req, res) => {
           return res.status(500).json({ error: "Internal Server Error" });
         }
         res.send("Menu item added successfully with Cloudinary image!");
-      }
+      },
     );
   });
 });
@@ -217,7 +223,7 @@ app.put("/update_menu/:menu_id", upload.single("menu_img"), (req, res) => {
           [menu_id, JSON.stringify(updatedFields), created_by],
           (err3) => {
             if (err3) console.error("Error logging menu update:", err3);
-          }
+          },
         );
       }
 
@@ -377,7 +383,7 @@ app.post("/add_categories", upload.single("categories_img"), (req, res) => {
       }
 
       res.send("Category added successfully with Cloudinary image!");
-    }
+    },
   );
 });
 
@@ -441,11 +447,11 @@ app.post("/add_ingredients", (req, res) => {
                   created_by,
                 },
               });
-            }
+            },
           );
-        }
+        },
       );
-    }
+    },
   );
 });
 
@@ -801,7 +807,7 @@ app.put("/expenses/:expenses_id", (req, res) => {
         return res.status(500).json({ message: "Failed to update expense." });
       }
       res.json({ message: "Expense updated successfully." });
-    }
+    },
   );
 });
 
@@ -895,15 +901,15 @@ FROM supply_drinks_tbl
                         total_orders: totalOrders,
                         average_order_value: averageOrderValue,
                       });
-                    }
+                    },
                   );
-                }
+                },
               );
-            }
+            },
           );
-        }
+        },
       );
-    }
+    },
   );
 });
 // ✅ Update ingredient and fetch worker info
@@ -947,7 +953,7 @@ app.put("/update_ingredient/:id", (req, res) => {
           updatedBy: rows[0],
         });
       });
-    }
+    },
   );
 });
 
@@ -1048,7 +1054,7 @@ app.put(
                     if (orderItemErr)
                       console.error(
                         "Error updating orderitem_tbl:",
-                        orderItemErr
+                        orderItemErr,
                       );
 
                     // Step 4: Fetch worker info
@@ -1087,17 +1093,17 @@ app.put(
                             workerInfo: userResult[0] || null,
                           },
                         });
-                      }
+                      },
                     );
-                  }
+                  },
                 );
-              }
+              },
             );
-          }
+          },
         );
       });
     });
-  }
+  },
 );
 
 // Express route to get a specific category by ID
@@ -1230,24 +1236,26 @@ app.get("/get_archived", (req, res) => {
   });
 });
 
-// Get all supply categories with status = 'deleted'
 app.get("/get_archive_supply_categories", (req, res) => {
   const sql = `
-    SELECT cat_supply_id, supply_cat_name, created_at, created_by, status
+    SELECT 
+      cat_supply_id,
+      supply_cat_name,
+      created_at,
+      created_by,
+      status
     FROM supply_categories
     WHERE status = 'deleted'
-    ORDER BY created_at DESC
   `;
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching deleted categories:", err);
-      return res
-        .status(500)
-        .json({ error: "Failed to fetch deleted categories" });
+  db.query(sql, (error, data) => {
+    if (error) {
+      console.error("Error fetching archived supply categories:", error);
+      return res.status(500).json({ error: "Internal Server Error" });
     }
 
-    res.json(results);
+    console.log("Fetched archived supply categories:", data);
+    return res.json(data);
   });
 });
 // ✅ Get all archived reservations
@@ -1306,7 +1314,7 @@ app.put("/restore_reservation/:reservation_id", (req, res) => {
   });
 });
 
-app.post("/restore_category/:id", (req, res) => {
+app.put("/restore_category/:id", (req, res) => {
   const serveId = req.params.id;
 
   const sql =
@@ -1321,11 +1329,11 @@ app.post("/restore_category/:id", (req, res) => {
   });
 });
 
-app.post("/restore_category_supply/:id", (req, res) => {
+app.put("/restore_category_supply/:id", (req, res) => {
   const serveId = req.params.id;
 
   const sql =
-    "UPDATE supply_categories SET status = 'Available' WHERE cat_supply_id = ?";
+    "UPDATE supply_categories SET status = 'Active' WHERE cat_supply_id = ?";
 
   db.query(sql, [serveId], (error) => {
     if (error) {
@@ -1371,7 +1379,7 @@ app.post("/add_supply_ingredients", (req, res) => {
         if (err) return callback(err);
         const batchCount = rows[0]?.batch_count || 0;
         callback(null, `Stock ${batchCount + 1}`);
-      }
+      },
     );
   };
 
@@ -1451,9 +1459,9 @@ app.post("/add_supply_ingredients", (req, res) => {
                 message: `Supply added with ${batchNo}`,
                 inventory_id: inventoryId,
               });
-            }
+            },
           );
-        }
+        },
       );
     });
   };
@@ -1491,10 +1499,10 @@ app.post("/add_supply_ingredients", (req, res) => {
               // New inventory → insert actual batch directly
               insertSupplyAndInventory(null, categoryName);
             }
-          }
+          },
         );
       }
-    }
+    },
   );
 });
 
@@ -1555,7 +1563,7 @@ app.post("/add_supply_drinks", (req, res) => {
           if (err2) return callback(err2);
           const batchCount = rows[0]?.batch_count || 0;
           callback(null, `Stock ${batchCount + 1}`);
-        }
+        },
       );
     };
 
@@ -1581,7 +1589,7 @@ app.post("/add_supply_drinks", (req, res) => {
             (err, result) => {
               if (err) return callback(err);
               callback(null, result.insertId);
-            }
+            },
           );
         };
 
@@ -1631,7 +1639,7 @@ app.post("/add_supply_drinks", (req, res) => {
                 message: `Drink supply added with ${batchNo}`,
                 drinks_inventory_id: newInvId,
               });
-            }
+            },
           );
         });
       });
@@ -1658,7 +1666,7 @@ app.post("/add_supply_drinks", (req, res) => {
           } else {
             insertSupplyAndInventory(null);
           }
-        }
+        },
       );
     }
   });
@@ -1829,11 +1837,11 @@ app.put("/update_supply/:supply_id", (req, res) => {
                     "Supply updated & inventory & menu availability updated successfully",
                 });
               });
-            }
+            },
           );
         });
       });
-    }
+    },
   );
 });
 
@@ -2000,7 +2008,7 @@ app.put("/update_supply_category/:id", (req, res) => {
               });
             });
           });
-        }
+        },
       );
     });
   });
@@ -2111,7 +2119,7 @@ app.post("/login", (req, res) => {
     const token = jwt.sign(
       { user_id: user.user_id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "1h" },
     );
 
     res.json({
@@ -2148,41 +2156,53 @@ app.post("/admin/logout", (req, res) => {
     res.json({ message: "Logout successful" });
   });
 });
-app.post("/worker/logout", (req, res) => {
-  const { user_id } = req.body;
+// WORKER
+app.post("/worker/logout/:user_id", (req, res) => {
+  const { user_id } = req.params;
+
+  if (!user_id) {
+    return res.status(400).json({ error: "Missing user_id" });
+  }
 
   const sql = `
     UPDATE user_tbl
     SET last_active_time = NOW(), user_login_time = NULL
-    WHERE user_id = ?
+    WHERE user_id = ? AND role = 'worker'
   `;
 
   db.query(sql, [user_id], (err, result) => {
     if (err) {
-      console.error("Logout error:", err);
+      console.error("Worker logout error:", err);
       return res.status(500).json({ error: "Internal Server Error" });
     }
-    res.json({ message: "Logout successful" });
+
+    res.json({ message: "Worker logout successful" });
   });
 });
 
 // Backend route for logging out client using URL param
 
+// CLIENT
 app.post("/client/logout/:user_id", (req, res) => {
-  const { user_id } = req.params; // read from URL
+  const { user_id } = req.params;
+
+  if (!user_id) {
+    return res.status(400).json({ error: "Missing user_id" });
+  }
 
   const sql = `
     UPDATE user_tbl
     SET last_active_time = NOW(), user_login_time = NULL
-    WHERE user_id = ?
+    WHERE user_id = ? AND role = 'client'
   `;
 
   db.query(sql, [user_id], (err, result) => {
     if (err) {
-      console.error("Logout error:", err);
+      console.error("Client logout error:", err);
       return res.status(500).json({ error: "Internal Server Error" });
     }
-    res.json({ message: "Logout successful" });
+
+    res.json({ message: "Client logout successful" });
   });
 });
 
@@ -2372,7 +2392,7 @@ app.post("/register", async (req, res) => {
                 "Account created successfully! Please check your email for verification link.",
             });
           }
-        }
+        },
       );
     });
   } catch (err) {
@@ -2415,7 +2435,7 @@ app.post("/forgot_password", (req, res) => {
             .status(500)
             .json({ message: "Failed to send reset email" });
         }
-      }
+      },
     );
   });
 });
@@ -2675,7 +2695,7 @@ app.get("/verify-email/:token", (req, res) => {
     if (err) {
       console.error(
         "❌ Database error during verification:",
-        err.sqlMessage || err
+        err.sqlMessage || err,
       );
       return res
         .status(500)
@@ -2700,7 +2720,7 @@ app.get("/verify-email/:token", (req, res) => {
       if (updateErr) {
         console.error(
           "❌ Error updating user:",
-          updateErr.sqlMessage || updateErr
+          updateErr.sqlMessage || updateErr,
         );
         return res
           .status(500)
@@ -2781,14 +2801,14 @@ app.post(
           return res
             .status(200)
             .json({ success: true, message: "Worker successfully added" });
-        }
+        },
       );
     } catch (err) {
       res
         .status(500)
         .json({ success: false, message: "Error hashing password" });
     }
-  }
+  },
 );
 
 app.get("/get_workers", (request, response) => {
@@ -2834,7 +2854,7 @@ app.put("/worker/:id", (req, res) => {
         return res.status(500).send("Error updating worker");
       }
       res.send("Worker updated successfully");
-    }
+    },
   );
 });
 //==========================  LOGIN COMPONENTS END ============================
@@ -2876,7 +2896,7 @@ app.put("/update_user/:id", upload.single("profile_pic"), (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
       }
       res.status(200).json({ message: "User updated successfully!" });
-    }
+    },
   );
 });
 
@@ -2889,29 +2909,32 @@ app.put("/update_user/:id", upload.single("profile_pic"), (req, res) => {
 // @ts-ignore
 app.post("/sendMessageToWorkers", (req, res) => {
   const { message, sender_id, recipient_id } = req.body;
-
-  if (!message || !sender_id || !recipient_id) {
-    return res
-      .status(400)
-      .json({ error: "Message, sender_id, and recipient_id are required" });
-  }
-
   const timestamp = new Date();
 
-  // Insert the message with admin as sender and worker as recipient
   db.query(
     "INSERT INTO message_tbl (message, sender_id, receiver_id, timestamp, status, is_read, read_by) VALUES (?, ?, ?, ?, 'active', 'unread', '0')",
     [message, sender_id, recipient_id, timestamp],
-    (err) => {
+    (err, result) => {
       if (err) {
-        console.error(
-          `Failed to send message to recipient ${recipient_id}:`,
-          err.message
-        );
         return res.status(500).json({ error: "Failed to send message" });
       }
-      res.status(200).json({ message: "Message sent successfully!" });
-    }
+
+      const newMessage = {
+        id: result.insertId,
+        message,
+        sender: "admin",
+        timestamp,
+        receiver_id: recipient_id,
+      };
+
+      // 🔥 EMIT HERE
+      io.to(`worker_${recipient_id}`).emit(
+        "receiveMessageFromAdmin",
+        newMessage,
+      );
+
+      res.status(200).json({ message_id: result.insertId });
+    },
   );
 });
 
@@ -2969,7 +2992,7 @@ app.get("/getMessagesForAdmin/:adminId/:workerId", (req, res) => {
     (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json(results); // Return the results to the frontend
-    }
+    },
   );
 });
 
@@ -3002,7 +3025,7 @@ app.post("/sendMessageToUser", (req, res) => {
         message: "Message sent successfully!",
         message_id: result.insertId,
       });
-    }
+    },
   );
 });
 
@@ -3020,7 +3043,7 @@ app.get("/get_worker_profile_pic/:workerId", (req, res) => {
       } else {
         res.status(404).json({ error: "Worker not found" });
       }
-    }
+    },
   );
 });
 
@@ -3080,7 +3103,7 @@ app.get("/getMessagesWorker/:workerId/:adminId", (req, res) => {
     (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json(results); // Return only the filtered results
-    }
+    },
   );
 });
 
@@ -3128,7 +3151,7 @@ app.post("/sendMessageToAdmin", (req, res) => {
         recipient_id,
         timestamp,
       });
-    }
+    },
   );
 });
 
@@ -3170,7 +3193,7 @@ app.post("/sendMessageToClients", (req, res) => {
         recipient_id,
         timestamp,
       });
-    }
+    },
   );
 });
 
@@ -3188,7 +3211,7 @@ app.get("/get_clients_profile_pic/:clientsId", (req, res) => {
       } else {
         res.status(404).json({ error: "Clients not found" });
       }
-    }
+    },
   );
 });
 
@@ -3314,7 +3337,7 @@ app.post("/sendMessageToAllWorkers", (req, res) => {
             if (err) {
               console.error(
                 `❌ Failed to send message to worker ${recipient_id}:`,
-                err.message
+                err.message,
               );
             } else {
               console.log(`✅ Message sent to worker ID: ${recipient_id}`);
@@ -3328,10 +3351,10 @@ app.post("/sendMessageToAllWorkers", (req, res) => {
                 totalSent: messagesSent,
               });
             }
-          }
+          },
         );
       });
-    }
+    },
   );
 });
 
@@ -3503,7 +3526,7 @@ app.post("/add_reservation/:user_id", (req, res) => {
 
 // Mark Reserved tables as Completed if past reservation time
 
-app.post("/update_completed_tables", (req, res) => {
+app.put("/update_completed_tables", (req, res) => {
   const query = `
     UPDATE reservation_tbl
     SET table_status = 'Completed'
@@ -3525,7 +3548,7 @@ app.post("/update_completed_tables", (req, res) => {
       return res.status(500).json({ success: false, error: err.message });
     }
     console.log(
-      "✅ Reserved tables automatically marked as Completed after 1 AM."
+      "✅ Reserved tables automatically marked as Completed after 1 AM.",
     );
     res.json({ success: true });
   });
@@ -3573,7 +3596,7 @@ app.get("/get_reservation_status", (req, res) => {
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json(result[0]);
-    }
+    },
   );
 });
 
@@ -3586,7 +3609,7 @@ app.put("/update_reservation_status", (req, res) => {
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ success: true });
-    }
+    },
   );
 });
 
@@ -3641,7 +3664,7 @@ app.delete("/delete_reservation/:user_id/:reservation_id", (req, res) => {
           }
 
           console.log(
-            `Archived reservation ${reservation_id} for user ${user_id}`
+            `Archived reservation ${reservation_id} for user ${user_id}`,
           );
           res.json({
             message: "Reservation archived successfully",
@@ -3802,7 +3825,7 @@ app.post("/most_reserve", (req, res) => {
         if (err2) {
           console.error(
             "Error updating most_reserve_tbl:",
-            err2.sqlMessage || err2
+            err2.sqlMessage || err2,
           );
           return res.status(500).json({ error: "Internal Server Error" });
         }
@@ -3818,7 +3841,7 @@ app.post("/most_reserve", (req, res) => {
         if (err3) {
           console.error(
             "Error inserting into most_reserve_tbl:",
-            err3.sqlMessage || err3
+            err3.sqlMessage || err3,
           );
           return res.status(500).json({ error: "Internal Server Error" });
         }
@@ -3907,7 +3930,7 @@ app.post("/add_to_cart/:user_id", (req, res) => {
               processedItems++;
               if (processedItems === items.length)
                 finishCartInsert(res, errors);
-            }
+            },
           );
         } else {
           const insertCartSql = `
@@ -3940,10 +3963,10 @@ app.post("/add_to_cart/:user_id", (req, res) => {
               processedItems++;
               if (processedItems === items.length)
                 finishCartInsert(res, errors);
-            }
+            },
           );
         }
-      }
+      },
     );
   });
 });
@@ -4044,7 +4067,7 @@ app.post("/create_order/:user_id", (req, res) => {
             });
 
             resolve(true);
-          }
+          },
         );
       });
     });
@@ -4084,12 +4107,12 @@ app.post("/create_order/:user_id", (req, res) => {
 
             const orderId = orderResult.insertId;
             console.log(
-              `Order ${orderId} created successfully for user ${userId}`
+              `Order ${orderId} created successfully for user ${userId}`,
             );
             res
               .status(200)
               .json({ message: "Order placed successfully", orderId });
-          }
+          },
         );
       })
       .catch((error) => {
@@ -4180,7 +4203,7 @@ app.post("/create_order_items/:user_id", (req, res) => {
                 .json({ message: "Order items added successfully" });
             });
           }
-        }
+        },
       );
     });
   });
@@ -4211,42 +4234,70 @@ app.get("/fetch_transaction/:user_id", (req, res) => {
   });
 });
 
-app.post("/update_payment_status/:order_id", async (req, res) => {
+app.post("/update_order_payment_status/:order_id", async (req, res) => {
   const orderId = req.params.order_id;
-  const paymentStatus = req.body.paymentStatus;
 
-  if (!paymentStatus || paymentStatus !== "paid") {
+  // ✅ FIX: normalize status (prevents mismatch)
+  const paymentStatus = req.body.paymentStatus?.toLowerCase();
+
+  // ❌ validation fix
+  if (paymentStatus !== "paid") {
     return res.status(400).json({ error: "Invalid payment status" });
   }
 
   try {
-    // 1️⃣ Update payment_status
+    // 1️⃣ Update order_tbl
     await new Promise((resolve, reject) => {
-      const sql = `UPDATE order_tbl SET payment_status = ? WHERE order_id = ?`;
+      const sql = `
+        UPDATE order_tbl
+        SET payment_status = ?
+        WHERE order_id = ?
+      `;
       db.query(sql, [paymentStatus, orderId], (err) => {
         if (err) reject(err);
         else resolve(true);
       });
     });
 
-    // 2️⃣ Get order items
+    // 2️⃣ Update payment_tbl (🔴 FIX ADDED)
+    await new Promise((resolve, reject) => {
+      const sql = `
+        UPDATE payment_tbl
+        SET payment_status = ?
+        WHERE order_id = ?
+      `;
+      db.query(sql, [paymentStatus, orderId], (err) => {
+        if (err) reject(err);
+        else resolve(true);
+      });
+    });
+
+    // 3️⃣ Get order items
     const orderItems = await new Promise((resolve, reject) => {
-      const sql = `SELECT item_name, order_quantity,  categories_name  FROM orderitem_tbl WHERE order_id = ?`;
+      const sql = `
+        SELECT item_name, order_quantity, categories_name
+        FROM orderitem_tbl
+        WHERE order_id = ?
+      `;
       db.query(sql, [orderId], (err, results) => {
         if (err) reject(err);
         else resolve(results);
       });
     });
 
-    const deductions = {}; // { ingredient_name: totalAmount }
+    const deductions = {};
 
-    // 3️⃣ Compute ingredient deductions
+    // 4️⃣ Ingredient deduction
     for (const item of orderItems) {
       const item_name = item.item_name;
       const order_quantity = parseFloat(item.order_quantity);
 
       const ingredients = await new Promise((resolve, reject) => {
-        const sql = `SELECT ingredients_name, measurement, unit FROM ingredients_tbl WHERE item_name = ?`;
+        const sql = `
+          SELECT ingredients_name, measurement, unit
+          FROM ingredients_tbl
+          WHERE item_name = ?
+        `;
         db.query(sql, [item_name], (err, results) => {
           if (err) reject(err);
           else resolve(results);
@@ -4259,31 +4310,29 @@ app.post("/update_payment_status/:order_id", async (req, res) => {
         const unit = ing.unit;
 
         const inventoryItem = await new Promise((resolve, reject) => {
-          const sql = `SELECT unit FROM inventory_tbl WHERE product_name = ?`;
+          const sql = `
+            SELECT unit FROM inventory_tbl
+            WHERE product_name = ?
+          `;
           db.query(sql, [name], (err, results) => {
             if (err) reject(err);
-            else if (results.length === 0)
-              reject(new Error("Inventory item not found"));
             else resolve(results[0]);
           });
         });
 
         const inventoryUnit = inventoryItem.unit;
-        const converted = parseFloat(
-          (
-            convertUnit(measurement, unit, inventoryUnit) * order_quantity
-          ).toFixed(3)
-        );
+
+        const converted =
+          convertUnit(measurement, unit, inventoryUnit) * order_quantity;
 
         deductions[name] = (deductions[name] || 0) + converted;
       }
     }
 
-    // 4️⃣ Update inventory using FIFO batch system
+    // 5️⃣ Inventory FIFO deduction (UNCHANGED)
     for (const ingredient in deductions) {
       let remainingToDeduct = deductions[ingredient];
 
-      // 4.1 Get all batches ordered by batch_no (FIFO)
       const batches = await new Promise((resolve, reject) => {
         const sql = `
           SELECT inventory_id, stock_in, stock_out, batch_no
@@ -4297,14 +4346,12 @@ app.post("/update_payment_status/:order_id", async (req, res) => {
         });
       });
 
-      // 4.2 Deduct from batches one by one
       for (const batch of batches) {
         if (remainingToDeduct <= 0) break;
 
-        let available = parseFloat(batch.stock_in);
+        const available = parseFloat(batch.stock_in);
         const deduction = Math.min(available, remainingToDeduct);
 
-        // Deduct from this batch
         await new Promise((resolve, reject) => {
           const sql = `
             UPDATE inventory_tbl
@@ -4319,187 +4366,54 @@ app.post("/update_payment_status/:order_id", async (req, res) => {
         });
 
         remainingToDeduct -= deduction;
-
-        // 4.3 Update batch status
-        const newStock = available - deduction;
-        let status = "Available";
-        if (newStock <= 0) status = "Not Available";
-        else if (newStock <= 2.0) status = "Low Stock";
-
-        await new Promise((resolve, reject) => {
-          const sql = `UPDATE inventory_tbl SET status=? WHERE inventory_id=?`;
-          db.query(sql, [status, batch.inventory_id], (err) => {
-            if (err) reject(err);
-            else resolve(true);
-          });
-        });
-
-        // 4.4 Notification
-        // Notification for low/out-of-stock (drinks)
-        if (newStock <= 2) {
-          const formattedStock = newStock.toFixed(3); // always 3 decimals
-          const message =
-            newStock <= 0
-              ? `${product} is out of stock (0.000 left).`
-              : `${product} is low on stock (${formattedStock} left).`;
-
-          await new Promise((resolve, reject) => {
-            const checkSql = `SELECT * FROM notifications_tbl WHERE message=?`;
-            db.query(checkSql, [message], (err, rows) => {
-              if (err) return reject(err);
-
-              if (rows.length > 0) {
-                const updateSql = `UPDATE notifications_tbl SET status='unread', created_at=NOW() WHERE message=?`;
-                db.query(updateSql, [message], (err2) =>
-                  err2 ? reject(err2) : resolve(true)
-                );
-              } else {
-                const insertSql = `INSERT INTO notifications_tbl (message, status, created_at) VALUES (?, 'unread', NOW())`;
-                db.query(insertSql, [message], (err3) =>
-                  err3 ? reject(err3) : resolve(true)
-                );
-              }
-            });
-          });
-        }
       }
     }
-    // 5️⃣ Deduct DRINKS FIFO (Correct location)
-    // 4️⃣ Deduct drinks inventory (FIFO)
-    const drinks = orderItems.filter(
-      (item) => item.categories_name === "Drinks"
-    );
 
-    for (const drink of drinks) {
-      let remaining = parseFloat(drink.order_quantity);
-      const product = drink.item_name;
-
-      const batches = await new Promise((resolve, reject) => {
-        const sql = `
-      SELECT drinks_inventory_id, stock_in, stock_out, batch_no
-      FROM drinks_inventory_tbl
-      WHERE product_name=?
-      ORDER BY batch_no ASC
-    `;
-        db.query(sql, [product], (err, results) =>
-          err ? reject(err) : resolve(results)
-        );
-      });
-
-      if (!batches || batches.length === 0) {
-        console.warn(`No inventory batches found for ${product}`);
-        continue;
-      }
-
-      for (const batch of batches) {
-        if (remaining <= 0) break;
-
-        // ensure stock_in is a number
-        const available = parseFloat(batch.stock_in) || 0;
-        if (available <= 0) continue;
-
-        const deduction = Math.min(available, remaining);
-        const newStock = available - deduction;
-        const status =
-          newStock <= 0
-            ? "Not Available"
-            : newStock <= 2
-            ? "Low Stock"
-            : "Available";
-
-        // Update stock and status
-        await new Promise((resolve, reject) => {
-          const sql = `
-        UPDATE drinks_inventory_tbl
-        SET stock_in = GREATEST(stock_in - ?, 0),
-            stock_out = stock_out + ?,
-            status = ?
-        WHERE drinks_inventory_id = ?
-      `;
-          db.query(
-            sql,
-            [deduction, deduction, status, batch.drinks_inventory_id],
-            (err) => (err ? reject(err) : resolve(true))
-          );
-        });
-
-        // Notification for low/out-of-stock
-        if (newStock <= 2) {
-          const message =
-            newStock <= 0
-              ? `${product} is out of stock.`
-              : `${product} is low on stock (${newStock} pcs left).`;
-
-          await new Promise((resolve, reject) => {
-            const checkSql = `SELECT * FROM notifications_tbl WHERE message=?`;
-            db.query(checkSql, [message], (err, rows) => {
-              if (err) return reject(err);
-
-              if (rows.length > 0) {
-                const updateSql = `UPDATE notifications_tbl SET status='unread', created_at=NOW() WHERE message=?`;
-                db.query(updateSql, [message], (err2) =>
-                  err2 ? reject(err2) : resolve(true)
-                );
-              } else {
-                const insertSql = `INSERT INTO notifications_tbl (message, status, created_at) VALUES (?, 'unread', NOW())`;
-                db.query(insertSql, [message], (err3) =>
-                  err3 ? reject(err3) : resolve(true)
-                );
-              }
-            });
-          });
-        }
-
-        remaining -= deduction;
-      }
-
-      if (remaining > 0)
-        console.warn(
-          `Not enough stock for drink ${product}. Remaining: ${remaining}`
-        );
-    }
-
-    // 5️⃣ Update menu_tbl availability based on BOTH ingredients + drinks stock
+    // 6️⃣ ✅ UPDATE MENU AVAILABILITY (PUT HERE)
     await new Promise((resolve, reject) => {
-      const sql = `
-    UPDATE menu_tbl m
-    LEFT JOIN (
-      /* INGREDIENTS total stock per item */
-      SELECT i.item_name, SUM(inv.stock_in) AS total_stock
-      FROM ingredients_tbl i
-      JOIN inventory_tbl inv ON i.ingredients_name = inv.product_name
-      GROUP BY i.item_name
+      const updateMenuSql = `
+  UPDATE menu_tbl m
+    SET m.availability = (
+      SELECT 
+        CASE 
+          WHEN COUNT(ing.ingredients_name) = 0 THEN 'Available'
 
-      UNION ALL
+          WHEN SUM(
+            CASE 
+              WHEN IFNULL(inv.total_stock, 0) <= 0 THEN 1 
+              ELSE 0 
+            END
+          ) > 0 THEN 'Not Available'
 
-      /* DRINKS total stock per drink item */
-      SELECT d.product_name AS item_name, SUM(d.stock_in) AS total_stock
-      FROM drinks_inventory_tbl d
-      GROUP BY d.product_name
-    ) AS t ON t.item_name = m.item_name
-
-    SET m.availability = CASE
-      WHEN COALESCE(t.total_stock, 0) > 0 THEN 'Available'
-      ELSE 'Not Available'
-    END
+          ELSE 'Available'
+        END
+      FROM ingredients_tbl ing
+      LEFT JOIN (
+        SELECT 
+          TRIM(LOWER(product_name)) AS product_name, 
+          SUM(stock_in) AS total_stock
+        FROM inventory_tbl
+        GROUP BY TRIM(LOWER(product_name))
+      ) inv 
+      ON TRIM(LOWER(inv.product_name)) = TRIM(LOWER(ing.ingredients_name))
+      WHERE ing.menu_id = m.menu_id
+    );
   `;
 
-      db.query(sql, (err) => {
+      db.query(updateMenuSql, (err) => {
         if (err) reject(err);
         else resolve(true);
       });
     });
 
     res.status(200).json({
-      message:
-        "Payment updated, inventory deducted, and stock status updated (Available / Low Stock / Not Available).",
+      message: "Payment updated successfully (order + payment + inventory).",
     });
   } catch (error) {
     console.error("❌ Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
-
 // Unit conversion helper
 function convertUnit(measurement, fromUnit, toUnit) {
   const unitMap = { g: 0.001, kg: 1, ml: 0.001, liter: 1, l: 1, piece: 1 };
@@ -4627,21 +4541,22 @@ app.delete("/remove_from_carts/:user_id", (req, res) => {
 // ✅ Corrected Fetch Orders Route
 app.get("/fetch_orders", (req, res) => {
   const fetchOrdersSql = `
-    SELECT 
-      o.order_id,
-      o.user_id,
-      o.order_date,
-      o.payment_status,
-      o.order_status,
-      o.fname,
-      o.lname,
-      o.profile_pic,
-      u.fname AS worker_fname,
-      u.lname AS worker_lname,
-      u.profile_pic AS worker_profile_pic
-    FROM order_tbl o
-    LEFT JOIN user_tbl u ON o.created_by = u.user_id
-    ORDER BY o.order_date DESC
+   SELECT 
+  o.order_id,
+  o.user_id,
+  o.order_date,
+  o.payment_status,
+  o.order_status,
+  u.fname,
+  u.lname,
+  u.profile_pic,
+  w.fname AS worker_fname,
+  w.lname AS worker_lname,
+  w.profile_pic AS worker_profile_pic
+FROM order_tbl o
+LEFT JOIN user_tbl u ON o.user_id = u.user_id
+LEFT JOIN user_tbl w ON o.created_by = w.user_id
+ORDER BY o.order_date DESC
   `;
 
   db.query(fetchOrdersSql, (err, results) => {
@@ -4847,7 +4762,7 @@ app.post("/activity_user/:user_id", (req, res) => {
           message: "Activity added successfully",
           activity_id: result.insertId,
         });
-      }
+      },
     );
   });
 });
@@ -5064,7 +4979,7 @@ app.get("/fetch_my_purchase/:user_id", async (req, res) => {
             categories_name: item.categories_name,
           })),
         };
-      })
+      }),
     );
 
     return res.status(200).json(ordersWithItems);
@@ -5192,7 +5107,7 @@ app.post("/bestseller", (req, res) => {
                 message: "Rating and comments updated successfully",
                 avg_rating: avgRating.toFixed(2),
               });
-            }
+            },
           );
         } else {
           // Not rated yet → Insert
@@ -5230,11 +5145,11 @@ app.post("/bestseller", (req, res) => {
               return res.status(201).json({
                 message: "Rating and comment submitted successfully",
               });
-            }
+            },
           );
         }
       });
-    }
+    },
   );
 });
 
@@ -5397,7 +5312,7 @@ app.post("/topselling", (req, res) => {
       if (err) {
         console.error(
           "Error fetching total_avg_rating from bestselling_tbl:",
-          err
+          err,
         );
         return res.status(500).json({
           error: "Failed to fetch total_avg_rating from bestselling_tbl",
@@ -5424,7 +5339,7 @@ app.post("/topselling", (req, res) => {
         if (err) {
           console.error(
             "Error fetching bestselling_id from bestselling_tbl:",
-            err
+            err,
           );
           return res.status(500).json({
             error: "Failed to fetch bestselling_id from bestselling_tbl",
@@ -5458,7 +5373,7 @@ app.post("/topselling", (req, res) => {
           if (result.length === 0) {
             // First-time rating, insert into topselling_tbl
             console.log(
-              "Item does not exist in topselling_tbl. Inserting new entry..."
+              "Item does not exist in topselling_tbl. Inserting new entry...",
             );
             return insertIntoTopselling(
               bestseller_id,
@@ -5468,7 +5383,7 @@ app.post("/topselling", (req, res) => {
               price,
               order_quantity,
               total_avg_rating,
-              res
+              res,
             );
           } else {
             // Product already exists, update based on quantity
@@ -5483,7 +5398,7 @@ app.post("/topselling", (req, res) => {
               total_avg_rating,
               existingQuantity,
               existingTotalAmount,
-              res
+              res,
             );
           }
         });
@@ -5501,7 +5416,7 @@ function insertIntoTopselling(
   price,
   order_quantity,
   total_avg_rating,
-  res
+  res,
 ) {
   const total_order_amount = order_quantity * price;
   console.log("Calculated total_order_amount:", total_order_amount);
@@ -5536,7 +5451,7 @@ function insertIntoTopselling(
       return res
         .status(201)
         .json({ message: "Data inserted successfully into topselling_tbl" });
-    }
+    },
   );
 }
 
@@ -5548,7 +5463,7 @@ function updateTopsellingData(
   total_avg_rating,
   existingQuantity,
   existingTotalAmount,
-  res
+  res,
 ) {
   const newTotalQuantity = existingQuantity + order_quantity;
   const newTotalAmount = existingTotalAmount + order_quantity * price;
@@ -5584,7 +5499,7 @@ function updateTopsellingData(
       return res
         .status(200)
         .json({ message: "Data updated successfully in topselling_tbl" });
-    }
+    },
   );
 }
 
@@ -5729,7 +5644,7 @@ app.post("/bestselling", (req, res) => {
                 total_avg_rating: avgRating.toFixed(2),
                 categories_name,
               });
-            }
+            },
           );
         } else {
           // Insert new record
@@ -5763,7 +5678,7 @@ app.post("/bestselling", (req, res) => {
                 rating_count: 1,
                 categories_name,
               });
-            }
+            },
           );
         }
       });
@@ -5948,7 +5863,7 @@ app.post("/send_announcement_to_worker", (req, res) => {
           status: "unread", // Assuming the initial status is unread
           workerId: recipient_id,
         });
-      }
+      },
     );
   });
 
@@ -6066,7 +5981,7 @@ app.post("/admin_mark_message_read/:messageId", (req, res) => {
         message: "Message marked as read",
         affectedRows: result.affectedRows,
       });
-    }
+    },
   );
 });
 
@@ -6114,7 +6029,7 @@ app.post("/markMessagesRead", (req, res) => {
         return res.status(500).json({ error: "Failed to mark messages read" });
       }
       res.json({ success: true });
-    }
+    },
   );
 });
 
@@ -6428,11 +6343,11 @@ app.post("/create_payment_link", async (req, res) => {
       {
         headers: {
           Authorization: `Basic ${Buffer.from(
-            "sk_test_L88xkD1vbXhDiT8SZUNrgYHz"
+            "sk_test_L88xkD1vbXhDiT8SZUNrgYHz",
           ).toString("base64")}`,
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     // Extract the payment link and transaction ID (reference number)
@@ -6457,7 +6372,7 @@ app.post("/create_payment_link", async (req, res) => {
 //========================== Announcement END ============================
 //========================== TRANSACTIONS ============================
 // Insert transaction into the database
-app.post("/paypal_transaction", async (req, res) => {
+app.post("/paypal_transaction/", async (req, res) => {
   const {
     amount,
     description,
@@ -6471,7 +6386,7 @@ app.post("/paypal_transaction", async (req, res) => {
   try {
     console.log(
       "🟡 Received request to store transaction with transaction_id:",
-      transaction_id
+      transaction_id,
     );
     console.log("🟡 user_id received from body:", user_id);
 
@@ -6560,7 +6475,7 @@ app.post("/paypal_transaction", async (req, res) => {
   try {
     console.log(
       "🟡 Received request to store transaction with transaction_id:",
-      transaction_id
+      transaction_id,
     );
     console.log("🟡 user_id received from body:", user_id);
 
@@ -6698,7 +6613,7 @@ app.post("/gcash_transaction", upload.single("proof_image"), (req, res) => {
   const proof_image = req.file?.path || null; // Cloudinary returns full URL
 
   const transaction_id = `GCASH-${Date.now()}-${Math.floor(
-    Math.random() * 1000
+    Math.random() * 1000,
   )}`;
 
   const sql = `
@@ -6839,7 +6754,7 @@ app.post("/insertTestimonial", (req, res) => {
 
         console.log("Testimonial inserted successfully:", result);
         res.send("Testimonial inserted successfully");
-      }
+      },
     );
   });
 });
@@ -6969,20 +6884,36 @@ app.put("/update_order_status", (req, res) => {
 
 // Update transaction_tbl (only if Paid → Completed)
 app.put("/update_transaction_status", (req, res) => {
-  const { user_id, status } = req.body;
+  const { order_id, status } = req.body;
 
-  if (status !== "Completed") {
-    return res.json({ success: true, message: "No update needed for Pending" });
+  if (!order_id) {
+    return res.status(400).json({ error: "order_id is required" });
   }
 
-  const query = `UPDATE transaction_tbl SET status = ? WHERE user_id = ? ORDER BY id DESC LIMIT 1`;
+  const normalizedStatus = status?.toLowerCase();
 
-  db.query(query, [status, user_id], (err) => {
+  // only allow completed
+  if (normalizedStatus !== "completed") {
+    return res.json({ success: true, message: "No update needed" });
+  }
+
+  const query = `
+    UPDATE transaction_tbl
+    SET status = 'completed'
+    WHERE order_id = ?
+  `;
+
+  db.query(query, [order_id], (err, result) => {
     if (err) {
       console.error("Error updating transaction:", err);
       return res.status(500).json({ error: "Database error" });
     }
-    res.json({ success: true });
+
+    res.json({
+      success: true,
+      message: "Transaction marked as completed",
+      affectedRows: result.affectedRows,
+    });
   });
 });
 
@@ -7053,7 +6984,7 @@ app.get("/get_payments", (req, res) => {
   const sql = `
     SELECT payment_id, user_id, amount_paid, payment_date, payment_method, payment_status
     FROM payment_tbl
-    WHERE payment_status = 'Completed'
+    WHERE payment_status = 'paid'
     ORDER BY payment_date ASC
   `;
 
@@ -7124,7 +7055,7 @@ app.post("/toggle_user_favorites/:menu_id", (req, res) => {
           (err4) => {
             if (err4) return res.status(500).json(err4);
             return res.json({ success: true, action: "added" });
-          }
+          },
         );
       });
     }

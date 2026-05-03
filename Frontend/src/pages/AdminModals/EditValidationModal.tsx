@@ -9,11 +9,14 @@ const { Option } = Select;
 interface EditValidationModalProps {
   order: any;
   onUpdateOrder?: (updatedOrder: any) => void;
+  onClose?: () => void; // ✅ Added onClose prop
 }
+const apiUrl = import.meta.env.VITE_API_URL;
 
 const EditValidationModal: React.FC<EditValidationModalProps> = ({
   order,
   onUpdateOrder,
+  onClose, // ✅ Destructure onClose
 }) => {
   const [message, setMessage] = useState<string>("");
   const [paymentStatus, setPaymentStatus] = useState<string>("Pending");
@@ -29,18 +32,26 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
       setPaymentStatus(formattedStatus || "Pending");
       setMessage(order.validation_message || "Your GCash payment is verified");
 
-      if (formattedStatus === "Paid") setIsSaved(true);
+      // ✅ Disable only if the order is already paid
+      setIsSaved(formattedStatus === "Paid");
     }
   }, [order]);
 
   const handleSave = async () => {
+    if (paymentStatus === "Pending") {
+      antdMessage.warning(
+        "Please select 'Paid' before saving. The current status is still Pending.",
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const workerId = sessionStorage.getItem("user_id");
       if (!workerId) throw new Error("Worker ID not found in session");
 
       // Send notification to client
-      await axios.post("http://localhost:8081/send_client_notification", {
+      await axios.post(`${apiUrl}/send_client_notification`, {
         message,
         sender_id: workerId,
         recipient_id: order?.user_id,
@@ -48,39 +59,49 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
       });
 
       if (paymentStatus === "Paid") {
-        // Update order status & created_by
-        const { data } = await axios.put(
-          "http://localhost:8081/update_order_status",
+        // Update order status & related tables
+        const { data } = await axios.put(`${apiUrl}/update_order_status`, {
+          order_id: order?.order_id,
+          payment_status: "paid",
+          created_by: workerId,
+        });
+
+        await axios.put(`${apiUrl}/update_transaction_status`, {
+          order_id: order?.order_id,
+          status: "completed",
+        });
+        await axios.put(`${apiUrl}/update_payment_status`, {
+          order_id: order?.order_id,
+          payment_status: "paid",
+        });
+
+        await axios.post(
+          `${apiUrl}/update_order_payment_status/${order.order_id}`,
           {
-            order_id: order?.order_id,
-            payment_status: "Paid",
-            created_by: workerId,
-          }
+            paymentStatus: "paid",
+          },
         );
 
-        // Update transaction/payment tables
-        await axios.put("http://localhost:8081/update_transaction_status", {
-          user_id: order?.user_id,
-          status: "Completed",
-        });
-        await axios.put("http://localhost:8081/update_payment_status", {
-          user_id: order?.user_id,
-          payment_status: "Completed",
-        });
-
-        // ✅ Real-time update in orders table
         if (onUpdateOrder && data.updatedOrder) {
           onUpdateOrder(data.updatedOrder);
         }
 
+        antdMessage.success("Payment completed & inventory updated!");
+        // ✅ Disable inputs only for this order after successful save
         setIsSaved(true);
-        antdMessage.success("Successfully Paid!");
+
+        // ✅ Close modal automatically after successful Paid save
+        if (onClose) onClose();
       } else {
         antdMessage.success("Validation saved successfully!");
+        // Optional: auto-close even for Pending
+        if (onClose) onClose();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving order:", error);
-      antdMessage.error("Failed to save changes.");
+      antdMessage.error(
+        error.response?.data?.error || "Failed to save changes.",
+      );
     } finally {
       setLoading(false);
     }
@@ -92,9 +113,13 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
         <label className="block font-medium mb-1">Payment Status</label>
         <Select
           value={paymentStatus}
-          onChange={setPaymentStatus}
+          onChange={(value) => {
+            setPaymentStatus(value);
+            // ✅ Re-enable Save button if user changes dropdown before saving
+            setIsSaved(false);
+          }}
           className="w-full"
-          disabled={isSaved}
+          disabled={isSaved} // ✅ Only disable after this order is saved as Paid
         >
           <Option value="Pending">Pending</Option>
           <Option value="Paid">Paid</Option>
@@ -108,19 +133,19 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Enter a note or message..."
-          disabled={isSaved}
+          disabled={isSaved} // ✅ Only disable after this order is saved as Paid
         />
       </div>
 
       <div className="flex justify-end gap-2">
         <Tooltip
-          title={isSaved ? "Cannot edit a paid order" : "Save your changes"}
+          title={isSaved ? "Changes have been saved" : "Save your changes"}
         >
           <Button
             type="primary"
             loading={loading}
             onClick={handleSave}
-            disabled={isSaved}
+            disabled={isSaved} // ✅ Only disable after this order is saved as Paid
           >
             Save Changes
           </Button>

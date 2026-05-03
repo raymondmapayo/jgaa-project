@@ -3,8 +3,22 @@
 @tailwind utilities;
 .products-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
+}
+
+/* Tablet */
+@media (max-width: 768px) {
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .products-grid {
+    grid-template-columns: 1fr;
+  }
 }
 @keyframes waveHand {
   0% {
@@ -34,12 +48,6 @@
   display: inline-block;
   transform-origin: 70% 70%;
   animation: waveHand 1.5s infinite;
-}
-/* Mobile */
-@media (max-width: 640px) {
-  .products-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 /*body {

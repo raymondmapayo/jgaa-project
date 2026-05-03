@@ -35,7 +35,7 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
   const [rawData, setRawData] = useState<RevenueData[]>([]);
   const [data, setData] = useState<RevenueData[]>([]);
   const [filterType, setFilterType] = useState<"daily" | "weekly" | "monthly">(
-    "daily"
+    "daily",
   );
 
   const generateMonthDates = (start: Dayjs, end: Dayjs) => {
@@ -52,7 +52,7 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
       .then((payments) => {
         const grouped: { [key: string]: number } = {};
         payments
-          .filter((p: any) => p.payment_status === "Completed")
+          .filter((p: any) => p.payment_status === "paid")
           .forEach((p: any) => {
             const date = dayjs(p.payment_date).format("YYYY-MM-DD");
             grouped[date] = (grouped[date] || 0) + Number(p.amount_paid);
@@ -84,10 +84,10 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
 
   const groupData = (
     dataset: RevenueData[],
-    type: "daily" | "monthly"
+    type: "daily" | "monthly",
   ): RevenueData[] => {
     const sorted = [...dataset].sort((a, b) =>
-      dayjs(a.date).diff(dayjs(b.date))
+      dayjs(a.date).diff(dayjs(b.date)),
     );
 
     if (type === "daily") return sorted;
@@ -177,15 +177,15 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
       const avgSales =
         recent.reduce((sum, v) => sum + v.sales, 0) / recent.length;
       analyticsText = `\n📊 Analytics: The highest sales were recorded on ${dayjs(
-        highest.date
+        highest.date,
       ).format("MMM DD, YYYY")} (₱${
         highest.sales
       }), while the lowest were on ${dayjs(lowest.date).format(
-        "MMM DD, YYYY"
+        "MMM DD, YYYY",
       )} (₱${
         lowest.sales
       }). On average, daily sales reached around ₱${avgSales.toFixed(
-        2
+        2,
       )}, showing variable sales activity between today and yesterday.`;
     } else {
       analyticsText =
@@ -196,7 +196,7 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
 📅 ${dayjs(last.date).format("MM/DD/YYYY")}: (₱${last.sales}) — ${
       prev
         ? `${changeText} compared to ${dayjs(prev.date).format(
-            "MM/DD/YYYY"
+            "MM/DD/YYYY",
           )}: (₱${prev.sales})`
         : "-"
     }

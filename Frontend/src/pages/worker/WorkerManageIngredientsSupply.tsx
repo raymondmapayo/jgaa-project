@@ -133,23 +133,17 @@ const WorkerIngredientsSupply = () => {
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL;
-
-  useEffect(() => {
-    const fetchSupply = async () => {
-      try {
-        const response = await axios.get(`${apiUrl}/get_supply`);
-        if (response.data.success) {
-          setDataSource(response.data.data);
-        } else {
-          console.error("⚠️ Backend returned error:", response.data.message);
-        }
-      } catch (error) {
-        console.error("❌ Error fetching supply:", error);
-      } finally {
-        setIsLoading(false);
+  const fetchSupply = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/get_supply`);
+      if (response.data.success) {
+        setDataSource(response.data.data);
       }
-    };
-
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  useEffect(() => {
     fetchSupply();
   }, [apiUrl]);
 
@@ -320,7 +314,7 @@ const WorkerIngredientsSupply = () => {
           setEditModalVisible(false);
           setSelectedItem(null);
         }}
-        onFinish={() => window.location.reload()}
+        onFinish={() => fetchSupply()}
       />
 
       <WorkerHistoryInventoryModal

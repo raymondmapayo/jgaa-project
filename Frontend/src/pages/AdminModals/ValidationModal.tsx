@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Card, Image, Tag } from "antd";
+import { useEffect, useState } from "react";
+import { Card, Image, Tag, Spin } from "antd";
 import dayjs from "dayjs";
 import styled from "styled-components";
 
@@ -49,8 +50,11 @@ const StyledPanelContent = styled.div`
     position: absolute;
     top: 16px;
     left: 20px;
-    font-size: 13px;
-    padding: 2px 10px;
+    font-size: 15px; /* 🔹 Slightly larger font */
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase; /* 🔹 Makes it BIG (PENDING, COMPLETED, PAID) */
+    padding: 4px 14px;
     border-radius: 8px;
   }
 
@@ -58,77 +62,130 @@ const StyledPanelContent = styled.div`
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid #f0f0f0;
+    text-align: center;
   }
 `;
 
 interface ValidationModalProps {
-  transaction: any;
+  order: any;
 }
 
-const ValidationModal: React.FC<ValidationModalProps> = ({ transaction }) => {
-  // ✅ Format date & time using dayjs
-  const formattedDate = transaction?.payment_date
+const apiUrl = import.meta.env.VITE_API_URL;
+
+const ValidationModal: React.FC<ValidationModalProps> = ({ order }) => {
+  const [transaction, setTransaction] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!order?.order_id) return;
+
+    const fetchTransaction = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(
+          `${apiUrl}/get_transac_validation/${order.order_id}`,
+        );
+        const data = await res.json();
+
+        if (res.ok && data.length > 0) {
+          setTransaction(data[0]);
+        } else {
+          setTransaction(null);
+        }
+      } catch (err) {
+        console.error("Error fetching transaction:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTransaction();
+  }, [order]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-10">
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (!transaction) {
+    return (
+      <p className="text-center text-gray-500">No transaction details found.</p>
+    );
+  }
+
+  const formattedDate = transaction.payment_date
     ? dayjs(transaction.payment_date).format("DD/MM/YYYY")
     : "";
-  const formattedTime = transaction?.payment_time
+  const formattedTime = transaction.payment_time
     ? dayjs(transaction.payment_time, "HH:mm:ss").format("h:mm A")
     : "";
 
   return (
     <Card title="Validate GCash Payment" className="w-full">
-      {transaction ? (
-        <StyledPanelContent>
-          <Card bordered={false} className="transaction-card">
-            {/* Status badge */}
-            <Tag
-              className="status-tag"
-              color={
-                transaction.status === "Completed"
-                  ? "green"
-                  : transaction.status === "Pending"
+      <StyledPanelContent>
+        <Card bordered={false} className="transaction-card">
+          {/* ✅ BIG status text */}
+          <Tag
+            className="status-tag"
+            color={
+              transaction.status.toLowerCase() === "completed"
+                ? "green"
+                : transaction.status.toLowerCase() === "pending"
                   ? "orange"
                   : "red"
+            }
+          >
+            {transaction.status.toUpperCase()} {/* 🔹 Forces big text */}
+          </Tag>
+
+          {/* Amount + DateTime */}
+          <div className="header">
+            <div className="amount">₱{transaction.amount}</div>
+            <div className="datetime">
+              {formattedDate}
+              <br />
+              {formattedTime}
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="details">
+            <div>Reference Code: {transaction.reference_code}</div>
+            <div>GCash Number: {transaction.gcash_number}</div>
+          </div>
+        </Card>
+
+        {/* Proof of Payment */}
+        {transaction.proof_image && (
+          <Card
+            bordered={false}
+            className="proof-image"
+            title="Proof of Payment"
+          >
+            <Image
+              src={
+                transaction.proof_image
+                  ? transaction.proof_image.startsWith("http")
+                    ? transaction.proof_image // Cloudinary URL
+                    : `${apiUrl}/uploads/images/${transaction.proof_image}` // fallback to backend path
+                  : "https://via.placeholder.com/150?text=No+Image" // final placeholder
               }
-            >
-              {transaction.status}
-            </Tag>
-
-            {/* Header with amount + datetime */}
-            <div className="header">
-              <div className="amount">₱{transaction.amount}</div>
-              <div className="datetime">
-                {formattedDate}
-                <br />
-                {formattedTime}
-              </div>
-            </div>
-
-            {/* Details section */}
-            <div className="details">
-              <div>Referral Code: {transaction.reference_code}</div>
-              <div>GCash No: {transaction.gcash_number}</div>
-            </div>
+              alt="Proof of payment"
+              style={{
+                borderRadius: 8,
+                width: "180px", // ✅ smaller image size
+                height: "auto",
+                objectFit: "contain",
+                display: "inline-block", // ✅ keeps it centered horizontally
+              }}
+              preview={{ mask: "Click to Preview" }}
+            />
           </Card>
-
-          {/* Proof of payment image */}
-          {transaction.proof_image && (
-            <Card
-              bordered={false}
-              className="proof-image"
-              title="Proof of Payment"
-            >
-              <Image
-                src={`http://localhost:8081/uploads/images/${transaction.proof_image}`}
-                alt="Proof of payment"
-                style={{ borderRadius: 8 }}
-                preview={{ mask: "Click to Preview" }}
-              />
-            </Card>
-          )}
-        </StyledPanelContent>
-      ) : (
-        <p>No transaction details found.</p>
-      )}
+        )}
+      </StyledPanelContent>
     </Card>
   );
 };

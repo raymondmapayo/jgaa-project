@@ -11,7 +11,6 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import AddCategories from "../../components/form/AddCategories";
-
 import Archive from "./Archive/Archive";
 import CategoriesEdit from "../WorkerModals/CategoriesEditModal";
 
@@ -163,9 +162,7 @@ const WorkerManageCategories = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentMenus = dataSource.slice(indexOfFirstItem, indexOfLastItem);
+
   const [isArchivedModalVisible, setIsArchivedModalVisible] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL;
@@ -174,31 +171,24 @@ const WorkerManageCategories = () => {
     { key: "2", label: "Sort by Name" },
   ];
 
-  // Polling function to fetch updated categories
+  const fetchCategories = async () => {
+    try {
+      setIsLoading(true);
+
+      const response = await axios.get(`${apiUrl}/get_categories`, {
+        headers: { "Cache-Control": "no-cache" },
+      });
+
+      setDataSource(response.data);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchCategories = async () => {
-      try {
-        const response = await axios.get(`${apiUrl}/get_categories`, {
-          headers: { "Cache-Control": "no-cache" },
-        });
-        if (isMounted) setDataSource(response.data);
-      } catch (error) {
-        console.error("Error fetching categories:", error);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
     fetchCategories();
-    const interval = setInterval(fetchCategories, 10000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [apiUrl]);
+  }, []);
 
   const handleAddCategory = async () => {
     try {
@@ -419,7 +409,7 @@ const WorkerManageCategories = () => {
           <p className="text-center text-gray-500">Loading...</p>
         ) : (
           <StyledTable
-            dataSource={currentMenus}
+            dataSource={dataSource}
             columns={columns}
             pagination={{
               current: currentPage,
@@ -476,6 +466,7 @@ const WorkerManageCategories = () => {
       <Archive
         isArchivedModalVisible={isArchivedModalVisible}
         onClose={handleCloseArchived}
+        onRestore={fetchCategories} // ✅ THIS IS REQUIRED
       />
       <AddCategories
         isAddModalVisible={isAddModalVisible}

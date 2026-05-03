@@ -57,11 +57,11 @@ const CategoriesEdit: React.FC<CategoriesEditProps> = ({
     const formData = new FormData();
     formData.append(
       "categories_name",
-      values.categories_name || selectedItem.categories_name
+      values.categories_name || selectedItem.categories_name,
     );
     formData.append(
       "description",
-      values.description || selectedItem.description
+      values.description || selectedItem.description,
     );
     formData.append("status", selectedItem.status || "active");
 
@@ -73,10 +73,10 @@ const CategoriesEdit: React.FC<CategoriesEditProps> = ({
     }
 
     try {
-      const response = await axios.put(
+      const response = await axios.post(
         `${apiUrl}/update_categories/${selectedItem.categories_id}`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
 
       if (response.data.success) {

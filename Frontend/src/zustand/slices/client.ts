@@ -39,7 +39,7 @@ export interface ClientSlice {
       status?: string;
       specialRequest?: string;
     },
-    resetForm?: () => void
+    resetForm?: () => void,
   ) => void;
 }
 
@@ -167,7 +167,7 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
         const index = currentCart.findIndex(
           (item) =>
             item.item_name === product.item_name &&
-            (item.size || "Normal size") === (product.size || "Normal size")
+            (item.size || "Normal size") === (product.size || "Normal size"),
         );
 
         if (index > -1) {
@@ -212,18 +212,21 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
 
       const data = await response.json();
-      if (!response.ok)
+
+      if (!response.ok) {
         throw new Error(data.error || "Failed to log out on server.");
+      }
 
       console.log("Client logout response:", data);
 
+      // ✅ FIXED: correct storage
       sessionStorage.clear();
-      localStorage.removeItem("userId");
 
+      // ✅ clear cart interval
       set((state) => {
         if ((state as any).cartRefreshInterval)
           clearInterval((state as any).cartRefreshInterval);
@@ -236,6 +239,7 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
       });
     } catch (error) {
       console.error("Client Logout error:", error);
+
       notification.error({
         message: "Logout Failed",
         description:
@@ -298,7 +302,7 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
   incrementCartItem: async (
     productId: any,
     itemName: string,
-    size?: string
+    size?: string,
   ) => {
     const userId = sessionStorage.getItem("user_id");
     if (!userId) return;
@@ -310,7 +314,7 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
         item.item_name === itemName &&
         (item.size || "Normal size") === (size || "Normal size")
           ? { ...item, quantity: item.quantity + 1 }
-          : item
+          : item,
       );
       return { ...state, client: { ...state.client, cart: updatedCart } };
     });
@@ -329,7 +333,7 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
   decrementCartItem: async (
     productId: any,
     itemName: string,
-    size?: string
+    size?: string,
   ) => {
     const userId = sessionStorage.getItem("user_id");
     if (!userId) return;
@@ -341,7 +345,7 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
         item.item_name === itemName &&
         (item.size || "Normal size") === (size || "Normal size")
           ? { ...item, quantity: Math.max(item.quantity - 1, 0) }
-          : item
+          : item,
       );
       return { ...state, client: { ...state.client, cart: updatedCart } };
     });
@@ -376,7 +380,7 @@ const createClientSlice: StateCreator<ClientSlice> = (set) => ({
             !(
               item.item_name === product.item_name &&
               (item.size || "Normal size") === (product.size || "Normal size")
-            )
+            ),
         );
 
         notification.info({

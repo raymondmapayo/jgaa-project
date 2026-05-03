@@ -1,58 +1,64 @@
 import { UploadOutlined } from "@ant-design/icons";
-import { Button, Modal, Table, Tooltip } from "antd";
+import { Button, Modal, Table, Tooltip, Tag } from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
 
-interface ArchiveProps {
-  isArchivedModalVisible: boolean;
-  onClose: () => void;
-}
-
-interface ArchivedCategoryItem {
-  categories_id: number;
-  categories_name: string;
-  categories_img: string;
-  description: string;
+interface UsedSupplyCategoryItem {
+  cat_supply_id: number;
+  supply_cat_name: string;
+  created_at: string;
+  created_by: string;
   status: string;
 }
 
-const Archive = ({ isArchivedModalVisible, onClose }: ArchiveProps) => {
-  const [archivedCategories, setArchivedCategories] = useState<
-    ArchivedCategoryItem[]
+interface UsedCategoriesModalProps {
+  isArchivedModalVisible: boolean; // rename back
+  onClose: () => void;
+  onRestore?: () => void; // <-- optional callback
+}
+
+const UsedSupplyCategoriesModal = ({
+  isArchivedModalVisible,
+  onClose,
+  onRestore, // <-- add this prop
+}: UsedCategoriesModalProps) => {
+  const [usedCategories, setUsedCategories] = useState<
+    UsedSupplyCategoryItem[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
   const apiUrl = import.meta.env.VITE_API_URL;
-  useEffect(() => {
-    let isMounted = true; // ✅ Prevent state updates on unmounted component
 
-    const fetchArchivedCategories = async () => {
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUsedCategories = async () => {
       try {
-        const response = await axios.get(`${apiUrl}/get_archived`, {
-          headers: { "Cache-Control": "no-cache" },
-        });
+        const response = await axios.get(
+          `${apiUrl}/get_archive_supply_categories`,
+          {
+            headers: { "Cache-Control": "no-cache" },
+          },
+        );
         if (isMounted) {
-          setArchivedCategories(response.data);
+          setUsedCategories(response.data);
         }
       } catch (error) {
-        console.error("Error fetching archived categories:", error);
+        console.error("Error fetching used categories:", error);
       } finally {
         if (isMounted) setIsLoading(false);
       }
     };
 
-    fetchArchivedCategories(); // Initial load
+    fetchUsedCategories();
+    const interval = setInterval(fetchUsedCategories, 10000);
 
-    // ✅ Poll every 10 seconds (not 10 ms)
-    const interval = setInterval(fetchArchivedCategories, 10000);
-
-    // ✅ Cleanup on unmount
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
   }, [apiUrl]);
 
-  const handleRestore = async (categories_id: number) => {
+  const handleRestore = async (cat_supply_id: number) => {
     Modal.confirm({
       title: "Are you sure you want to restore this category?",
       content: "This will restore the category back to active status.",
@@ -61,10 +67,16 @@ const Archive = ({ isArchivedModalVisible, onClose }: ArchiveProps) => {
       cancelText: "Cancel",
       onOk: async () => {
         try {
-          await axios.post(`${apiUrl}/restore_category/${categories_id}`);
-          setArchivedCategories((prevData) =>
-            prevData.filter((item) => item.categories_id !== categories_id)
+          await axios.post(
+            `${apiUrl}/restore_category_supply/${cat_supply_id}`,
           );
+
+          setUsedCategories((prev) =>
+            prev.filter((item) => item.cat_supply_id !== cat_supply_id),
+          );
+
+          // ✅ Notify parent to refresh main table
+          if (onRestore) onRestore();
         } catch (error) {
           console.error("Error restoring category:", error);
         }
@@ -74,49 +86,39 @@ const Archive = ({ isArchivedModalVisible, onClose }: ArchiveProps) => {
 
   const columns = [
     {
-      title: "Category ID",
-      dataIndex: "categories_id",
-      key: "categories_id",
+      title: "ID",
+      dataIndex: "cat_supply_id",
+      key: "cat_supply_id",
     },
     {
       title: "Category Name",
-      dataIndex: "categories_name",
-      key: "categories_name",
-      render: (text: any, record: any) => (
-        <div className="flex items-center gap-3">
-          <img
-            src={`${apiUrl}/uploads/images/${record.categories_img}`}
-            alt={record.categories_name}
-            className="w-10 h-10 rounded"
-          />
-          <span>{text}</span>
-        </div>
-      ),
+      dataIndex: "supply_cat_name",
+      key: "supply_cat_name",
     },
     {
-      title: "Description",
-      dataIndex: "description",
-      key: "description",
+      title: "Created At",
+      dataIndex: "created_at",
+      key: "created_at",
     },
     {
       title: "Status",
       dataIndex: "status",
       key: "status",
       render: (status: string) => (
-        <span className="font-bold text-red-500">
+        <Tag color={status === "deleted" ? "red" : "green"}>
           {status.charAt(0).toUpperCase() + status.slice(1)}
-        </span>
+        </Tag>
       ),
     },
     {
       title: "Action",
       key: "action",
-      render: (_: any, record: any) => (
+      render: (_: any, record: UsedSupplyCategoryItem) => (
         <Tooltip title="Restore Category">
           <Button
             type="primary"
             icon={<UploadOutlined />}
-            onClick={() => handleRestore(record.categories_id)}
+            onClick={() => handleRestore(record.cat_supply_id)}
           >
             Restore
           </Button>
@@ -127,27 +129,26 @@ const Archive = ({ isArchivedModalVisible, onClose }: ArchiveProps) => {
 
   return (
     <Modal
-      title="Archived Categories"
+      title="Used Supply Categories"
       visible={isArchivedModalVisible}
       onCancel={onClose}
       footer={null}
-      width="100%" // Make modal full width
-      style={{ maxWidth: "1000px" }} // Max width for the modal
+      width="100%"
+      style={{ maxWidth: "1000px" }}
     >
       {isLoading ? (
         <p>Loading...</p>
       ) : (
         <Table
-          dataSource={archivedCategories}
+          dataSource={usedCategories}
           columns={columns}
-          rowKey="categories_id"
-          pagination={{ pageSize: 3 }}
-          scroll={{ x: true }} // Enable horizontal scrolling if necessary
-          style={{ width: "100%" }} // Ensure the table takes full width of its container
+          rowKey="cat_supply_id"
+          pagination={{ pageSize: 5 }}
+          scroll={{ x: true }}
         />
       )}
     </Modal>
   );
 };
 
-export default Archive;
+export default UsedSupplyCategoriesModal;

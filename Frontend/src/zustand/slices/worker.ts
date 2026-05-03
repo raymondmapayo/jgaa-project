@@ -57,42 +57,38 @@ const createWorkerSlice: StateCreator<WorkerSlice> = (set) => ({
   },
   logoutworker: async () => {
     try {
-      // ✅ Prefer sessionStorage for current logged-in worker ID
-      const user_id =
-        sessionStorage.getItem("user_id") || localStorage.getItem("userId");
+      const user_id = sessionStorage.getItem("user_id");
 
-      if (!user_id) {
-        throw new Error("No user ID found. Cannot log out.");
-      }
+      if (!user_id) throw new Error("User ID not found.");
 
       console.log("Logging out worker user_id:", user_id);
 
-      // ✅ Call backend to update last_active_time
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/worker/logout`,
+        `${import.meta.env.VITE_API_URL}/worker/logout/${user_id}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id }),
-        }
+        },
       );
 
       const data = await response.json();
-      console.log("Worker logout response from backend:", data);
+      console.log("Worker logout response:", data);
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to log out on server.");
       }
 
-      // ✅ Clear frontend state (same as admin)
+      // ✅ CLEAR STORAGE (FIXED)
+      sessionStorage.removeItem("user_id");
+      sessionStorage.removeItem("role");
+
       localStorage.removeItem("token");
       localStorage.removeItem("userRole");
       localStorage.removeItem("fname");
       localStorage.removeItem("email");
-      localStorage.removeItem("userId");
-      sessionStorage.removeItem("user_id");
+      localStorage.removeItem("userId"); // safe to remove if exists
 
-      // ✅ Reset Zustand worker state
+      // ✅ RESET STATE
       set(() => ({ worker: initialState }));
 
       notification.success({
@@ -102,12 +98,12 @@ const createWorkerSlice: StateCreator<WorkerSlice> = (set) => ({
     } catch (error) {
       console.error("Worker Logout error:", error);
 
-      let errorMessage = "An error occurred while logging out.";
-      if (error instanceof Error) errorMessage = error.message;
-
       notification.error({
         message: "Logout Failed",
-        description: errorMessage,
+        description:
+          error instanceof Error
+            ? error.message
+            : "An error occurred while logging out.",
       });
     }
   },

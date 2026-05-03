@@ -45,7 +45,7 @@ export const WorkerRoutes = [
   {
     path: "/Worker/Manage/Ingredients",
     component: lazy(
-      () => import("../pages/worker/Tabs/Drinks&IngredientsTabs")
+      () => import("../pages/worker/Tabs/Drinks&IngredientsTabs"),
     ),
   },
   {

@@ -38,41 +38,19 @@ const Reservation = () => {
   const apiUrl = import.meta.env.VITE_API_URL;
 
   // 🔹 Sync with worker toggle
-
-  // 🔹 Sync with worker toggle (via backend)
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-
     const fetchReservationStatus = async () => {
-      try {
-        const res = await axios.get(`${apiUrl}/get_reservation_status`);
-        const { reservation_enabled } = res.data;
-
-        setIsWorkerEnabled(reservation_enabled === 1);
-
-        if (reservation_enabled !== 1 && interval) {
-          clearInterval(interval);
-          interval = null;
-          console.log("⏹️ Interval stopped — reservation disabled");
-        }
-      } catch (error) {
-        console.error("Error fetching reservation status:", error);
-      } finally {
-        setLoading(false);
-      }
+      const res = await axios.get(`${apiUrl}/get_reservation_status`);
+      setIsWorkerEnabled(res.data.reservation_enabled === 1);
     };
 
     fetchReservationStatus();
-    interval = setInterval(fetchReservationStatus, 10000);
 
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-        console.log("🧹 Interval cleared (component unmounted)");
-      }
-    };
+    const onFocus = () => fetchReservationStatus();
+    window.addEventListener("focus", onFocus);
+
+    return () => window.removeEventListener("focus", onFocus);
   }, [apiUrl]);
-
   useEffect(() => {
     const storedEmail = sessionStorage.getItem("email");
     const storedFname = sessionStorage.getItem("fname");
@@ -88,7 +66,7 @@ const Reservation = () => {
 
       // ✅ Show ReservationTermsConditionModal if user hasn't accepted yet
       const termsAccepted = sessionStorage.getItem(
-        "reservation_terms_accepted"
+        "reservation_terms_accepted",
       );
       if (!termsAccepted) {
         setIsTermsModalVisible(true); // <-- show modal
@@ -109,23 +87,36 @@ const Reservation = () => {
     const checkReservationTime = () => {
       const now = dayjs().tz("Asia/Manila");
       const hour = now.hour();
-
       // ✅ OPEN: 8:00 AM → 12:59 AM (next day)
-      // ❌ CLOSED: 1:00 AM → 7:59 AM
+      // // ❌ CLOSED: 1:00 AM → 7:59 AM
       if (hour >= 8 || hour < 1) {
-        setIsReservationOpen(true); // show reservation UI
+        setIsReservationOpen(true);
       } else {
-        setIsReservationOpen(false); // show ReservationClose UI
+        setIsReservationOpen(false);
       }
 
-      setLoading(false); // ✅ hide loading after check
+      setLoading(false);
     };
 
+    // run once on load
     checkReservationTime();
 
-    // Recheck every minute in case user leaves the page open
-    const interval = setInterval(checkReservationTime, 60000);
-    return () => clearInterval(interval);
+    // run when user returns to tab
+    const onFocus = () => checkReservationTime();
+    window.addEventListener("focus", onFocus);
+
+    // run when tab becomes visible again (better than focus sometimes)
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        checkReservationTime();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
 
   const fetchReservedTables = async () => {
@@ -235,7 +226,7 @@ const Reservation = () => {
           special_request: notes,
           table_ids: selectedTables,
         },
-        { headers: { "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } },
       );
 
       const reserveId = reservationResponse.data.reserveId;
@@ -251,16 +242,16 @@ const Reservation = () => {
           axios.post(
             `${apiUrl}/most_reserve`,
             { table_id: tableId, reservation_date: reservationDate },
-            { headers: { "Content-Type": "application/json" } }
-          )
-        )
+            { headers: { "Content-Type": "application/json" } },
+          ),
+        ),
       );
 
       // 3️⃣ Add reservation activity
       await axios.post(
         `${apiUrl}/reservation_activity/${userId}`,
         { reservation_id: reserveId, activity_date: reservationDate },
-        { headers: { "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } },
       );
 
       // 4️⃣ Reset selection & update reserved tables
@@ -275,7 +266,7 @@ const Reservation = () => {
     } catch (err: any) {
       console.error(
         "Error during reservation:",
-        err.response?.data || err.message
+        err.response?.data || err.message,
       );
       notification.error({
         message: "Error",
@@ -365,8 +356,8 @@ const Reservation = () => {
                     isReserved
                       ? "border-4 border-gray-400 bg-white cursor-not-allowed"
                       : isSelected
-                      ? "border-4 border-green-500 bg-white"
-                      : "border-4 border-green-500 bg-white"
+                        ? "border-4 border-green-500 bg-white"
+                        : "border-4 border-green-500 bg-white"
                   }
                 `}
                 onClick={() => handleTableClick(table.tableName)}

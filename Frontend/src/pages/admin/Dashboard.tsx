@@ -157,6 +157,8 @@ const AdminDashboard = () => {
     totalProducts !== null ? `${totalProducts.toLocaleString()}` : "...";
   const formattedTotalCategories =
     totalCategories !== null ? `${totalCategories.toLocaleString()}` : "...";
+  const [fname, setFname] = useState<string>("");
+  const userId = sessionStorage.getItem("user_id");
 
   const cardData = [
     {
@@ -207,28 +209,55 @@ const AdminDashboard = () => {
       link: "view more",
     },
   ];
+  useEffect(() => {
+    if (!userId) return;
 
+    fetch(`${apiUrl}/get_user/${userId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.fname) {
+          setFname(data.fname);
+        }
+      })
+      .catch(() => {
+        setFname("User");
+      });
+  }, []);
   return (
     <div
       className="space-y-6 
-    bg-white dark:bg-[rgb(0,51,102)] text-black dark:text-white
-    p-0 rounded-none w-full
-    sm:p-4 sm:rounded-xl"
+  bg-white dark:bg-[rgb(0,51,102)] text-black dark:text-white
+  p-0 rounded-none w-full"
     >
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
-        <h1 className="text-lg font-semibold">Dashboard</h1>
+      {/* 🔸 Header */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        {/* LEFT SIDE - Title */}
+        <div className="flex flex-col">
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+            Hi {fname} <span className="wave-hand">👋</span>
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-300">
+            Welcome to your dashboard
+          </p>
+        </div>
 
-        {/* 🔸 Unified Filter Modal Button */}
-        <Button
-          type="default"
-          onClick={showModal}
-          className="flex items-center gap-2"
-        >
-          <FiFilter className="text-orange-500" />
-          <span className="font-medium">Filter - </span>
-          {dates[0]?.format("MMM DD, YYYY")} →{" "}
-          {dates[1]?.format("MMM DD, YYYY")}
-        </Button>
+        {/* RIGHT SIDE - Filter + Reset (STACK ON MOBILE) */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <Button
+            type="default"
+            onClick={showModal}
+            className="flex items-center gap-2 w-full"
+          >
+            <FiFilter className="text-orange-500" />
+            <span className="font-medium">Filter - </span>
+            {dates[0]?.format("MMM DD, YYYY")} →{" "}
+            {dates[1]?.format("MMM DD, YYYY")}
+          </Button>
+
+          <Button className="w-full sm:w-auto" onClick={handleReset}>
+            Reset
+          </Button>
+        </div>
 
         <Modal
           open={isModalOpen}
@@ -241,7 +270,7 @@ const AdminDashboard = () => {
             <span>Filter by Date</span>
           </div>
 
-          <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="flex items-center justify-center gap-3 mb-4 flex-wrap">
             <div className="border px-3 py-1 rounded-md">
               {dates[0] ? dates[0].format("MMM DD") : "Start"}
             </div>
@@ -283,12 +312,11 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-6">
+          <div className="flex justify-end gap-2 mt-6 flex-wrap">
             <Button onClick={handleCancel}>Cancel</Button>
             <Button type="primary" onClick={handleApply}>
               Apply
             </Button>
-            <Button onClick={handleReset}>Reset</Button>
           </div>
         </Modal>
       </div>
@@ -344,7 +372,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* 🔸 Charts */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-4">
         {/* First row */}
         <TopSellingProductsChart />
         <TopSelling />
@@ -352,9 +380,11 @@ const AdminDashboard = () => {
         <TotalCustomersChart dates={dates} />
         <MostReservedTablesChart dates={dates} />
       </div>
-      {/* Full-width row */}
+
       {/* 🔸 Revenue Section */}
-      <TotalRevenue dates={dates} />
+      <div className="mt-4 w-full">
+        <TotalRevenue dates={dates} />
+      </div>
 
       {/* 🔸 Modals */}
       <TotalProductsModal

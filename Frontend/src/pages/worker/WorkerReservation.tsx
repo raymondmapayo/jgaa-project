@@ -161,29 +161,6 @@ const WorkerReservation = () => {
   };
 
   useEffect(() => {
-    const completePastReservations = async () => {
-      try {
-        // Trigger backend to mark past Reserved tables as Completed
-        await axios.post(`${apiUrl}/update_completed_tables`);
-        console.log("✅ Reserved tables updated to Completed if past due");
-
-        // Refresh reservations after update
-        const resReservations = await axios.get(`${apiUrl}/get_reservation`);
-        setReservations(resReservations.data);
-      } catch (err) {
-        console.error("❌ Failed to update completed tables:", err);
-      }
-    };
-
-    // Run immediately on load
-    completePastReservations();
-
-    // Re-run every 5 minutes if page is left open
-    const interval = setInterval(completePastReservations, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
     const fetchReservationStatus = async () => {
       try {
         const res = await axios.get(`${apiUrl}/get_reservation_status`);
@@ -201,34 +178,43 @@ const WorkerReservation = () => {
   const fetchData = async () => {
     try {
       const [resReservations, resClients] = await Promise.all([
-        axios.get(`${apiUrl}/get_reservation`),
+        axios.get(`${apiUrl}/get_reservation`), // ✅ backend already auto-updates
         axios.get(`${apiUrl}/get_clients`),
       ]);
+
       setReservations(resReservations.data);
       setClients(resClients.data);
     } catch (error) {
-      console.error(error);
+      console.error("❌ Fetch error:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // =======================
+  // LOAD DATA ONCE
+  // =======================
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [apiUrl]);
 
   // ✅ Toggle reservation status
   const handleToggleReservation = async (checked: boolean) => {
     try {
       setReservationEnabled(checked);
+
       await axios.put(`${apiUrl}/update_reservation_status`, {
         reservation_enabled: checked ? 1 : 0,
       });
 
+      // 🔥 re-sync with backend
+      const res = await axios.get(`${apiUrl}/get_reservation_status`);
+      setReservationEnabled(res.data.reservation_enabled === 1);
+
       message.success(
         checked
           ? "✅ Online reservations have been enabled."
-          : "🚫 Online reservations have been disabled. Customers will see a message instead."
+          : "🚫 Online reservations have been disabled.",
       );
     } catch (error) {
       console.error(error);
@@ -238,21 +224,21 @@ const WorkerReservation = () => {
 
   const handleDeleteReservation = (reservation_id: number) => {
     const reservation = reservations.find(
-      (r) => r.reservation_id === reservation_id
+      (r) => r.reservation_id === reservation_id,
     );
     if (!reservation) return;
     axios
       .delete(
-        `${apiUrl}/delete_reservation/${reservation.user_id}/${reservation_id}`
+        `${apiUrl}/delete_reservation/${reservation.user_id}/${reservation_id}`,
       )
       .then(() => {
         setReservations((prev) =>
-          prev.filter((r) => r.reservation_id !== reservation_id)
+          prev.filter((r) => r.reservation_id !== reservation_id),
         );
         Swal.fire("Deleted!", "The reservation has been deleted.", "success");
       })
       .catch(() =>
-        Swal.fire("Error", "Failed to delete reservation.", "error")
+        Swal.fire("Error", "Failed to delete reservation.", "error"),
       );
   };
 
@@ -421,7 +407,7 @@ const WorkerReservation = () => {
           (r) =>
             r.full_name.toLowerCase().includes(searchText.toLowerCase()) ||
             r.email.toLowerCase().includes(searchText.toLowerCase()) ||
-            r.pnum.toLowerCase().includes(searchText.toLowerCase())
+            r.pnum.toLowerCase().includes(searchText.toLowerCase()),
         )}
         columns={columns}
         rowKey="reservation_id"
@@ -454,8 +440,8 @@ const WorkerReservation = () => {
             prev.map((r) =>
               r.reservation_id === updated.reservation_id
                 ? { ...r, ...updated } // ✅ merge with existing reservation
-                : r
-            )
+                : r,
+            ),
           );
         }}
       />

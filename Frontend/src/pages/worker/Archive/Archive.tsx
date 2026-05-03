@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 interface ArchiveProps {
   isArchivedModalVisible: boolean;
   onClose: () => void;
+  onRestore: () => void;
 }
 
 interface ArchivedCategoryItem {
@@ -16,55 +17,50 @@ interface ArchivedCategoryItem {
   status: string;
 }
 
-const Archive = ({ isArchivedModalVisible, onClose }: ArchiveProps) => {
+const Archive = ({
+  isArchivedModalVisible,
+  onClose,
+  onRestore,
+}: ArchiveProps) => {
   const [archivedCategories, setArchivedCategories] = useState<
     ArchivedCategoryItem[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
   const apiUrl = import.meta.env.VITE_API_URL;
   useEffect(() => {
-    let isMounted = true; // ✅ Prevent state updates on unmounted component
+    if (!isArchivedModalVisible) return;
 
     const fetchArchivedCategories = async () => {
       try {
         const response = await axios.get(`${apiUrl}/get_archived`, {
           headers: { "Cache-Control": "no-cache" },
         });
-        if (isMounted) {
-          setArchivedCategories(response.data);
-        }
+
+        setArchivedCategories(response.data);
       } catch (error) {
         console.error("Error fetching archived categories:", error);
       } finally {
-        if (isMounted) setIsLoading(false);
+        setIsLoading(false);
       }
     };
 
-    fetchArchivedCategories(); // Initial load
-
-    // ✅ Poll every 10 seconds (not 10 ms)
-    const interval = setInterval(fetchArchivedCategories, 10000);
-
-    // ✅ Cleanup on unmount
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [apiUrl]);
-
+    fetchArchivedCategories();
+  }, [apiUrl, isArchivedModalVisible]);
   const handleRestore = async (categories_id: number) => {
     Modal.confirm({
       title: "Are you sure you want to restore this category?",
-      content: "This will restore the category back to active status.",
       okText: "Yes, Restore",
       okType: "primary",
       cancelText: "Cancel",
       onOk: async () => {
         try {
-          await axios.post(`${apiUrl}/restore_category/${categories_id}`);
-          setArchivedCategories((prevData) =>
-            prevData.filter((item) => item.categories_id !== categories_id)
+          await axios.put(`${apiUrl}/restore_category/${categories_id}`);
+
+          // 🔥 AUTO UPDATE UI (no reload, no interval)
+          setArchivedCategories((prev) =>
+            prev.filter((item) => item.categories_id !== categories_id),
           );
+          onRestore();
         } catch (error) {
           console.error("Error restoring category:", error);
         }

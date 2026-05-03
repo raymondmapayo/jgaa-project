@@ -3,6 +3,7 @@ import {
   CheckCircleOutlined,
   FilterOutlined,
   FolderOutlined,
+  PrinterOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
 import {
@@ -19,6 +20,7 @@ import { useEffect, useState } from "react";
 import styled from "styled-components";
 import OrderDetailsModal from "../AdminModals/OrderDetailsModal";
 import ValidationEditTabsModal from "../AdminModals/ValidationEditTabsModal";
+import OrdersPdfModal from "../worker/Pdf/OrdersPdfModal";
 
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
@@ -29,27 +31,52 @@ const StyledContainer = styled.div`
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
   transition: background-color 0.3s ease;
   margin: 0 auto;
+  box-sizing: border-box;
 
   .dark & {
     background-color: #001f3f;
     color: white;
   }
 
-  /* ===== Mobile full-stretch ===== */
   @media (max-width: 1024px) {
-    border-radius: 0;
-    box-shadow: none;
     width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
-    padding: 16px;
+    max-width: 100vw;
+    margin: 0;
+    border-radius: 0;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    box-shadow: none;
+    overflow-x: hidden;
+  }
+
+  @media (max-width: 768px) {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  @media (max-width: 480px) {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 `;
 
 const StyledTable = styled(Table)`
   width: 100%;
+
   .ant-table {
     width: 100%;
+  }
+
+  .ant-table-content {
+    width: 100%;
+    min-width: 0 !important; /* allow table to shrink */
+    overflow-x: auto; /* horizontal scroll only if needed */
   }
 
   .ant-table-thead > tr > th {
@@ -62,12 +89,19 @@ const StyledTable = styled(Table)`
     background-color: #f9fafb !important;
   }
 
-  /* Make table responsive on smaller screens */
   @media (max-width: 1024px) {
     font-size: 13px;
-    .ant-table-content {
-      overflow-x: auto;
-    }
+    margin-top: 16px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 11px;
+    margin-top: 24px;
   }
 `;
 
@@ -81,12 +115,40 @@ const ActionButton = styled(Button)`
     transform: scale(1.05);
   }
 `;
+interface Order {
+  order_id: number;
+  user_id: number;
+
+  fname: string;
+  lname: string;
+  profile_pic: string | null;
+
+  order_date: string;
+  payment_status: "pending" | "paid";
+
+  created_by: number | null;
+
+  worker_fname?: string | null;
+  worker_lname?: string | null;
+  worker_profile_pic?: string | null;
+}
+interface OrderItem {
+  order_item_id: number;
+  product_name: string;
+  quantity: number;
+  price: number;
+  final_total: number;
+}
 
 const ManageOrder = () => {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [ordersPdfVisible, setOrdersPdfVisible] = useState(false);
+  const [selectedOrderForPdf, setSelectedOrderForPdf] = useState<Order | null>(
+    null,
+  );
 
   // ✅ States for combined Validation & Edit tab modal
   const [isValidationEditVisible, setIsValidationEditVisible] = useState(false);
@@ -94,8 +156,31 @@ const ManageOrder = () => {
     useState<any>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const apiUrl = import.meta.env.VITE_API_URL;
+  // 🔽 Sort by Order Date (Newest → Oldest)
+  const sortByDate = () => {
+    setOrders((prev) =>
+      [...prev].sort(
+        (a, b) =>
+          new Date(b.order_date).getTime() - new Date(a.order_date).getTime(),
+      ),
+    );
+  };
+
+  const sortByStatus = () => {
+    setOrders((prev) => {
+      const hasPending = prev.some((o) => o.payment_status === "pending");
+      if (!hasPending) return prev;
+
+      return [...prev].sort((a, b) => {
+        // Pending first, Paid last
+        const priority = { pending: 0, paid: 1 };
+        return priority[a.payment_status] - priority[b.payment_status];
+      });
+    });
+  };
+
   // Handler to fetch transaction and open combined Validate & Edit modal
-  const handleValidateEdit = (record: any) => {
+  const handleValidateEdit = (record: Order) => {
     axios
       .get(`${apiUrl}/fetch_transaction/${record.user_id}`)
       .then((res) => {
@@ -151,7 +236,7 @@ const ManageOrder = () => {
       });
   }, []);
 
-  const handleViewDetails = (record: any) => {
+  const handleViewDetails = (record: Order) => {
     setSelectedOrder(record);
     axios
       .get(`${apiUrl}/fetch_order_items/${record.order_id}`)
@@ -201,9 +286,11 @@ const ManageOrder = () => {
         <div className="flex items-center gap-3 min-w-[180px]">
           <img
             src={
-              record.profile_pic && record.profile_pic !== ""
-                ? `${apiUrl}/uploads/images/${record.profile_pic}`
-                : "/avatar.jpg"
+              record.profile_pic
+                ? record.profile_pic.startsWith("http")
+                  ? record.profile_pic // from Cloudinary
+                  : `${apiUrl}/uploads/images/${record.profile_pic}` // from local uploads folder
+                : "/avatar.jpg" // default placeholder
             }
             alt={`${record.fname} ${record.lname}`}
             className="w-10 h-10 rounded-full object-cover flex-shrink-0"
@@ -251,9 +338,12 @@ const ManageOrder = () => {
           <div className="flex items-center gap-3 min-w-[180px]">
             <img
               src={
-                record.worker_profile_pic && record.worker_profile_pic !== ""
-                  ? `${apiUrl}/uploads/images/${record.worker_profile_pic}`
-                  : "/avatar.jpg"
+                record.worker_profile_pic?.startsWith("http")
+                  ? record.worker_profile_pic
+                  : record.worker_profile_pic &&
+                      record.worker_profile_pic !== ""
+                    ? `${apiUrl}/uploads/images/${record.worker_profile_pic}`
+                    : "/avatar.jpg"
               }
               alt={
                 hasName
@@ -262,6 +352,7 @@ const ManageOrder = () => {
               }
               className="w-10 h-10 rounded-full object-cover flex-shrink-0"
             />
+
             <span className="font-medium text-sm sm:text-base">
               {hasName
                 ? `${record.worker_fname} ${record.worker_lname}`
@@ -291,6 +382,17 @@ const ManageOrder = () => {
               type="primary"
               icon={<CheckCircleOutlined />}
               onClick={() => handleValidateEdit(record)}
+            />
+          </Tooltip>
+          {/* ✅ NEW — Print Receipt Button */}
+          <Tooltip title="Print Receipt">
+            <ActionButton
+              type="default"
+              icon={<PrinterOutlined />}
+              onClick={() => {
+                setSelectedOrderForPdf(record);
+                setOrdersPdfVisible(true);
+              }}
             />
           </Tooltip>
         </div>
@@ -335,8 +437,12 @@ const ManageOrder = () => {
             <Dropdown
               overlay={
                 <Menu>
-                  <Menu.Item key="1">Sort by Date</Menu.Item>
-                  <Menu.Item key="2">Sort by Status</Menu.Item>
+                  <Menu.Item key="date" onClick={sortByDate}>
+                    Sort by Date
+                  </Menu.Item>
+                  <Menu.Item key="status" onClick={sortByStatus}>
+                    Sort by Status
+                  </Menu.Item>
                 </Menu>
               }
               trigger={["click"]}
@@ -371,8 +477,10 @@ const ManageOrder = () => {
         onUpdateOrder={(updatedOrder) => {
           setOrders((prevOrders) =>
             prevOrders.map((o) =>
-              o.order_id === updatedOrder.order_id ? updatedOrder : o
-            )
+              o.order_id === updatedOrder.order_id
+                ? { ...o, ...updatedOrder }
+                : o,
+            ),
           );
         }}
       />
@@ -386,6 +494,14 @@ const ManageOrder = () => {
         formatDateWithTime={formatDateWithTime}
         calculateTotal={calculateTotal}
       />
+
+      {ordersPdfVisible && (
+        <OrdersPdfModal
+          isVisible={ordersPdfVisible}
+          onClose={() => setOrdersPdfVisible(false)}
+          order={selectedOrderForPdf}
+        />
+      )}
     </StyledContainer>
   );
 };

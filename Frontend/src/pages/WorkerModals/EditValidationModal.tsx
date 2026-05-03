@@ -40,7 +40,7 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
   const handleSave = async () => {
     if (paymentStatus === "Pending") {
       antdMessage.warning(
-        "Please select 'Paid' before saving. The current status is still Pending."
+        "Please select 'Paid' before saving. The current status is still Pending.",
       );
       return;
     }
@@ -62,23 +62,25 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
         // Update order status & related tables
         const { data } = await axios.put(`${apiUrl}/update_order_status`, {
           order_id: order?.order_id,
-          payment_status: "Paid",
+          payment_status: "paid",
           created_by: workerId,
         });
 
         await axios.put(`${apiUrl}/update_transaction_status`, {
-          user_id: order?.user_id,
-          status: "Completed",
+          order_id: order?.order_id,
+          status: "completed",
         });
-
         await axios.put(`${apiUrl}/update_payment_status`, {
-          user_id: order?.user_id,
-          payment_status: "Completed",
+          order_id: order?.order_id,
+          payment_status: "paid",
         });
 
-        await axios.post(`${apiUrl}/update_payment_status/${order.order_id}`, {
-          paymentStatus: "paid",
-        });
+        await axios.post(
+          `${apiUrl}/update_order_payment_status/${order.order_id}`,
+          {
+            paymentStatus: "paid",
+          },
+        );
 
         if (onUpdateOrder && data.updatedOrder) {
           onUpdateOrder(data.updatedOrder);
@@ -98,7 +100,7 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
     } catch (error: any) {
       console.error("Error saving order:", error);
       antdMessage.error(
-        error.response?.data?.error || "Failed to save changes."
+        error.response?.data?.error || "Failed to save changes.",
       );
     } finally {
       setLoading(false);

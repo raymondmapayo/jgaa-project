@@ -1,21 +1,96 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Modal } from "antd";
+import { Modal, Tag, Divider } from "antd";
 import styled from "styled-components";
 
 const StyledModalContent = styled.div`
-  .details-row {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 8px;
+    align-items: flex-start;
+  }
+
+  .order-id {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .customer {
+    font-size: 13px;
+    color: #6b7280;
+  }
+
+  .meta {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .meta-item span:first-child {
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .total-card {
+    background: #f0fdf4;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .total-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #166534;
+  }
+
+  .total-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #16a34a;
+  }
+
+  .products-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .product-card {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 12px;
+  }
+
+  .product-img {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    object-fit: cover;
+  }
+
+  .product-name {
+    font-weight: 600;
     font-size: 14px;
   }
-  .details-label {
-    font-weight: 600;
-    color: #4b5563;
+
+  .product-meta {
+    font-size: 12px;
+    color: #6b7280;
   }
-  ul li {
-    border-bottom: 1px solid #e5e7eb;
-    padding-bottom: 8px;
+
+  @media (max-width: 640px) {
+    .meta {
+      grid-template-columns: 1fr;
+    }
   }
 `;
 
@@ -27,7 +102,9 @@ interface OrderDetailsModalProps {
   formatDateWithTime: (dateString: string) => string;
   calculateTotal: () => number;
 }
+
 const apiUrl = import.meta.env.VITE_API_URL;
+
 const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   isVisible,
   order,
@@ -36,67 +113,91 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   formatDateWithTime,
   calculateTotal,
 }) => {
+  if (!order) return null;
+
   return (
     <Modal
-      title={`Order Details: ORD${order?.order_id || ""}`}
       open={isVisible}
       onCancel={onClose}
       footer={null}
+      width={620}
+      centered
+      title="Order Details"
     >
-      {order && (
-        <StyledModalContent>
-          <div className="details-row">
-            <span className="details-label">Customer:</span>
-            <span>{`${order.fname} ${order.lname}`}</span>
-          </div>
-          <div className="details-row">
-            <span className="details-label">Order Date:</span>
-            <span>{formatDateWithTime(order.order_date)}</span>
-          </div>
-          <div className="details-row">
-            <span className="details-label">Payment Status:</span>
-            <span>{order.payment_status}</span>
-          </div>
-          <div className="details-row">
-            <span className="details-label">Order Status:</span>
-            <span>{order.order_status}</span>
-          </div>
-          <div className="details-row font-bold text-lg text-green-600">
-            <span>Total:</span>
-            <span>₱{calculateTotal().toFixed(2)}</span>
-          </div>
+      <StyledModalContent>
+        {/* Header */}
+        <div className="header">
+          <div className="flex items-center gap-3">
+            <img
+              src={
+                order.profile_pic
+                  ? order.profile_pic.startsWith("http")
+                    ? order.profile_pic
+                    : `${apiUrl}/uploads/images/${order.profile_pic}`
+                  : "/avatar.jpg"
+              }
+              alt="Customer"
+              className="w-10 h-10 rounded-full object-cover border"
+            />
 
-          <h3 className="mt-4 font-bold">Products:</h3>
-          <ul className="space-y-3">
-            {orderItems.map((product: any, index: number) => (
-              <li key={index} className="flex gap-3 items-center">
-                <img
-                  src={
-                    product.menu_img
-                      ? product.menu_img.startsWith("http")
-                        ? product.menu_img // Cloudinary URL
-                        : `${apiUrl}/uploads/images/${product.menu_img}` // local backend
-                      : "https://via.placeholder.com/48?text=No+Image" // fallback placeholder
-                  }
-                  alt={product.item_name}
-                  className="w-12 h-12 rounded object-cover"
-                />
+            <div>
+              <div className="order-id">ORD{order.order_id}</div>
+              <div className="customer">
+                {order.fname} {order.lname}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Tag color="blue">{order.payment_status}</Tag>
+            <Tag color="green">{order.order_status}</Tag>
+          </div>
+        </div>
 
-                <div>
-                  <p className="font-semibold">{product.item_name}</p>
-                  <p className="text-sm text-gray-600">
-                    Quantity: {product.order_quantity}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Price: ₱{product.price}
-                  </p>
-                  <p className="text-sm text-gray-600">Sizes: {product.size}</p>
+        {/* Meta */}
+        <div className="meta">
+          <div className="meta-item">
+            <span>Order Date</span>
+            <div>{formatDateWithTime(order.order_date)}</div>
+          </div>
+        </div>
+
+        {/* Total */}
+        <div className="total-card">
+          <span className="total-label">Total Amount</span>
+          <span className="total-value">₱{calculateTotal().toFixed(2)}</span>
+        </div>
+
+        <Divider />
+
+        {/* Products */}
+        <div className="products-title">Order products</div>
+
+        <div className="products-grid">
+          {orderItems.map((product: any, index: number) => (
+            <div key={index} className="product-card">
+              <img
+                src={
+                  product.menu_img
+                    ? product.menu_img.startsWith("http")
+                      ? product.menu_img
+                      : `${apiUrl}/uploads/images/${product.menu_img}`
+                    : "https://via.placeholder.com/56?text=No+Image"
+                }
+                alt={product.item_name}
+                className="product-img"
+              />
+
+              <div>
+                <div className="product-name">{product.item_name}</div>
+                <div className="product-meta">
+                  Qty: {product.order_quantity} • ₱{product.price}
                 </div>
-              </li>
-            ))}
-          </ul>
-        </StyledModalContent>
-      )}
+                <div className="product-meta">Size: {product.size}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </StyledModalContent>
     </Modal>
   );
 };

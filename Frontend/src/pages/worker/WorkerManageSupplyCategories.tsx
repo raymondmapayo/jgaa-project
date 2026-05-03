@@ -143,8 +143,13 @@ const WorkerManageSupplyCategories = () => {
   // ✅ Fetch supply categories
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/get_supply_categories`);
-      setDataSource(response.data); // replaces old data
+      setIsLoading(true);
+
+      const response = await axios.get(`${apiUrl}/get_supply_categories`, {
+        headers: { "Cache-Control": "no-cache" },
+      });
+
+      setDataSource(response.data);
     } catch (error) {
       console.error("Error fetching supply categories:", error);
     } finally {
@@ -172,18 +177,19 @@ const WorkerManageSupplyCategories = () => {
       cancelText: "Cancel",
       onOk: async () => {
         try {
-          // 1️⃣ Call backend first
-          await axios.delete(
-            `${apiUrl}/categories_supply_delete/${cat_supply_id}`
+          // 🔥 Optimistic UI (remove immediately)
+          setDataSource((prevData) =>
+            prevData.filter((item) => item.cat_supply_id !== cat_supply_id),
           );
 
-          // 2️⃣ Update frontend state only after success
-          setDataSource((prevData) =>
-            prevData.filter((item) => item.cat_supply_id !== cat_supply_id)
+          // 🔥 Backend delete
+          await axios.delete(
+            `${apiUrl}/categories_supply_delete/${cat_supply_id}`,
           );
         } catch (error) {
           console.error("Error deleting supply category:", error);
-          // Optionally refetch categories
+
+          // 🔄 rollback / refresh if error happens
           const response = await axios.get(`${apiUrl}/get_supply_categories`);
           setDataSource(response.data);
         }
@@ -220,7 +226,7 @@ const WorkerManageSupplyCategories = () => {
       dataIndex: "status",
       render: (text: string) => {
         const colors: { [key: string]: string } = {
-          Available: "green",
+          Active: "green",
           "Not Available": "red",
         };
         return <Tag color={colors[text] || "default"}>{text}</Tag>;

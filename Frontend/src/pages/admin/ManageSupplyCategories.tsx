@@ -6,12 +6,22 @@ import {
   PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Dropdown, Input, Menu, Modal, Table, Tooltip } from "antd";
+import {
+  Button,
+  Dropdown,
+  Input,
+  Menu,
+  Modal,
+  Table,
+  Tag,
+  Tooltip,
+} from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 
 import dayjs from "dayjs"; // ✅ import dayjs
+
 import AddSupplyCategories from "../AdminModals/AddSupplyCategories";
 import Archive from "../AdminModals/Archive";
 import EditSupplyCategories from "../AdminModals/EditSupplyCategories";
@@ -24,27 +34,52 @@ const StyledContainer = styled.div`
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
   transition: background-color 0.3s ease;
   margin: 0 auto;
+  box-sizing: border-box;
 
   .dark & {
     background-color: #001f3f;
     color: white;
   }
 
-  /* ===== Mobile full-stretch ===== */
   @media (max-width: 1024px) {
-    border-radius: 0;
-    box-shadow: none;
     width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
-    padding: 16px;
+    max-width: 100vw;
+    margin: 0;
+    border-radius: 0;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    box-shadow: none;
+    overflow-x: hidden;
+  }
+
+  @media (max-width: 768px) {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  @media (max-width: 480px) {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 `;
 
 const StyledTable = styled(Table)`
   width: 100%;
+
   .ant-table {
     width: 100%;
+  }
+
+  .ant-table-content {
+    width: 100%;
+    min-width: 0 !important; /* allow table to shrink */
+    overflow-x: auto; /* horizontal scroll only if needed */
   }
 
   .ant-table-thead > tr > th {
@@ -57,12 +92,19 @@ const StyledTable = styled(Table)`
     background-color: #f9fafb !important;
   }
 
-  /* Make table responsive on smaller screens */
   @media (max-width: 1024px) {
     font-size: 13px;
-    .ant-table-content {
-      overflow-x: auto;
-    }
+    margin-top: 16px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 11px;
+    margin-top: 24px;
   }
 `;
 
@@ -82,9 +124,10 @@ interface SupplyCategoryItem {
   cat_supply_id: number;
   supply_cat_name: string;
   created_at: string;
+  status: string;
 }
 
-const ManageSupplyCategories = () => {
+const AdminManageSupplyCategories = () => {
   const [dataSource, setDataSource] = useState<SupplyCategoryItem[]>([]);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,18 +141,18 @@ const ManageSupplyCategories = () => {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const apiUrl = import.meta.env.VITE_API_URL;
   // ✅ Fetch supply categories
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await axios.get(`${apiUrl}/get_supply_categories`);
-        setDataSource(response.data); // replaces old data
-      } catch (error) {
-        console.error("Error fetching supply categories:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/get_supply_categories`);
+      setDataSource(response.data); // replaces old data
+    } catch (error) {
+      console.error("Error fetching supply categories:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchCategories(); // fetch only once
   }, [apiUrl]);
 
@@ -129,14 +172,18 @@ const ManageSupplyCategories = () => {
       cancelText: "Cancel",
       onOk: async () => {
         try {
-          setDataSource((prevData) =>
-            prevData.filter((item) => item.cat_supply_id !== cat_supply_id)
-          );
+          // 1️⃣ Call backend first
           await axios.delete(
-            `${apiUrl}/delete_supply_category/${cat_supply_id}`
+            `${apiUrl}/categories_supply_delete/${cat_supply_id}`,
+          );
+
+          // 2️⃣ Update frontend state only after success
+          setDataSource((prevData) =>
+            prevData.filter((item) => item.cat_supply_id !== cat_supply_id),
           );
         } catch (error) {
           console.error("Error deleting supply category:", error);
+          // Optionally refetch categories
           const response = await axios.get(`${apiUrl}/get_supply_categories`);
           setDataSource(response.data);
         }
@@ -160,12 +207,24 @@ const ManageSupplyCategories = () => {
       dataIndex: "supply_cat_name",
       key: "supply_cat_name",
     },
+
     {
       title: "Created At",
       dataIndex: "created_at",
       key: "created_at",
       render: (createdAt: string) =>
-        dayjs(createdAt).format("YYYY-MM-DD h:mm A"), // ✅ format like 2025-09-03 8:10 PM
+        dayjs(createdAt).format("MM-DD-YYYY h:mm A"), // ✅ format like 2025-09-03 8:10 PM
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      render: (text: string) => {
+        const colors: { [key: string]: string } = {
+          Available: "green",
+          "Not Available": "red",
+        };
+        return <Tag color={colors[text] || "default"}>{text}</Tag>;
+      },
     },
     {
       title: "Action",
@@ -276,6 +335,7 @@ const ManageSupplyCategories = () => {
       <Archive
         isArchivedModalVisible={isArchivedModalVisible}
         onClose={() => setIsArchivedModalVisible(false)}
+        onRestore={() => fetchCategories()} // Add this callback
       />
       <EditSupplyCategories
         isEditModalVisible={isEditModalVisible}
@@ -293,4 +353,4 @@ const ManageSupplyCategories = () => {
   );
 };
 
-export default ManageSupplyCategories;
+export default AdminManageSupplyCategories;

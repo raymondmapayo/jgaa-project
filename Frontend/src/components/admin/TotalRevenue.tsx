@@ -1,4 +1,4 @@
-// src/components/Admin/TotalRevenue.tsx
+// src/components/admin/AdminTotalRevenue.tsx
 import dayjs, { Dayjs } from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
@@ -20,7 +20,7 @@ dayjs.extend(isSameOrBefore);
 dayjs.extend(isoWeek);
 
 // ✅ Accept `dates` as prop to fix TypeScript error
-interface TotalRevenueProps {
+interface AdminTotalRevenueProps {
   dates: [Dayjs | null, Dayjs | null];
 }
 
@@ -31,11 +31,11 @@ interface RevenueData {
 
 const apiUrl = import.meta.env.VITE_API_URL;
 
-const TotalRevenue: React.FC<TotalRevenueProps> = ({ dates }) => {
+const AdminTotalRevenue: React.FC<AdminTotalRevenueProps> = ({ dates }) => {
   const [rawData, setRawData] = useState<RevenueData[]>([]);
   const [data, setData] = useState<RevenueData[]>([]);
   const [filterType, setFilterType] = useState<"daily" | "weekly" | "monthly">(
-    "daily"
+    "daily",
   );
 
   const generateMonthDates = (start: Dayjs, end: Dayjs) => {
@@ -52,7 +52,7 @@ const TotalRevenue: React.FC<TotalRevenueProps> = ({ dates }) => {
       .then((payments) => {
         const grouped: { [key: string]: number } = {};
         payments
-          .filter((p: any) => p.payment_status === "Completed")
+          .filter((p: any) => p.payment_status === "paid")
           .forEach((p: any) => {
             const date = dayjs(p.payment_date).format("YYYY-MM-DD");
             grouped[date] = (grouped[date] || 0) + Number(p.amount_paid);
@@ -84,10 +84,10 @@ const TotalRevenue: React.FC<TotalRevenueProps> = ({ dates }) => {
 
   const groupData = (
     dataset: RevenueData[],
-    type: "daily" | "monthly"
+    type: "daily" | "monthly",
   ): RevenueData[] => {
     const sorted = [...dataset].sort((a, b) =>
-      dayjs(a.date).diff(dayjs(b.date))
+      dayjs(a.date).diff(dayjs(b.date)),
     );
 
     if (type === "daily") return sorted;
@@ -151,13 +151,17 @@ const TotalRevenue: React.FC<TotalRevenueProps> = ({ dates }) => {
   const totalSales = data.reduce((sum, item) => sum + item.sales, 0);
 
   const summary = useMemo(() => {
-    const valid = data.filter((item) => item.sales > 0);
+    const valid = data
+      .filter((item) => item.sales > 0)
+      .sort((a, b) => dayjs(a.date).diff(dayjs(b.date)));
+
     if (valid.length === 0) return "";
 
-    const highest = valid.reduce((a, b) => (a.sales > b.sales ? a : b));
-    const lowest = valid.reduce((a, b) => (a.sales < b.sales ? a : b));
-    const last = valid[valid.length - 1];
-    const prev = valid.length > 1 ? valid[valid.length - 2] : null;
+    const recent = valid.slice(-2); // only keep the last 2 days
+    const highest = recent.reduce((a, b) => (a.sales > b.sales ? a : b));
+    const lowest = recent.reduce((a, b) => (a.sales < b.sales ? a : b));
+    const last = recent[recent.length - 1];
+    const prev = recent.length > 1 ? recent[recent.length - 2] : null;
 
     let changeText = "-";
     if (prev && prev.sales !== 0) {
@@ -165,17 +169,41 @@ const TotalRevenue: React.FC<TotalRevenueProps> = ({ dates }) => {
       const sign = change >= 0 ? "+" : "";
       changeText = `${sign}${change.toFixed(1)}% ${change >= 0 ? "📈" : "📉"}`;
     }
+
+    // 🟢 Analytics only based on recent data
+    let analyticsText = "";
+    const uniqueSales = [...new Set(recent.map((v) => v.sales))];
+    if (uniqueSales.length > 1) {
+      const avgSales =
+        recent.reduce((sum, v) => sum + v.sales, 0) / recent.length;
+      analyticsText = `\n📊 Analytics: The highest sales were recorded on ${dayjs(
+        highest.date,
+      ).format("MMM DD, YYYY")} (₱${
+        highest.sales
+      }), while the lowest were on ${dayjs(lowest.date).format(
+        "MMM DD, YYYY",
+      )} (₱${
+        lowest.sales
+      }). On average, daily sales reached around ₱${avgSales.toFixed(
+        2,
+      )}, showing variable sales activity between today and yesterday.`;
+    } else {
+      analyticsText =
+        "\n📊 Analytics: Sales were consistent between today and yesterday with no significant variation.";
+    }
+
     return `
 📅 ${dayjs(last.date).format("MM/DD/YYYY")}: (₱${last.sales}) — ${
       prev
         ? `${changeText} compared to ${dayjs(prev.date).format(
-            "MM/DD/YYYY"
+            "MM/DD/YYYY",
           )}: (₱${prev.sales})`
         : "-"
     }
 🔼 Highest: ${dayjs(highest.date).format("MM/DD/YYYY")} — ₱${highest.sales}
 🔽 Lowest: ${dayjs(lowest.date).format("MM/DD/YYYY")} — ₱${lowest.sales}
-💰 Total Sales: ₱${valid.reduce((sum, item) => sum + item.sales, 0)}
+💰 Total Sales: ₱${recent.reduce((sum, item) => sum + item.sales, 0)}
+${analyticsText}
   `.trim();
   }, [data]);
 
@@ -260,4 +288,4 @@ const TotalRevenue: React.FC<TotalRevenueProps> = ({ dates }) => {
   );
 };
 
-export default TotalRevenue;
+export default AdminTotalRevenue;

@@ -5,6 +5,9 @@ import axios from "axios";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
+import InventoryModal from "../WorkerModals/AddSupplyIngredientsModal";
+import EditInventoryModal from "../WorkerModals/EditSupplyModal";
+import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
@@ -15,27 +18,52 @@ const StyledContainer = styled.div`
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
   transition: background-color 0.3s ease;
   margin: 0 auto;
+  box-sizing: border-box;
 
   .dark & {
     background-color: #001f3f;
     color: white;
   }
 
-  /* ===== Mobile full-stretch ===== */
   @media (max-width: 1024px) {
-    border-radius: 0;
-    box-shadow: none;
     width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
-    padding: 16px;
+    max-width: 100vw;
+    margin: 0;
+    border-radius: 0;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    box-shadow: none;
+    overflow-x: hidden;
+  }
+
+  @media (max-width: 768px) {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  @media (max-width: 480px) {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 `;
 
 const StyledTable = styled(Table)`
   width: 100%;
+
   .ant-table {
     width: 100%;
+  }
+
+  .ant-table-content {
+    width: 100%;
+    min-width: 0 !important; /* allow table to shrink */
+    overflow-x: auto; /* horizontal scroll only if needed */
   }
 
   .ant-table-thead > tr > th {
@@ -48,12 +76,19 @@ const StyledTable = styled(Table)`
     background-color: #f9fafb !important;
   }
 
-  /* Make table responsive on smaller screens */
   @media (max-width: 1024px) {
     font-size: 13px;
-    .ant-table-content {
-      overflow-x: auto;
-    }
+    margin-top: 16px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 11px;
+    margin-top: 24px;
   }
 `;
 
@@ -66,16 +101,18 @@ interface InventoryItem {
   stock_in: number;
   stock_out: number;
   unit: string;
-
+  batch_no: string; // <-- Add batch_no here
   status: string;
   created_at: string;
 }
 
-const ManageInventory = () => {
+const AdminManageIngredientsInventory = () => {
   const [dataSource, setDataSource] = useState<InventoryItem[]>([]);
-
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
+  const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
   useEffect(() => {
     const fetchInventory = async () => {
@@ -97,6 +134,12 @@ const ManageInventory = () => {
     fetchInventory(); // fetch only once
   }, [apiUrl]);
 
+  const handleAddInventory = (values: any) => {
+    console.log("New Product Added:", values);
+    setIsModalVisible(false);
+    // Optionally refresh inventory after adding
+  };
+
   // ✅ Cleaned columns (removed Created By, fname, lname, profile_pic)
   const columns = [
     {
@@ -111,6 +154,12 @@ const ManageInventory = () => {
 
     { title: "Stock In", dataIndex: "stock_in", key: "stock_in" },
     { title: "Stock Out", dataIndex: "stock_out", key: "stock_out" },
+    {
+      title: "Batch",
+      dataIndex: "batch_no",
+      key: "batch_no",
+      render: (batch: string) => <Tag color="blue">{batch}</Tag>,
+    },
     { title: "Unit", dataIndex: "unit", key: "unit" },
 
     {
@@ -132,7 +181,7 @@ const ManageInventory = () => {
       dataIndex: "created_at",
       key: "created_at",
       render: (createdAt: string) =>
-        dayjs(createdAt).format("YYYY-MM-DD h:mm A"), // ✅ format like 2025-09-03 8:10 PM
+        dayjs(createdAt).format("MM-DD-YYYY h:mm A"), // ✅ format like 2025-09-03 8:10 PM
     },
   ];
 
@@ -141,8 +190,10 @@ const ManageInventory = () => {
       {/* Header Section */}
       <div className="flex flex-col gap-4 mb-6">
         <div>
-          <h2 className="text-lg font-bold">Food Inventory</h2>
-          <p className="text-gray-500 text-sm">Manage your food inventory</p>
+          <h2 className="text-lg font-bold">Ingredients Inventory</h2>
+          <p className="text-gray-500 text-sm">
+            Manage your ingredients inventory
+          </p>
         </div>
       </div>
 
@@ -170,17 +221,50 @@ const ManageInventory = () => {
           </Button>
         </Dropdown>
       </div>
-
       {/* Table */}
-      <StyledTable
-        dataSource={dataSource}
-        columns={columns}
-        rowKey="inventory_id"
-        pagination={{ pageSize: 5, showSizeChanger: false }}
-        loading={isLoading}
+      <div className="mt-6 overflow-x-auto lg:overflow-x-hidden">
+        {isLoading ? (
+          <p className="text-center text-gray-500 py-6">Loading...</p>
+        ) : (
+          <StyledTable
+            dataSource={dataSource}
+            columns={columns}
+            rowKey="inventory_id"
+            pagination={{ pageSize: 5, showSizeChanger: false }}
+            scroll={{ x: true }}
+          />
+        )}
+      </div>
+
+      {/* Add Inventory Modal */}
+      <InventoryModal
+        visible={isModalVisible}
+        onFinish={handleAddInventory}
+        onClose={() => setIsModalVisible(false)}
+      />
+      {/* View Inventory Modal */}
+      <ViewInventoryModal
+        visible={viewModalVisible}
+        selectedItem={selectedItem}
+        onClose={() => {
+          setViewModalVisible(false);
+          setSelectedItem(null);
+        }}
+      />
+      {/* Edit Inventory Modal */}
+      <EditInventoryModal
+        visible={editModalVisible}
+        selectedItem={selectedItem}
+        onClose={() => {
+          setEditModalVisible(false);
+          setSelectedItem(null);
+        }}
+        onFinish={() => {
+          window.location.reload();
+        }}
       />
     </StyledContainer>
   );
 };
 
-export default ManageInventory;
+export default AdminManageIngredientsInventory;

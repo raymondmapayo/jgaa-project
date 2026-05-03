@@ -64,7 +64,7 @@ const ClientsCommentsRated: React.FC<ClientsCommentsRatedProps> = ({
       setFilteredRatings(ratings);
     } else {
       const filtered = ratings.filter(
-        (r) => Math.round(Number(r.avg_rating)) === star
+        (r) => Math.round(Number(r.avg_rating)) === star,
       );
       setFilteredRatings(filtered);
     }
@@ -116,7 +116,7 @@ const ClientsCommentsRated: React.FC<ClientsCommentsRatedProps> = ({
               <div className="flex justify-end gap-2">
                 {[5, 4, 3].map((star) => {
                   const count = ratings.filter(
-                    (r) => Math.round(Number(r.avg_rating)) === star
+                    (r) => Math.round(Number(r.avg_rating)) === star,
                   ).length;
                   return (
                     <button
@@ -134,7 +134,7 @@ const ClientsCommentsRated: React.FC<ClientsCommentsRatedProps> = ({
               <div className="flex justify-end gap-2">
                 {[2, 1].map((star) => {
                   const count = ratings.filter(
-                    (r) => Math.round(Number(r.avg_rating)) === star
+                    (r) => Math.round(Number(r.avg_rating)) === star,
                   ).length;
                   return (
                     <button
@@ -165,9 +165,11 @@ const ClientsCommentsRated: React.FC<ClientsCommentsRatedProps> = ({
                 <div key={idx} className="flex border-b pb-4 gap-3">
                   <img
                     src={
-                      r.profile_pic
-                        ? `http://localhost:8081/uploads/images/${r.profile_pic}`
-                        : "avatar.jpg"
+                      r.profile_pic?.startsWith("http")
+                        ? r.profile_pic
+                        : r.profile_pic
+                          ? `${apiUrl}/uploads/images/${r.profile_pic}`
+                          : "/avatar.jpg"
                     }
                     alt={r.fname + " " + r.lname}
                     className="w-12 h-12 rounded-full border-2 border-orange-500 shadow-md object-cover"

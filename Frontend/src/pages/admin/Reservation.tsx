@@ -22,7 +22,8 @@ import { useEffect, useState } from "react";
 import styled from "styled-components";
 import Swal from "sweetalert2";
 import ReservationModal from "../AdminModals/ReservationModal";
-import ReservationDissolveModal from "../AdminModals/ReservationDissolveModal";
+import ReservationCanceledModal from "../AdminModals/ReservationCanceledModal";
+import ArchiveReservationModal from "../admin/Archive/ArchiveReservationModal";
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
@@ -30,7 +31,9 @@ const StyledContainer = styled.div`
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.3s ease;
   margin: 0 auto;
+  box-sizing: border-box;
 
   .dark & {
     background-color: #001f3f;
@@ -38,30 +41,69 @@ const StyledContainer = styled.div`
   }
 
   @media (max-width: 1024px) {
-    border-radius: 0;
-    box-shadow: none;
     width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
-    padding: 16px;
+    max-width: 100vw;
+    margin: 0;
+    border-radius: 0;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    box-shadow: none;
+    overflow-x: hidden;
+  }
+
+  @media (max-width: 768px) {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  @media (max-width: 480px) {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 `;
 
 const StyledTable = styled(Table)`
   width: 100%;
+
+  .ant-table {
+    width: 100%;
+  }
+
+  .ant-table-content {
+    width: 100%;
+    min-width: 0 !important; /* allow table to shrink */
+    overflow-x: auto; /* horizontal scroll only if needed */
+  }
+
   .ant-table-thead > tr > th {
     background: #f9fafb;
     font-weight: bold;
     color: #374151;
   }
+
   tr:hover td {
     background-color: #f9fafb !important;
   }
+
   @media (max-width: 1024px) {
     font-size: 13px;
-    .ant-table-content {
-      overflow-x: auto;
-    }
+    margin-top: 16px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 11px;
+    margin-top: 24px;
   }
 `;
 
@@ -101,24 +143,19 @@ const Reservation = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isArchivedModalVisible, setIsArchivedModalVisible] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [currentReservation, setCurrentReservation] =
     useState<Reservation | null>(null);
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
-  // In Reservation component
   const [reservationEnabled, setReservationEnabled] = useState<boolean>(false);
-  const [dissolveModalVisible, setDissolveModalVisible] = useState(false); // ✅ added
+  const [canceledModalVisible, setCanceledModalVisible] = useState(false); // ✅ added
   const apiUrl = import.meta.env.VITE_API_URL;
 
   const handleEditReservation = (record: Reservation) => {
     setCurrentReservation(record);
-    setDissolveModalVisible(true); // ✅ open dissolve modal
-  };
-
-  const handleArchive = () => {
-    // Example: Open a modal or archive selected reservations
-    console.log("Archive button clicked");
+    setCanceledModalVisible(true); // ✅ open canceled modal
   };
 
   useEffect(() => {
@@ -159,21 +196,22 @@ const Reservation = () => {
     fetchReservationStatus();
   }, [apiUrl]);
 
+  const fetchData = async () => {
+    try {
+      const [resReservations, resClients] = await Promise.all([
+        axios.get(`${apiUrl}/get_reservation`),
+        axios.get(`${apiUrl}/get_clients`),
+      ]);
+      setReservations(resReservations.data);
+      setClients(resClients.data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [resReservations, resClients] = await Promise.all([
-          axios.get(`${apiUrl}/get_reservation`),
-          axios.get(`${apiUrl}/get_clients`),
-        ]);
-        setReservations(resReservations.data);
-        setClients(resClients.data);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchData();
   }, []);
 
@@ -188,7 +226,7 @@ const Reservation = () => {
       message.success(
         checked
           ? "✅ Online reservations have been enabled."
-          : "🚫 Online reservations have been disabled. Customers will see a message instead."
+          : "🚫 Online reservations have been disabled. Customers will see a message instead.",
       );
     } catch (error) {
       console.error(error);
@@ -198,21 +236,21 @@ const Reservation = () => {
 
   const handleDeleteReservation = (reservation_id: number) => {
     const reservation = reservations.find(
-      (r) => r.reservation_id === reservation_id
+      (r) => r.reservation_id === reservation_id,
     );
     if (!reservation) return;
     axios
       .delete(
-        `${apiUrl}/delete_reservation/${reservation.user_id}/${reservation_id}`
+        `${apiUrl}/delete_reservation/${reservation.user_id}/${reservation_id}`,
       )
       .then(() => {
         setReservations((prev) =>
-          prev.filter((r) => r.reservation_id !== reservation_id)
+          prev.filter((r) => r.reservation_id !== reservation_id),
         );
         Swal.fire("Deleted!", "The reservation has been deleted.", "success");
       })
       .catch(() =>
-        Swal.fire("Error", "Failed to delete reservation.", "error")
+        Swal.fire("Error", "Failed to delete reservation.", "error"),
       );
   };
 
@@ -274,8 +312,8 @@ const Reservation = () => {
           case "Reserved":
             color = "orange"; // Reserved → Orange
             break;
-          case "Dissolve":
-            color = "red"; // Dissolve → Red
+          case "Canceled":
+            color = "red"; // Canceled → Red
             break;
           case "Completed":
             color = "green"; // Completed → Green
@@ -304,7 +342,7 @@ const Reservation = () => {
             <ActionButton
               type="primary"
               icon={<EditOutlined />}
-              onClick={() => handleEditReservation(record)} // ✅ opens dissolve modal
+              onClick={() => handleEditReservation(record)} // ✅ opens canceled modal
             />
           </Tooltip>
           <Tooltip title="Delete Reservation">
@@ -364,12 +402,14 @@ const Reservation = () => {
           </Dropdown>
 
           {/* 🗂️ Archive Button */}
+          {/* Archived */}
           <Button
             className="bg-red-500 text-white hover:bg-red-600 focus:ring-4 focus:ring-red-300 rounded-md w-full sm:w-[170px]"
             icon={<FolderOutlined />}
-            onClick={handleArchive}
+            onClick={() => setIsArchivedModalVisible(true)}
+            size="middle"
           >
-            Archive
+            Archived
           </Button>
         </div>
       </div>
@@ -379,7 +419,7 @@ const Reservation = () => {
           (r) =>
             r.full_name.toLowerCase().includes(searchText.toLowerCase()) ||
             r.email.toLowerCase().includes(searchText.toLowerCase()) ||
-            r.pnum.toLowerCase().includes(searchText.toLowerCase())
+            r.pnum.toLowerCase().includes(searchText.toLowerCase()),
         )}
         columns={columns}
         rowKey="reservation_id"
@@ -396,17 +436,24 @@ const Reservation = () => {
         onClose={() => setModalVisible(false)}
       />
 
-      <ReservationDissolveModal
-        visible={dissolveModalVisible}
-        onClose={() => setDissolveModalVisible(false)}
+      {/* Archived Modal */}
+      <ArchiveReservationModal
+        isArchivedModalVisible={isArchivedModalVisible}
+        onClose={() => setIsArchivedModalVisible(false)}
+        onRestore={() => fetchData()} // Add this callback
+      />
+
+      <ReservationCanceledModal
+        visible={canceledModalVisible}
+        onClose={() => setCanceledModalVisible(false)}
         reservation={currentReservation}
         onUpdateReservation={(updated) => {
           setReservations((prev) =>
             prev.map((r) =>
               r.reservation_id === updated.reservation_id
                 ? { ...r, ...updated } // ✅ merge with existing reservation
-                : r
-            )
+                : r,
+            ),
           );
         }}
       />

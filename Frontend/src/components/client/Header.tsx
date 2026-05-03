@@ -49,14 +49,14 @@ export const ClientHeader = () => {
 
   const handleLogout = async () => {
     try {
-      await logoutClient(); // Ensure the logout completes
-      sessionStorage.clear(); // Clear all session storage
-      navigate("/", { replace: true }); // Redirect to the landing page
+      await logoutClient();
+
+      // ✅ go to HOME page
+      navigate("/", { replace: true });
     } catch (error) {
       console.error("Logout Error:", error);
     }
   };
-
   const navigate = useNavigate();
 
   // ✅ Popover User Menu

@@ -21,12 +21,12 @@ const IngredientsModal: React.FC<IngredientsModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [categories, setCategories] = useState<MenuItem[]>([]);
-
-  const unitOptions = ["kg", "g", "ml", "liters"];
+  const user_id = sessionStorage.getItem("user_id");
+  const unitOptions = ["kg", "g", "pcs", "ml", "liters"];
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get(`${apiUrl}/menu_items`);
+      const res = await axios.get(`${apiUrl}/ingredients_items`);
       setCategories(res.data);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -46,6 +46,7 @@ const IngredientsModal: React.FC<IngredientsModalProps> = ({
           measurement: ing.measurement,
           unit: ing.unit,
           category: values.category,
+          created_by: user_id,
         });
         addedIngredients.push(res.data.ingredient); // <-- push inserted ingredient
       }

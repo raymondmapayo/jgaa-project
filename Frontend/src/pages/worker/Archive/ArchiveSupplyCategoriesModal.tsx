@@ -14,7 +14,7 @@ interface UsedSupplyCategoryItem {
 interface UsedCategoriesModalProps {
   isArchivedModalVisible: boolean; // rename back
   onClose: () => void;
-  onRestore?: () => void; // <-- optional callback
+  onRestore: () => void;
 }
 
 const UsedSupplyCategoriesModal = ({
@@ -29,34 +29,29 @@ const UsedSupplyCategoriesModal = ({
   const apiUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
-    let isMounted = true;
+    if (!isArchivedModalVisible) return;
 
     const fetchUsedCategories = async () => {
       try {
+        setIsLoading(true);
+
         const response = await axios.get(
           `${apiUrl}/get_archive_supply_categories`,
           {
             headers: { "Cache-Control": "no-cache" },
-          }
+          },
         );
-        if (isMounted) {
-          setUsedCategories(response.data);
-        }
+
+        setUsedCategories(response.data);
       } catch (error) {
         console.error("Error fetching used categories:", error);
       } finally {
-        if (isMounted) setIsLoading(false);
+        setIsLoading(false);
       }
     };
 
     fetchUsedCategories();
-    const interval = setInterval(fetchUsedCategories, 10000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [apiUrl]);
+  }, [apiUrl, isArchivedModalVisible]);
 
   const handleRestore = async (cat_supply_id: number) => {
     Modal.confirm({
@@ -67,16 +62,13 @@ const UsedSupplyCategoriesModal = ({
       cancelText: "Cancel",
       onOk: async () => {
         try {
-          await axios.post(
-            `${apiUrl}/restore_category_supply/${cat_supply_id}`
-          );
+          await axios.put(`${apiUrl}/restore_category_supply/${cat_supply_id}`);
 
           setUsedCategories((prev) =>
-            prev.filter((item) => item.cat_supply_id !== cat_supply_id)
+            prev.filter((item) => item.cat_supply_id !== cat_supply_id),
           );
 
-          // ✅ Notify parent to refresh main table
-          if (onRestore) onRestore();
+          onRestore();
         } catch (error) {
           console.error("Error restoring category:", error);
         }

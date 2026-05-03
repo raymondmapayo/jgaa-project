@@ -2,8 +2,8 @@ import { PlusOutlined } from "@ant-design/icons";
 import { Button, Input, Pagination } from "antd";
 import axios from "axios";
 import React, { useEffect, useState } from "react";
-import WorkerIngredientsEditModal from "../AdminModals/IngredientsEditModal";
-import WorkerIngredientsModal from "../AdminModals/IngredientsModal";
+import AdminIngredientsEditModal from "../AdminModals/IngredientsEditModal";
+import AdminIngredientsModal from "../AdminModals/IngredientsModal";
 
 const { Search } = Input;
 
@@ -22,7 +22,7 @@ interface Ingredient {
   unit: string;
 }
 
-const ManageIngredients: React.FC = () => {
+const AdminManageIngredients: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [ingredientsMap, setIngredientsMap] = useState<
@@ -70,7 +70,7 @@ const ManageIngredients: React.FC = () => {
   }, [menuItems]);
 
   const filteredItems = menuItems.filter((item) =>
-    item.item_name.toLowerCase().includes(searchTerm.toLowerCase())
+    item.item_name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const startIndex = (currentPage - 1) * pageSize;
@@ -213,12 +213,12 @@ const ManageIngredients: React.FC = () => {
         </div>
 
         {/* Add Modal */}
-        <WorkerIngredientsModal
+        <AdminIngredientsModal
           visible={isModalVisible}
           onClose={() => setIsModalVisible(false)}
           onIngredientAdded={(newIngredients, categoryName) => {
             const menuItem = menuItems.find(
-              (item) => item.item_name === categoryName
+              (item) => item.item_name === categoryName,
             );
             if (!menuItem) return;
 
@@ -234,7 +234,7 @@ const ManageIngredients: React.FC = () => {
 
         {/* Edit Modal */}
         {editingData && (
-          <WorkerIngredientsEditModal
+          <AdminIngredientsEditModal
             visible={isEditModalVisible}
             onClose={() => setIsEditModalVisible(false)}
             ingredientData={editingData}
@@ -251,4 +251,4 @@ const ManageIngredients: React.FC = () => {
   );
 };
 
-export default ManageIngredients;
+export default AdminManageIngredients;

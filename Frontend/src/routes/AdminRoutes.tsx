@@ -13,10 +13,7 @@ export const AdminRoutes = [
     path: "/Admin/Manage/Order",
     component: lazy(() => import("../pages/admin/ManageOrder")),
   },
-  {
-    path: "/Admin/Manage/Categories",
-    component: lazy(() => import("../pages/admin/ManageCategories")),
-  },
+
   {
     path: "/Admin/Manage/Reservation",
     component: lazy(() => import("../pages/admin/Reservation")),
@@ -25,17 +22,10 @@ export const AdminRoutes = [
     path: "/Admin/Manage/Users",
     component: lazy(() => import("../pages/admin/ManageUser")),
   },
-  {
-    path: "/Admin/Manage/Supply",
-    component: lazy(() => import("../pages/admin/Supply")),
-  },
-  {
-    path: "/Admin/Manage/SupplyCategories",
-    component: lazy(() => import("../pages/admin/ManageSupplyCategories")),
-  },
+
   {
     path: "/Admin/Manage/Inventory",
-    component: lazy(() => import("../pages/admin/ManageInventory")),
+    component: lazy(() => import("../pages/admin/Tabs/InventoryTabs")),
   },
   {
     path: "/Admin/AnalyticsReports",
@@ -61,5 +51,34 @@ export const AdminRoutes = [
   {
     path: "/Admin/MyProfile",
     component: lazy(() => import("../components/admin/ProfileAdmin")),
+  },
+  {
+    path: "/Admin/Manage/Inventory",
+    component: lazy(() => import("../pages/admin/ManageInventory")),
+  },
+
+  {
+    path: "/Admin/Manage/Inventory",
+    component: lazy(() => import("../pages/admin/Tabs/InventoryTabs")),
+  },
+  {
+    path: "/Admin/Manage/Categories",
+    component: lazy(() => import("../pages/admin/Tabs/CategoriesTabs")),
+  },
+  {
+    path: "/Admin/Manage/Supply",
+    component: lazy(() => import("../pages/admin/Tabs/SupplyTabs")),
+  },
+  {
+    path: "/Admin/Manage/Ingredients",
+    component: lazy(() => import("../pages/admin/Tabs/Drinks&IngredientsTabs")),
+  },
+  {
+    path: "/Admin/Manage/Expenses",
+    component: lazy(() => import("../pages/admin/AdminManageExpenses")),
+  },
+  {
+    path: "/Admin/Manage/Sales_Summary",
+    component: lazy(() => import("../pages/admin/AdminManageSalesSummary")),
   },
 ];

@@ -65,7 +65,7 @@ const Header = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
   const handleAdminLogout = async () => {
     try {
       await logoutadmin();
-      sessionStorage.clear();
+
       navigate("/", { replace: true });
     } catch (error) {
       console.error("Logout Error:", error);

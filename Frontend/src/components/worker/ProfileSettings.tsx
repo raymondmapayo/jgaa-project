@@ -111,8 +111,8 @@ const ProfileSettings = ({ user_id }: ProfileSettingsProps) => {
                 newProfilePic
                   ? URL.createObjectURL(newProfilePic)
                   : userData.profile_pic
-                  ? `${apiUrl}/uploads/images/${userData.profile_pic}`
-                  : "/avatar.jpg"
+                    ? `${apiUrl}/uploads/images/${userData.profile_pic}`
+                    : "/avatar.jpg"
               }
               alt="Profile"
               className="w-full h-full object-cover"

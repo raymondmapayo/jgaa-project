@@ -127,13 +127,26 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       <StyledModalContent>
         {/* Header */}
         <div className="header">
-          <div>
-            <div className="order-id">ORD{order.order_id}</div>
-            <div className="customer">
-              {order.fname} {order.lname}
+          <div className="flex items-center gap-3">
+            <img
+              src={
+                order.profile_pic
+                  ? order.profile_pic.startsWith("http")
+                    ? order.profile_pic
+                    : `${apiUrl}/uploads/images/${order.profile_pic}`
+                  : "/avatar.jpg"
+              }
+              alt="Customer"
+              className="w-10 h-10 rounded-full object-cover border"
+            />
+
+            <div>
+              <div className="order-id">ORD{order.order_id}</div>
+              <div className="customer">
+                {order.fname} {order.lname}
+              </div>
             </div>
           </div>
-
           <div className="flex gap-2">
             <Tag color="blue">{order.payment_status}</Tag>
             <Tag color="green">{order.order_status}</Tag>
@@ -157,7 +170,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         <Divider />
 
         {/* Products */}
-        <div className="products-title">Products</div>
+        <div className="products-title">Order products</div>
 
         <div className="products-grid">
           {orderItems.map((product: any, index: number) => (

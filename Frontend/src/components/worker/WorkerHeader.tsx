@@ -146,13 +146,13 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
 
       try {
         const response = await axios.get(
-          `${apiUrl}/get_notifications_for_worker/${workerId}`
+          `${apiUrl}/get_notifications_for_worker/${workerId}`,
         );
         const data = response.data;
 
         if (isMounted) {
           setUnreadCount(
-            data.filter((n: Notification) => n.status === "unread").length
+            data.filter((n: Notification) => n.status === "unread").length,
           );
         }
       } catch (error) {
@@ -179,12 +179,13 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
 
   const handleWorkerLogout = async () => {
     try {
-      console.log("Logging out worker..."); // Log logout attempt
-      await logoutworker(); // Ensure the logout completes
-      sessionStorage.clear(); // Clear all session storage
-      navigate("/", { replace: true }); // Redirect to the landing page
+      console.log("Logging out worker...");
+
+      await logoutworker(); // wait for backend + cleanup
+      // ✅ NAVIGATE HERE (correct place)
+      navigate("/", { replace: true });
     } catch (error) {
-      console.error("Logout Error:", error); // Log any errors during logout
+      console.error("Logout Error:", error);
     }
   };
 

@@ -1,23 +1,18 @@
 import { Menu } from "antd";
 import { useEffect } from "react";
-import { FaReceipt, FaUsersGear } from "react-icons/fa6";
-import { MdAnnouncement, MdInventory2, MdMenuBook } from "react-icons/md";
-import { RiDashboardFill } from "react-icons/ri";
+import { FaUsersGear } from "react-icons/fa6";
+import { LuNotebookPen } from "react-icons/lu";
+import { RiMenuSearchLine } from "react-icons/ri";
+import { MdAnnouncement, MdOutlineInventory } from "react-icons/md";
+import { RxDashboard } from "react-icons/rx";
 import { useNavigate } from "react-router-dom";
 import { StyledSider } from "../../styled/worker";
-
+import { LuChartLine } from "react-icons/lu";
+import { TbCategoryPlus } from "react-icons/tb";
 interface SidebarProps {
   collapsed: boolean;
   setCollapsed: (value: boolean) => void;
 }
-
-// ✅ Define menu item type so TS knows children items have links
-type MenuGroup = {
-  key: string;
-  label: string;
-  icon: React.ReactNode;
-  children: { key: string; label: string; link: string }[];
-};
 
 const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
   const navigate = useNavigate();
@@ -37,11 +32,11 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
     localStorage.setItem("sidebar-collapsed", String(collapsed));
   }, [collapsed]);
 
-  const menuItems: MenuGroup[] = [
+  const menuItems = [
     {
       key: "dashboard",
       label: "Dashboard",
-      icon: <RiDashboardFill size={25} />,
+      icon: <RxDashboard size={25} />,
       children: [
         {
           key: "overview",
@@ -53,21 +48,17 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
     {
       key: "menu_management",
       label: "Menu Management",
-      icon: <MdMenuBook size={25} />,
+      icon: <RiMenuSearchLine size={25} />,
       children: [
         {
           key: "menu",
           label: "Menu Items",
           link: "/Admin/Manage/Menu",
         },
-        {
-          key: "categories",
-          label: "Categories",
-          link: "/Admin/Manage/Categories",
-        },
+
         {
           key: "recipe",
-          label: "Ingredients",
+          label: "Ingredients & Drinks",
           link: "/Admin/Manage/Ingredients",
         },
       ],
@@ -75,18 +66,14 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
     {
       key: "inventory_supplies",
       label: "Inventory & Supplies",
-      icon: <MdInventory2 size={25} />,
+      icon: <MdOutlineInventory size={25} />,
       children: [
         {
           key: "inventory",
           label: "Inventory & Supplies",
           link: "/Admin/Manage/Inventory",
         },
-        {
-          key: "supply_categories",
-          label: "Supply Categories",
-          link: "/Admin/Manage/SupplyCategories",
-        },
+
         {
           key: "supply",
           label: "Supply",
@@ -97,7 +84,7 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
     {
       key: "orders_reservations",
       label: "Orders & Reservations",
-      icon: <FaReceipt size={25} />,
+      icon: <LuNotebookPen size={25} />,
       children: [
         {
           key: "orders",
@@ -110,6 +97,29 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
           link: "/Admin/Manage/Reservation",
         },
       ],
+    },
+    {
+      key: "finacial_report",
+      label: "Financal Report",
+      icon: <LuChartLine size={25} />,
+      children: [
+        {
+          key: "sales_summary",
+          label: "Sales Summary",
+          link: "/Admin/Manage/Sales_Summary",
+        },
+        {
+          key: "expenses",
+          label: "Expenses",
+          link: "/Admin/Manage/Expenses",
+        },
+      ],
+    },
+    {
+      key: "categories",
+      label: "Categories",
+      icon: <TbCategoryPlus size={25} />,
+      link: "/Admin/Manage/Categories",
     },
     {
       key: "manage_users",
@@ -178,25 +188,30 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
           defaultOpenKeys={["dashboard"]}
           defaultSelectedKeys={[
             menuItems
-              .flatMap((item) => item.children)
+              .flatMap((item) => item.children || [item])
               .find((child) => child.link === window.location.pathname)?.key ||
               "overview",
           ]}
           onClick={({ key }) => {
-            const found = menuItems
-              .flatMap((group) => group.children)
-              .find((child) => child.key === key);
+            // Search both parent and child items
+            const found =
+              menuItems.find((item) => item.key === key && item.link) ||
+              menuItems
+                .flatMap((group) => group.children || [])
+                .find((child) => child.key === key);
 
-            if (found) navigate(found.link);
+            if (found && found.link) navigate(found.link);
           }}
           items={menuItems.map((group) => ({
             key: group.key,
             icon: group.icon,
             label: group.label,
-            children: group.children.map((child) => ({
-              key: child.key,
-              label: child.label,
-            })),
+            children: group.children
+              ? group.children.map((child) => ({
+                  key: child.key,
+                  label: child.label,
+                }))
+              : undefined, // ✅ Allows single (non-dropdown) items to work
           }))}
         />
       </div>

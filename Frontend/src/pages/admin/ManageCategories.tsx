@@ -6,16 +6,52 @@ import {
   PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Dropdown, Input, Modal, Table, Tooltip } from "antd";
+import { Button, Dropdown, Input, Modal, Table, Tag, Tooltip } from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
+
 import AddCategories from "../../components/form/AddCategories";
 
 import Archive from "../AdminModals/Archive";
 import CategoriesEdit from "../AdminModals/CategoriesEditModal";
 
 // ====================== Styled Components ======================
+
+const StyledModalContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  .card-item {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .meta-label {
+    color: #6b7280;
+    font-weight: 500;
+    font-size: 13px;
+  }
+
+  .meta-value {
+    font-weight: 600;
+    color: #111827;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 640px) {
+    .card-item {
+      padding: 12px;
+    }
+  }
+`;
+
 const StyledContainer = styled.div`
   width: 100%;
   background-color: #fff;
@@ -24,27 +60,52 @@ const StyledContainer = styled.div`
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
   transition: background-color 0.3s ease;
   margin: 0 auto;
+  box-sizing: border-box;
 
   .dark & {
     background-color: #001f3f;
     color: white;
   }
 
-  /* ===== Mobile full-stretch ===== */
   @media (max-width: 1024px) {
-    border-radius: 0;
-    box-shadow: none;
     width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
-    padding: 16px;
+    max-width: 100vw;
+    margin: 0;
+    border-radius: 0;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    box-shadow: none;
+    overflow-x: hidden;
+  }
+
+  @media (max-width: 768px) {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  @media (max-width: 480px) {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 `;
 
 const StyledTable = styled(Table)`
   width: 100%;
+
   .ant-table {
     width: 100%;
+  }
+
+  .ant-table-content {
+    width: 100%;
+    min-width: 0 !important; /* allow table to shrink */
+    overflow-x: auto; /* horizontal scroll only if needed */
   }
 
   .ant-table-thead > tr > th {
@@ -57,12 +118,19 @@ const StyledTable = styled(Table)`
     background-color: #f9fafb !important;
   }
 
-  /* Make table responsive on smaller screens */
   @media (max-width: 1024px) {
     font-size: 13px;
-    .ant-table-content {
-      overflow-x: auto;
-    }
+    margin-top: 16px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 11px;
+    margin-top: 24px;
   }
 `;
 
@@ -86,7 +154,7 @@ interface CategoryItem {
   categories_id: number;
 }
 
-const ManageCategories = () => {
+const AdminManageCategories = () => {
   const [dataSource, setDataSource] = useState<CategoryItem[]>([]);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -100,6 +168,7 @@ const ManageCategories = () => {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentMenus = dataSource.slice(indexOfFirstItem, indexOfLastItem);
   const [isArchivedModalVisible, setIsArchivedModalVisible] = useState(false);
+
   const apiUrl = import.meta.env.VITE_API_URL;
   const sortMenuItems = [
     { key: "1", label: "Sort by Date" },
@@ -152,8 +221,8 @@ const ManageCategories = () => {
       prevData.map((cat) =>
         cat.categories_id === updatedCategory.categories_id
           ? updatedCategory
-          : cat
-      )
+          : cat,
+      ),
     );
 
     // Optional: reset to first page to ensure updated item is visible
@@ -177,7 +246,7 @@ const ManageCategories = () => {
         try {
           // Optimistic UI: Remove from state before actual deletion
           setDataSource((prevData) =>
-            prevData.filter((item) => item.categories_id !== categories_id)
+            prevData.filter((item) => item.categories_id !== categories_id),
           );
 
           // Perform actual archive operation
@@ -208,8 +277,8 @@ const ManageCategories = () => {
           record.categories_img && record.categories_img.startsWith("http")
             ? record.categories_img // full Cloudinary URL
             : record.categories_img
-            ? `${apiUrl}/uploads/images/${record.categories_img}` // local fallback
-            : "https://via.placeholder.com/60x40?text=No+Image"; // placeholder
+              ? `${apiUrl}/uploads/images/${record.categories_img}` // local fallback
+              : "https://via.placeholder.com/60x40?text=No+Image"; // placeholder
 
         return (
           <div className="flex items-center gap-3">
@@ -240,18 +309,16 @@ const ManageCategories = () => {
       render: (status: string) => {
         const formattedStatus =
           status.charAt(0).toUpperCase() + status.slice(1);
-        const statusColors: Record<string, string> = {
-          Active: "text-green-500",
-          Inactive: "text-red-500",
+
+        const colors: Record<string, string> = {
+          Active: "green",
+          Inactive: "red",
         };
+
         return (
-          <span
-            className={`${
-              statusColors[formattedStatus] || "text-gray-500"
-            } font-bold`}
-          >
+          <Tag color={colors[formattedStatus] || "default"}>
             {formattedStatus}
-          </span>
+          </Tag>
         );
       },
     },
@@ -368,26 +435,35 @@ const ManageCategories = () => {
       {/* Category Detail Modal */}
       <Modal
         title="Category Details"
-        visible={isDetailModalVisible}
+        open={isDetailModalVisible}
         onCancel={() => setIsDetailModalVisible(false)}
         footer={[
           <Button key="close" onClick={() => setIsDetailModalVisible(false)}>
             Close
           </Button>,
         ]}
+        width={500}
+        centered
       >
         {selectedItem && (
-          <div>
-            <p>
-              <strong>Category Name:</strong> {selectedItem.categories_name}
-            </p>
-            <p>
-              <strong>Description:</strong> {selectedItem.description}
-            </p>
-            <p>
-              <strong>Status:</strong> {selectedItem.status}
-            </p>
-          </div>
+          <StyledModalContent>
+            <div className="meta-item">
+              <span>Category Name: </span>
+              <span>{selectedItem.categories_name}</span>
+            </div>
+
+            <div className="meta-item">
+              <span>Description:</span>
+              <span>{selectedItem.description || "N/A"}</span>
+            </div>
+
+            <div className="meta-item">
+              <span>Status:</span>
+              <Tag color="green" className="tag-status">
+                {selectedItem.status}
+              </Tag>
+            </div>
+          </StyledModalContent>
         )}
       </Modal>
 
@@ -411,4 +487,4 @@ const ManageCategories = () => {
   );
 };
 
-export default ManageCategories;
+export default AdminManageCategories;
