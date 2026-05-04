@@ -20,6 +20,9 @@ import dayjs, { Dayjs } from "dayjs";
 import { AiOutlineArrowRight } from "react-icons/ai";
 import { FiCalendar, FiFilter } from "react-icons/fi";
 
+import WelcomeCard from "./WelcomeCard";
+import ShowCard from "./ShowCard";
+
 interface Category {
   categories_id: number;
   categories_name: string;
@@ -231,16 +234,6 @@ const WorkerDashboard = () => {
     >
       {/* 🔸 Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-        {/* LEFT SIDE - Title */}
-        <div className="flex flex-col">
-          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-            Hi {fname} <span className="wave-hand">👋</span>
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-300">
-            Welcome to your dashboard
-          </p>
-        </div>
-
         {/* RIGHT SIDE - Filter + Reset (STACK ON MOBILE) */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <Button
@@ -258,6 +251,7 @@ const WorkerDashboard = () => {
             Reset
           </Button>
         </div>
+        {/* LEFT SIDE - Title */}
 
         <Modal
           open={isModalOpen}
@@ -319,6 +313,17 @@ const WorkerDashboard = () => {
             </Button>
           </div>
         </Modal>
+      </div>
+      <div className="flex flex-col lg:flex-row gap-3 items-stretch">
+        {/* LEFT SIDE */}
+        <div className="flex-1 min-w-0">
+          <WelcomeCard fname={fname} />
+        </div>
+
+        {/* RIGHT SIDE */}
+        <div className="flex-1 min-w-0">
+          <ShowCard />
+        </div>
       </div>
 
       {/* 🔸 Cards */}

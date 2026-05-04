@@ -1,16 +1,16 @@
 import { Avatar, List, Tag, Spin } from "antd";
 import dayjs from "dayjs";
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom"; // ✅ ADD THIS
 import axios from "axios";
 
 interface Notification {
-  id: number; // sender_id
+  id: number;
   title?: string;
   description: string;
   time: string;
   profile_pic: string;
-  is_read: string; // "read" or "unread"
+  is_read: string;
 }
 
 interface Props {
@@ -26,15 +26,14 @@ const MessageNotification: React.FC<Props> = ({
   onUnreadCountChange,
   onCloseDropdown,
 }) => {
-  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     if (!userId) return;
 
-    let isMounted = true; // prevent state update if component unmounted
-    let isFetching = false; // prevent overlapping fetches
+    let isMounted = true;
+    let isFetching = false;
 
     const fetchNotifications = async () => {
       if (isFetching) return;
@@ -55,7 +54,6 @@ const MessageNotification: React.FC<Props> = ({
         if (isMounted) {
           setNotifications(data);
 
-          // Update unread badge count
           const unread = data.filter((n) => n.is_read !== "read").length;
           onUnreadCountChange?.(unread);
         }
@@ -67,14 +65,11 @@ const MessageNotification: React.FC<Props> = ({
       }
     };
 
-    // Initial fetch
     setLoading(true);
     fetchNotifications();
 
-    // Poll every 5 seconds
     const intervalId = setInterval(fetchNotifications, 5000);
 
-    // Cleanup
     return () => {
       isMounted = false;
       clearInterval(intervalId);
@@ -90,56 +85,81 @@ const MessageNotification: React.FC<Props> = ({
   }
 
   return (
-    <div style={{ maxHeight: "60vh", overflowY: "auto", paddingRight: 4 }}>
+    <div
+      style={{
+        flex: 1,
+        overflowY: "auto",
+        paddingRight: 4,
+        minHeight: 0,
+      }}
+    >
       <List
         size="small"
         dataSource={notifications}
         renderItem={(item) => (
-          <List.Item
-            key={item.id + item.time}
-            className={`flex items-start gap-3 px-3 py-2 rounded-lg cursor-pointer ${
-              item.is_read === "read"
-                ? "opacity-50"
-                : "hover:bg-gray-100 dark:hover:bg-gray-800"
-            }`}
-            onClick={() => {
-              navigate("/Worker/Manage/Chats", {
-                state: { selectedUserId: item.id },
-              });
-              onCloseDropdown?.();
-            }}
+          <Link
+            to="/Worker/Manage/Chats"
+            state={{ selectedUserId: item.id }}
+            onClick={() => onCloseDropdown?.()} // ✅ CLOSE DRAWER ON CLICK
+            style={{ textDecoration: "none", color: "inherit" }}
           >
-            <Avatar
-              className="w-10 h-10 md:w-12 md:h-12"
-              src={
-                item.profile_pic
-                  ? `${apiUrl}/uploads/images/${item.profile_pic}`
-                  : "/avatar.jpg"
-              }
-            />
+            <List.Item
+              key={item.id + item.time}
+              style={{
+                paddingLeft: 0,
+                paddingRight: 8,
+                alignItems: "flex-start",
+              }}
+              className={`flex items-start cursor-pointer ${
+                item.is_read === "read"
+                  ? "bg-gray-50 dark:bg-gray-900"
+                  : "hover:bg-gray-100 dark:hover:bg-gray-800"
+              }`}
+            >
+              <Avatar
+                className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14"
+                src={
+                  item.profile_pic
+                    ? item.profile_pic.startsWith("http")
+                      ? item.profile_pic
+                      : `${apiUrl}/uploads/images/${item.profile_pic}`
+                    : "/avatar.jpg"
+                }
+                style={{
+                  imageRendering: "crisp-edges",
+                }}
+              />
 
-            <div className="flex flex-col flex-1">
-              <span className="text-xs sm:text-sm md:text-base">
-                {item.title}
-                {item.is_read === "read" ? (
-                  <Tag color="green" style={{ marginLeft: "auto" }}>
-                    Read
-                  </Tag>
-                ) : (
-                  <Tag color="red" style={{ marginLeft: "auto" }}>
-                    Unread
-                  </Tag>
-                )}
-              </span>
+              {/* CONTENT */}
+              <div className="flex flex-col flex-1 min-w-0 pl-2">
+                <div className="flex items-start justify-between w-full text-black dark:text-white">
+                  <span className="text-sm md:text-base font-bold break-words text-black dark:text-white">
+                    {item.title}
+                  </span>
 
-              <p className="text-xs sm:text-sm line-clamp-2">
-                {item.description}
-              </p>
-              <span className="text-xs text-gray-400">
-                {dayjs(item.time).format("YYYY-MM-DD h:mm A")}
-              </span>
-            </div>
-          </List.Item>
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                    <span className="text-xs text-black dark:text-gray-300 whitespace-nowrap">
+                      {dayjs(item.time).format("MMM DD, h:mm A")}
+                    </span>
+
+                    {item.is_read === "read" ? (
+                      <Tag color="green" className="m-0">
+                        Read
+                      </Tag>
+                    ) : (
+                      <Tag color="red" className="m-0">
+                        Unread
+                      </Tag>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-base font-medium text-gray-800 dark:text-gray-300 mt-1 leading-relaxed break-words">
+                  {item.description}
+                </p>
+              </div>
+            </List.Item>
+          </Link>
         )}
       />
     </div>

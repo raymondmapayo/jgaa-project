@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { useTheme } from "../../contexts/ThemeContext";
 import { logoutworker } from "../../zustand/store/store.provider";
-import AllNotifications from "../../pages/WorkerModals/AllNotifications";
+import AllNotifications from "../../Drawer/AllNotificationsDrawer";
 // Define the Notification type
 interface Notification {
   id: number; // For both message_id or announcement_id
@@ -217,7 +217,6 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
         </MenuButton>
       </div>
 
-      {/* Right Section */}
       <StyledRightSection>
         {isDarkMode ? (
           <FaSun
@@ -232,24 +231,22 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
             title="Switch to dark mode"
           />
         )}
-        <Dropdown
-          menu={{ items: [] }} // placeholder
-          dropdownRender={() => (
-            <AllNotifications
-              apiUrl={apiUrl}
-              onCloseDropdown={() => setIsNotificationVisible(false)}
-            />
-          )}
-          trigger={["click"]}
+
+        {/* 🔔 Bell */}
+        <StyledBadge count={unreadCount}>
+          <FaBell
+            onClick={() => setIsNotificationVisible(true)}
+            style={{ color: "#888", fontSize: "20px", cursor: "pointer" }}
+          />
+        </StyledBadge>
+
+        {loading && <Spin size="small" style={{ marginLeft: 10 }} />}
+        {/* ✅ DRAWER LIVES HERE (NOT INSIDE DROPDOWN) */}
+        <AllNotifications
+          apiUrl={apiUrl}
           open={isNotificationVisible}
-          onOpenChange={setIsNotificationVisible}
-        >
-          <StyledBadge count={unreadCount}>
-            <FaBell
-              style={{ color: "#888", fontSize: "20px", cursor: "pointer" }}
-            />
-          </StyledBadge>
-        </Dropdown>
+          onClose={() => setIsNotificationVisible(false)}
+        />
         {loading && <Spin size="small" style={{ marginLeft: 10 }} />}
         <ProfileDropdown overlay={profileMenu} trigger={["click"]}>
           <Avatar

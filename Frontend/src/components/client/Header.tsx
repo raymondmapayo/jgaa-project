@@ -18,6 +18,7 @@ import ActivityLog from "./ActivityLog";
 import BillingDetails from "./BillingDetails"; // Adjust path if needed
 import ClientNotification from "./ClientNotification";
 import CommentUs from "./CommentUs";
+import UserDrawer from "../../Drawer/UserDrawer";
 export const ClientHeader = () => {
   const client = useStore(selector("client"));
   const [isAccountSettingVisible, setIsAccountSettingVisible] = useState(false);
@@ -27,8 +28,7 @@ export const ClientHeader = () => {
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const userName = sessionStorage.getItem("fname");
   const userEmail = sessionStorage.getItem("email");
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-
+  const [isUserDrawerOpen, setIsUserDrawerOpen] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
   // Get the user profile picture from the backend
   useEffect(() => {
@@ -50,7 +50,6 @@ export const ClientHeader = () => {
   const handleLogout = async () => {
     try {
       await logoutClient();
-
       // ✅ go to HOME page
       navigate("/", { replace: true });
     } catch (error) {
@@ -58,178 +57,6 @@ export const ClientHeader = () => {
     }
   };
   const navigate = useNavigate();
-
-  // ✅ Popover User Menu
-  const userPopoverContent = (
-    <div className="w-64">
-      <div className="flex items-start sm:items-center gap-4 p-4 border-b">
-        {/* Avatar slightly shifted left */}
-        <div className="-ml-2 flex-shrink-0">
-          <Avatar
-            size={48}
-            src={
-              profilePic?.startsWith("http")
-                ? profilePic
-                : profilePic
-                  ? `${apiUrl}/uploads/images/${profilePic}`
-                  : "/avatar.jpg"
-            }
-            alt="User Avatar"
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover"
-          />
-        </div>
-
-        {/* User info */}
-        <div className="flex flex-col justify-center">
-          <h3 className="font-semibold text-base sm:text-lg text-gray-800 dark:text-blue-100">
-            {userName}
-          </h3>
-          <p className="text-gray-500 text-sm sm:text-base break-all">
-            {userEmail}
-          </p>
-        </div>
-      </div>
-
-      <div className="py-2">
-        {/* Account Settings */}
-        <button
-          onClick={() => {
-            const isAuthenticated =
-              sessionStorage.getItem("isAuthenticated") === "true";
-
-            if (!isAuthenticated) {
-              notification.info({
-                key: "auth-required-modal",
-                message: "Authentication Required",
-                description: "Please login first to access Account Settings.",
-                placement: "topRight",
-                duration: 2,
-              });
-              return;
-            }
-
-            setIsAccountSettingVisible(true); // open modal
-            setIsPopoverOpen(false); // close popover
-            setIsMenuOpen(false);
-          }}
-          className="flex items-center p-3 hover:bg-gray-100 text-gray-700 w-full text-left"
-        >
-          <span className="flex-grow">Account Setting</span>
-        </button>
-
-        {/* My Purchase */}
-        <Link
-          to="/MyPurchase"
-          onClick={(e) => {
-            const isAuthenticated =
-              sessionStorage.getItem("isAuthenticated") === "true";
-
-            if (!isAuthenticated) {
-              e.preventDefault();
-              notification.info({
-                message: "Authentication Required",
-                description: "Please login first to view your purchases.",
-                placement: "topRight",
-                duration: 2,
-              });
-            } else {
-              setIsPopoverOpen(false); // ✅ close popover
-              setIsMenuOpen(false);
-            }
-          }}
-          className="flex items-center p-3 hover:bg-gray-100 text-gray-700"
-        >
-          <span className="flex-grow">My Purchase</span>
-        </Link>
-
-        {/* My Favourites */}
-        <Link
-          to="/MyFavourates"
-          onClick={(e) => {
-            const isAuthenticated =
-              sessionStorage.getItem("isAuthenticated") === "true";
-
-            if (!isAuthenticated) {
-              e.preventDefault();
-              notification.info({
-                message: "Authentication Required",
-                description: "Please login first to view your favourites.",
-                placement: "topRight",
-                duration: 2,
-              });
-            } else {
-              setIsPopoverOpen(false); // ✅ close popover
-              setIsMenuOpen(false);
-            }
-          }}
-          className="flex items-center p-3 hover:bg-gray-100 text-gray-700"
-        >
-          <span className="flex-grow">My Favourites</span>
-        </Link>
-
-        {/* Activity Log */}
-        <button
-          onClick={() => {
-            const isAuthenticated =
-              sessionStorage.getItem("isAuthenticated") === "true";
-
-            if (!isAuthenticated) {
-              notification.info({
-                message: "Authentication Required",
-                description: "Please login first to view your activity log.",
-                placement: "topRight",
-                duration: 2,
-              });
-              return;
-            }
-
-            setIsLogVisible(true); // open modal
-            setIsPopoverOpen(false); // close popover
-            setIsMenuOpen(false);
-          }}
-          className="flex items-center p-3 hover:bg-gray-100 text-gray-700 w-full text-left"
-        >
-          <span className="flex-grow">Activity Log</span>
-        </button>
-
-        {/* Comment Us */}
-        <button
-          onClick={() => {
-            const isAuthenticated =
-              sessionStorage.getItem("isAuthenticated") === "true";
-
-            if (!isAuthenticated) {
-              notification.info({
-                message: "Authentication Required",
-                description: "Please login first to leave a comment.",
-                placement: "topRight",
-                duration: 2,
-              });
-              return;
-            }
-
-            setIsCommentUsVisible(true); // open modal
-            setIsPopoverOpen(false); // close popover
-            setIsMenuOpen(false);
-          }}
-          className="flex items-center p-3 hover:bg-gray-100 text-gray-700 w-full text-left"
-        >
-          <span className="flex-grow">Comment Us</span>
-        </button>
-
-        {/* Sign Out */}
-        <button
-          onClick={() => {
-            handleLogout();
-            setIsPopoverOpen(false); // close popover
-          }}
-          className="flex w-full items-center p-3 hover:bg-gray-100 text-red-500 text-left"
-        >
-          Sign Out
-        </button>
-      </div>
-    </div>
-  );
 
   const isAuthenticated = client.isAuthenticated;
 
@@ -359,17 +186,12 @@ export const ClientHeader = () => {
                     </span>
                   )}
                 </button>
-                <Popover
-                  content={userPopoverContent}
-                  trigger="click"
-                  placement="bottomRight"
-                  open={isPopoverOpen}
-                  onOpenChange={(open) => setIsPopoverOpen(open)} // This keeps it in sync
+                <button
+                  onClick={() => setIsUserDrawerOpen(true)}
+                  className="text-orange-500 hover:text-orange-600 transform hover:scale-110 transition"
                 >
-                  <button className="text-orange-500 hover:text-orange-600 transform hover:scale-110 transition">
-                    <FaUser size={24} />
-                  </button>
-                </Popover>
+                  <FaUser size={24} />
+                </button>
               </div>
             ) : (
               <button
@@ -424,11 +246,15 @@ export const ClientHeader = () => {
               >
                 My Cart
               </Link>
-              <Popover content={userPopoverContent} trigger="click">
-                <button className="px-6 py-3 text-left hover:bg-gray-100 text-gray-700">
-                  My Profile
-                </button>
-              </Popover>
+              <button
+                onClick={() => {
+                  setIsUserDrawerOpen(true);
+                  setIsMenuOpen(false);
+                }}
+                className="px-6 py-3 text-gray-700 hover:bg-gray-100 block w-full text-left"
+              >
+                Profile
+              </button>
             </>
           ) : (
             <button
@@ -478,6 +304,18 @@ export const ClientHeader = () => {
       >
         <CommentUs />
       </Modal>
+      <UserDrawer
+        open={isUserDrawerOpen}
+        onClose={() => setIsUserDrawerOpen(false)}
+        profilePic={profilePic}
+        userName={userName}
+        userEmail={userEmail}
+        apiUrl={apiUrl}
+        setIsAccountSettingVisible={setIsAccountSettingVisible}
+        setIsLogVisible={setIsLogVisible}
+        setIsCommentUsVisible={setIsCommentUsVisible}
+        handleLogout={handleLogout}
+      />
     </header>
   );
 };

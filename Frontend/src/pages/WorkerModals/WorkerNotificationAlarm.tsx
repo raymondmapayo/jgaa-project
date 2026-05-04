@@ -27,7 +27,7 @@ const WorkerNotificationAlarm: React.FC<WorkerNotificationAlarmProps> = () => {
 
       // Filter only "Low on stock" messages
       const lowStockNotifications = response.data.filter((n: Notification) =>
-        n.message.toLowerCase().includes("low on stock")
+        n.message.toLowerCase().includes("low on stock"),
       );
 
       setNotifications(lowStockNotifications);
@@ -41,8 +41,8 @@ const WorkerNotificationAlarm: React.FC<WorkerNotificationAlarmProps> = () => {
 
         await axios.all(
           unreadIds.map((id: number) =>
-            axios.post(`${apiUrl}/notifications/read/${id}`)
-          )
+            axios.post(`${apiUrl}/notifications/read/${id}`),
+          ),
         );
 
         setNotifications((prev) => prev.map((n) => ({ ...n, status: "read" })));
@@ -74,7 +74,12 @@ const WorkerNotificationAlarm: React.FC<WorkerNotificationAlarmProps> = () => {
         position: "relative",
         width: "100%",
         maxWidth: 380,
-        maxHeight: "70vh",
+
+        // 🔥 IMPORTANT: remove vh control (Drawer controls it)
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
       }}
     >
       {/* Stop button */}
@@ -102,7 +107,14 @@ const WorkerNotificationAlarm: React.FC<WorkerNotificationAlarmProps> = () => {
           No low/out-of-stock notifications.
         </p>
       ) : (
-        <div style={{ maxHeight: "60vh", overflowY: "auto", paddingRight: 4 }}>
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            paddingRight: 4,
+            minHeight: 0, // 🔥 IMPORTANT for flex scroll inside Drawer
+          }}
+        >
           <List
             itemLayout="horizontal"
             dataSource={notifications}
@@ -111,7 +123,7 @@ const WorkerNotificationAlarm: React.FC<WorkerNotificationAlarmProps> = () => {
                 <List.Item.Meta
                   title={<span>{item.message}</span>}
                   description={dayjs(item.created_at).format(
-                    "YYYY-MM-DD h:mm A"
+                    "YYYY-MM-DD h:mm A",
                   )}
                 />
               </List.Item>
