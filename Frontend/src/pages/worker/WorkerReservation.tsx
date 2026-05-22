@@ -28,7 +28,7 @@ import ArchiveReservationModal from "./Archive/ArchiveReservationModal";
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  background-color: #fff;
+  background-color: #fafafa;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
@@ -38,7 +38,7 @@ const StyledContainer = styled.div`
 
   .dark & {
     background-color: #001f3f;
-    color: white;
+    color: #fafafa !important;
   }
 
   @media (max-width: 1024px) {
@@ -392,7 +392,7 @@ const WorkerReservation = () => {
           {/* 🗂️ Archive Button */}
           {/* Archived */}
           <Button
-            className="bg-red-500 text-white hover:bg-red-600 focus:ring-4 focus:ring-red-300 rounded-md w-full sm:w-[170px]"
+            className="bg-red-500 text-[#fafafa] hover:bg-red-600 focus:ring-4 focus:ring-red-300 rounded-md w-full sm:w-[170px]"
             icon={<FolderOutlined />}
             onClick={() => setIsArchivedModalVisible(true)}
             size="middle"

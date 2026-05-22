@@ -53,7 +53,7 @@ const WorkerAnalyticsInsights = () => {
           (table: any) => ({
             name: `Table ${table.table_id}`, // Name format for the chart
             reservations: table.most_reservation, // The number of reservations
-          })
+          }),
         );
 
         console.log("Formatted data for the chart:", formattedData); // Log the formatted data for the chart
@@ -84,7 +84,7 @@ const WorkerAnalyticsInsights = () => {
     <div className="min-h-screen p-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ">
         {/* Total Sales Chart */}
-        <div className="bg-white p-6 dark:text-white rounded-lg shadow-md dark:bg-[#001f3f]">
+        <div className="bg-[#fafafa] p-6 dark:text-[#fafafa] rounded-lg shadow-md dark:bg-[#001f3f]">
           <h2 className="text-lg font-bold mb-4">Total Sales</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={totalSalesData}>
@@ -92,8 +92,8 @@ const WorkerAnalyticsInsights = () => {
               <XAxis dataKey="name" stroke="#ccc" />
               <YAxis stroke="#ccc" />
               <Tooltip
-                contentStyle={{ backgroundColor: "#333", color: "#fff" }}
-                labelStyle={{ color: "#fff" }}
+                contentStyle={{ backgroundColor: "#333", color: "#fafafa" }}
+                labelStyle={{ color: "#fafafa" }}
               />
               <Legend />
               <Bar dataKey="sales" fill="#8884d8" name="Sales" />
@@ -102,7 +102,7 @@ const WorkerAnalyticsInsights = () => {
         </div>
 
         {/* Total Customers Chart */}
-        <div className="bg-white p-6 rounded-lg shadow-md dark:bg-[#001f3f]">
+        <div className="bg-[#fafafa] p-6 rounded-lg shadow-md dark:bg-[#001f3f]">
           <h2 className="text-lg font-bold mb-4">Total Customers</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={totalCustomersData}>
@@ -110,8 +110,8 @@ const WorkerAnalyticsInsights = () => {
               <XAxis dataKey="name" stroke="#ccc" />
               <YAxis stroke="#ccc" />
               <Tooltip
-                contentStyle={{ backgroundColor: "#333", color: "#fff" }}
-                labelStyle={{ color: "#fff" }}
+                contentStyle={{ backgroundColor: "#333", color: "#fafafa" }}
+                labelStyle={{ color: "#fafafa" }}
               />
               <Legend />
               <Bar dataKey="customers" fill="#82ca9d" name="Customers" />
@@ -120,7 +120,7 @@ const WorkerAnalyticsInsights = () => {
         </div>
 
         {/* Most Reserved Tables */}
-        <div className="bg-white p-6 rounded-lg shadow-md dark:bg-[#001f3f]">
+        <div className="bg-[#fafafa] p-6 rounded-lg shadow-md dark:bg-[#001f3f]">
           <h2 className="text-lg font-bold mb-4">Most Reserved Tables</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={reservedTablesData}>
@@ -128,8 +128,8 @@ const WorkerAnalyticsInsights = () => {
               <XAxis dataKey="name" stroke="#ccc" />
               <YAxis stroke="#ccc" />
               <Tooltip
-                contentStyle={{ backgroundColor: "#333", color: "#fff" }}
-                labelStyle={{ color: "#fff" }}
+                contentStyle={{ backgroundColor: "#333", color: "#fafafa" }}
+                labelStyle={{ color: "#fafafa" }}
               />
               <Legend />
               <Bar dataKey="reservations" fill="#ffc658" name="Reservations" />
@@ -138,7 +138,7 @@ const WorkerAnalyticsInsights = () => {
         </div>
 
         {/* Top Selling Products */}
-        <div className="bg-white p-6 rounded-lg shadow-md dark:bg-[#001f3f]">
+        <div className="bg-[#fafafa] p-6 rounded-lg shadow-md dark:bg-[#001f3f]">
           <h2 className="text-lg font-bold mb-4">Top Selling Products</h2>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
@@ -157,8 +157,8 @@ const WorkerAnalyticsInsights = () => {
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{ backgroundColor: "#333", color: "#fff" }}
-                labelStyle={{ color: "#fff" }}
+                contentStyle={{ backgroundColor: "#333", color: "#fafafa" }}
+                labelStyle={{ color: "#fafafa" }}
               />
               <Legend />
             </PieChart>

@@ -17,7 +17,9 @@ export const StyledSider = styled(Sider)<{ $collapsed?: boolean }>`
   display: flex;
   flex-direction: column;
   overflow: hidden; /* prevent double scrollbars */
-  transition: width 0.3s ease-in-out, transform 0.3s ease-in-out,
+  transition:
+    width 0.3s ease-in-out,
+    transform 0.3s ease-in-out,
     background-color 0.3s ease;
 
   ${({ $collapsed }) =>

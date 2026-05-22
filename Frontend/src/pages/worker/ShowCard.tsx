@@ -111,7 +111,7 @@ const ShowCard = () => {
                 borderRadius: 16,
                 overflow: "hidden",
                 position: "relative",
-                color: "#fff",
+                color: "#fafafa",
                 background: "#000",
               }}
             >

@@ -27,13 +27,12 @@ interface Notification {
 // Styled components
 
 const StyledHeader = styled(Layout.Header)`
-  background-color: white;
+  background-color: #fafafa !important;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 24px;
   height: 80px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 
   /* dark mode */
   .dark & {
@@ -45,7 +44,7 @@ const StyledHeader = styled(Layout.Header)`
     .logo {
       background: #001f3f;
       color: #f0f0f0;
-      border-bottom: 1px solid #334155;
+      border-bottom: 1px;
     }
 
     /* Ant Design menu styling if menus exist in header */

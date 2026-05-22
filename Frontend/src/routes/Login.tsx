@@ -2,7 +2,7 @@ import { EyeInvisibleOutlined, EyeTwoTone } from "@ant-design/icons";
 import { Button, Checkbox, Form, Input, message, Modal } from "antd";
 import axios from "axios";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { T_LoginPayload, T_LoginResponse } from "../types";
 import {
   saveadminInfo,
@@ -21,14 +21,14 @@ const Login = () => {
     // Check if the checkbox is checked
     if (!isChecked) {
       message.error(
-        "You must agree to the Terms of Service and Privacy Policy to proceed."
+        "You must agree to the Terms of Service and Privacy Policy to proceed.",
       );
       return; // Prevent form submission
     }
     try {
       const response = await axios.post<T_LoginResponse>(
         `${apiUrl}/login`,
-        values
+        values,
       );
 
       if (response.data.success) {
@@ -144,13 +144,13 @@ const Login = () => {
                       try {
                         const response = await axios.post(
                           `${apiUrl}/check-email-status`,
-                          { email: value }
+                          { email: value },
                         );
                         if (response.data.status !== "active") {
                           return Promise.reject(
                             new Error(
-                              "Please verify your email account in your email inbox."
-                            )
+                              "Please verify your email account in your email inbox.",
+                            ),
                           );
                         }
                       } catch (error) {
@@ -161,18 +161,18 @@ const Login = () => {
                         ) {
                           return Promise.reject(
                             new Error(
-                              "Email not found. Please check and try again."
-                            )
+                              "Email not found. Please check and try again.",
+                            ),
                           );
                         } else {
                           console.error(
                             "Email verification check failed:",
-                            error
+                            error,
                           );
                           return Promise.reject(
                             new Error(
-                              "Error verifying email status. Try again later."
-                            )
+                              "Error verifying email status. Try again later.",
+                            ),
                           );
                         }
                       }
@@ -257,9 +257,9 @@ const Login = () => {
           <div className="flex justify-center space-x-4">
             <p className="text-lg">
               Don’t have an account yet?{" "}
-              <a href="/Register" className="text-blue-500 hover:underline">
+              <Link to="/Register" className="text-blue-500 hover:underline">
                 Sign up
-              </a>
+              </Link>
             </p>
           </div>
 

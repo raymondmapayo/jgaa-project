@@ -40,7 +40,7 @@ const ReservationDisableEnable = () => {
           type="primary"
           size="large"
           href=""
-          className="bg-orange-500 hover:bg-orange-600 font-core font-bold text-white px-8 py-3 rounded-lg shadow-lg transition"
+          className="bg-orange-500 hover:bg-orange-600 font-core font-bold text-[#fafafa] px-8 py-3 rounded-lg shadow-lg transition"
         >
           Call 0956 517 8708
         </Button>

@@ -1,4 +1,4 @@
-import { Avatar, Menu, Modal, notification, Popover, Tabs } from "antd";
+import { Menu, Modal, notification, Tabs } from "antd";
 import Dropdown from "antd/es/dropdown/dropdown";
 import TabPane from "antd/es/tabs/TabPane";
 import axios from "axios";

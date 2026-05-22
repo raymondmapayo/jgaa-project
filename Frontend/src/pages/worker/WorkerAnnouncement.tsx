@@ -13,7 +13,7 @@ const apiUrl = import.meta.env.VITE_API_URL;
 const WorkerAnnouncement: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [readAnnouncements, setReadAnnouncements] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   const workerId = sessionStorage.getItem("user_id");
@@ -104,7 +104,7 @@ const WorkerAnnouncement: React.FC = () => {
   const onSelectAllChange = async (checked: boolean) => {
     if (checked) {
       setReadAnnouncements(
-        new Set(announcements.map((a) => a.announcement_id))
+        new Set(announcements.map((a) => a.announcement_id)),
       );
 
       if (!workerId) {
@@ -119,7 +119,7 @@ const WorkerAnnouncement: React.FC = () => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ worker_id: workerId, status: "read" }),
-          }
+          },
         );
         const data = await response.json();
 
@@ -161,8 +161,8 @@ const WorkerAnnouncement: React.FC = () => {
       style={{ maxWidth: "2500px", margin: "auto" }}
     >
       {/* Center content */}
-      <div className="flex-1 bg-white rounded shadow-md p-1 min-h-[439px] flex flex-col h-32 overflow-y-auto">
-        <h2 className="text-2xl font-semibold mb-6 text-gray-800 text-center sticky top-0 bg-white p-4 z-10 shadow-md">
+      <div className="flex-1 bg-[#fafafa] rounded shadow-md p-1 min-h-[439px] flex flex-col h-32 overflow-y-auto">
+        <h2 className="text-2xl font-semibold mb-6 text-gray-800 text-center sticky top-0 bg-[#fafafa] p-4 z-10 shadow-md">
           Announcements 📢
         </h2>
 
@@ -202,7 +202,7 @@ const WorkerAnnouncement: React.FC = () => {
                         >
                           {title}
                         </h3>
-                        <span className="text-xs text-gray-400 bg-white rounded-md px-2 py-1">
+                        <span className="text-xs text-gray-400 bg-[#fafafa] rounded-md px-2 py-1">
                           {created_at ? formatDate(created_at) : "No date"}
                         </span>
                       </div>
@@ -223,7 +223,7 @@ const WorkerAnnouncement: React.FC = () => {
                       </div>
                     </div>
                   );
-                }
+                },
               )}
             </div>
           </>

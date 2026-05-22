@@ -2,7 +2,7 @@ import React from "react";
 
 const ReceiptUI: React.FC = () => {
   return (
-    <div className="w-full max-w-md mx-auto bg-white shadow-lg p-6 border border-gray-300 rounded-lg">
+    <div className="w-full max-w-md mx-auto bg-[#fafafa] shadow-lg p-6 border border-gray-300 rounded-lg">
       {/* Title */}
       <h1 className="text-center text-2xl font-bold">Jgaa Restaurant</h1>
       <p className="text-center text-gray-600 text-sm -mt-1 mb-3">

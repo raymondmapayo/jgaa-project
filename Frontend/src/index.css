@@ -314,6 +314,9 @@ html {
 .dark .ant-pagination-item:hover a {
   color: #1677ff !important;
 }
+.ant-menu {
+  border-right: none !important;
+}
 
 /* Active item (same as original Ant Design) */
 .dark .ant-pagination-item-active {

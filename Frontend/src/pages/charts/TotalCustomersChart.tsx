@@ -50,10 +50,10 @@ const TotalCustomersChart: React.FC<TotalCustomersChartProps> = ({ dates }) => {
 
       const mappedData = weekdays.map((shortDay) => {
         const fullDay = Object.keys(dayMap).find(
-          (key) => dayMap[key] === shortDay
+          (key) => dayMap[key] === shortDay,
         )!;
         const items = result.filter(
-          (item) => dayjs(item.name).format("dddd") === fullDay
+          (item) => dayjs(item.name).format("dddd") === fullDay,
         );
 
         return {
@@ -78,25 +78,25 @@ const TotalCustomersChart: React.FC<TotalCustomersChartProps> = ({ dates }) => {
         const avg =
           result.reduce(
             (sum: number, curr: CustomerItem) => sum + curr.customers,
-            0
+            0,
           ) / result.length;
 
         let desc = `📌 ${dayjs(top.name).format(
-          "dddd, MMMM D"
+          "dddd, MMMM D",
         )} had the highest customer count with ${top.customers} customer${
           top.customers !== 1 ? "s" : ""
         }`;
 
         if (bottom && bottom.name !== top.name) {
           desc += `, while ${dayjs(bottom.name).format(
-            "dddd, MMMM D"
+            "dddd, MMMM D",
           )} had the lowest, also with ${bottom.customers} customer${
             bottom.customers !== 1 ? "s" : ""
           }`;
         }
 
         desc += `. On average, the restaurant served ${avg.toFixed(
-          1
+          1,
         )} customer${avg !== 1 ? "s" : ""} per day.`;
 
         setDescription(desc);
@@ -119,10 +119,10 @@ const TotalCustomersChart: React.FC<TotalCustomersChartProps> = ({ dates }) => {
 
   return (
     <div className="relative -mx-6 sm:mx-0">
-      <div className="bg-white dark:bg-[#001f3f] rounded-lg shadow-lg sm:w-full h-full p-6 flex flex-col transition-colors">
+      <div className="bg-[#fafafa] dark:bg-[#001f3f] rounded-lg shadow-lg sm:w-full h-full p-6 flex flex-col transition-colors">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-between sm:items-center mb-4 border-b border-dotted pb-2 gap-1">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-[#fafafa]">
             Total Customers
           </h2>
           <div className="text-sm text-gray-500 dark:text-gray-300">
@@ -197,7 +197,7 @@ const TotalCustomersChart: React.FC<TotalCustomersChartProps> = ({ dates }) => {
                       (d: {
                         name: string;
                         details?: { date: string; customers: number }[];
-                      }) => d.name === props.payload.name
+                      }) => d.name === props.payload.name,
                     );
                     if (!item || !item.details) return ["0", null];
 
@@ -206,7 +206,7 @@ const TotalCustomersChart: React.FC<TotalCustomersChartProps> = ({ dates }) => {
                         (d: { date: string; customers: number }) =>
                           `${d.date} - ${d.customers} customer${
                             d.customers !== 1 ? "s" : ""
-                          }`
+                          }`,
                       )
                       .join("\n");
 

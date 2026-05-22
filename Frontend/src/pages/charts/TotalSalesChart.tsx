@@ -60,8 +60,8 @@ const TotalSalesChart = () => {
               <XAxis dataKey="name" stroke="#ccc" />
               <YAxis stroke="#ccc" />
               <Tooltip
-                contentStyle={{ backgroundColor: "#333", color: "#fff" }}
-                labelStyle={{ color: "#fff" }}
+                contentStyle={{ backgroundColor: "#333", color: "#fafafa" }}
+                labelStyle={{ color: "#fafafa" }}
               />
               <Legend />
               <Bar

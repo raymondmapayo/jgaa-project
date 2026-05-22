@@ -49,7 +49,7 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
 
       const formatted: ReservedTable[] = allTables.map((t) => {
         const tableData = res.data.reservedTables.find(
-          (r: any) => `Table ${r.table_id}` === t
+          (r: any) => `Table ${r.table_id}` === t,
         );
 
         let filteredDetails: { date: string; reservations: number }[] = [];
@@ -68,7 +68,7 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
           name: t,
           reservations: filteredDetails.reduce(
             (sum, d) => sum + d.reservations,
-            0
+            0,
           ),
           details: filteredDetails,
         };
@@ -82,8 +82,8 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
       if (validTables.length === 0) {
         setDescription(
           `📊 No table reservation data available as of ${dayjs().format(
-            "MMMM DD, YYYY"
-          )}.`
+            "MMMM DD, YYYY",
+          )}.`,
         );
 
         setLoading(false);
@@ -91,7 +91,7 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
       }
 
       const sorted = [...validTables].sort(
-        (a, b) => b.reservations - a.reservations
+        (a, b) => b.reservations - a.reservations,
       );
       const top = sorted[0];
       const bottom = sorted[sorted.length - 1];
@@ -120,7 +120,7 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
       // 🧠 CASE 4: Tied for most reserved
       else {
         const topTables = validTables.filter(
-          (t) => t.reservations === top.reservations
+          (t) => t.reservations === top.reservations,
         );
         if (topTables.length > 1) {
           const tableNames = topTables.map((t) => t.name).join(" and ");
@@ -129,7 +129,7 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
           } reservation${
             top.reservations !== 1 ? "s" : ""
           } each. On average, each reserved table was used ${avg.toFixed(
-            1
+            1,
           )} times today.`;
         }
         // 🧠 CASE 5: Normal (clear top and bottom)
@@ -143,7 +143,7 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
           } reservation${
             bottom.reservations !== 1 ? "s" : ""
           }. On average, each reserved table was used about ${avg.toFixed(
-            1
+            1,
           )} times today.`;
         }
       }
@@ -161,10 +161,10 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
   }, [dates]);
   return (
     <div className="relative -mx-6 sm:mx-0">
-      <div className="bg-white dark:bg-[#001f3f] rounded-lg shadow-lg sm:w-full h-full p-6 flex flex-col transition-colors">
+      <div className="bg-[#fafafa] dark:bg-[#001f3f] rounded-lg shadow-lg sm:w-full h-full p-6 flex flex-col transition-colors">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-between sm:items-center mb-4 border-b border-dotted pb-2 gap-1">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-[#fafafa]">
             Most Reserved
           </h2>
           <div className="text-sm text-gray-500 dark:text-gray-300">
@@ -231,7 +231,7 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
                   labelFormatter={(label: string) => label}
                   formatter={(_value: number, _name: string, props: any) => {
                     const table = data.find(
-                      (d: ReservedTable) => d.name === props.payload.name
+                      (d: ReservedTable) => d.name === props.payload.name,
                     );
                     if (!table || !table.details || table.details.length === 0)
                       return ["0", null];
@@ -241,7 +241,7 @@ const MostReservedTablesChart: React.FC<MostReservedTablesChartProps> = ({
                         (d: { date: string; reservations: number }) =>
                           `${dayjs(d.date).format("MM/DD/YYYY")} - ${
                             d.reservations
-                          } reservation${d.reservations !== 1 ? "s" : ""}`
+                          } reservation${d.reservations !== 1 ? "s" : ""}`,
                       )
                       .join("\n");
 

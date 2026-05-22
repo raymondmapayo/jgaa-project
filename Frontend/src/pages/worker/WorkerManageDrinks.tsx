@@ -70,7 +70,7 @@ const WorkerManageDrinks: React.FC = () => {
   }, [menuItems]);
 
   const filteredItems = menuItems.filter((item) =>
-    item.item_name.toLowerCase().includes(searchTerm.toLowerCase())
+    item.item_name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const startIndex = (currentPage - 1) * pageSize;
@@ -83,7 +83,7 @@ const WorkerManageDrinks: React.FC = () => {
   return (
     <section className="relative -mx-6 sm:mx-0">
       {/* Remove max-w-7xl and mx-auto so the bg stretches edge-to-edge */}
-      <div className="bg-white dark:bg-[#001f3f] rounded-lg shadow-lg sm:w-full p-6 flex flex-col transition-colors">
+      <div className="bg-[#fafafa] dark:bg-[#001f3f] rounded-lg shadow-lg sm:w-full p-6 flex flex-col transition-colors">
         {/* Header */}
         <header className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 w-full">
           {/* Title */}
@@ -128,7 +128,7 @@ const WorkerManageDrinks: React.FC = () => {
               flex flex-col
             "
               >
-                <div className="bg-[#FFF7EC] border border-gray-200 rounded-lg shadow-lg flex flex-col h-full w-full">
+                <div className="bg-[#fafafa] border border-gray-200 rounded-lg shadow-lg flex flex-col h-full w-full">
                   {/* Image */}
                   <div className="relative w-24 h-24 mx-auto mt-4">
                     <img
@@ -218,7 +218,7 @@ const WorkerManageDrinks: React.FC = () => {
           onClose={() => setIsModalVisible(false)}
           onIngredientAdded={(newIngredients, categoryName) => {
             const menuItem = menuItems.find(
-              (item) => item.item_name === categoryName
+              (item) => item.item_name === categoryName,
             );
             if (!menuItem) return;
 

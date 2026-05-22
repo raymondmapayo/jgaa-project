@@ -38,7 +38,7 @@ const WelcomeCard = ({ fname }: Props) => {
       {/* TOP TEXT SECTION */}
       <Title
         style={{
-          color: "#fff",
+          color: "#fafafa",
           marginBottom: 0,
         }}
         level={isMobile ? 4 : 3}
@@ -48,7 +48,7 @@ const WelcomeCard = ({ fname }: Props) => {
 
       <Title
         style={{
-          color: "#fff",
+          color: "#fafafa",
           marginTop: 0,
         }}
         level={isMobile ? 5 : 4}

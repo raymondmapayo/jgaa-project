@@ -5,10 +5,23 @@ import styled from "styled-components";
 
 export const StyledLayout = styled(Layout)`
   height: 100vh;
+  background-color: #fafafa !important;
+
+  .ant-layout {
+    background-color: #fafafa !important;
+  }
+
+  .dark & {
+    background-color: #001f3f !important;
+
+    .ant-layout {
+      background-color: #001f3f !important;
+    }
+  }
 `;
 
 export const StyledSider = styled(Sider)<{ $collapsed?: boolean }>`
-  background-color: #ffffff !important;
+  background-color: #fafafa !important;
   min-height: 100vh !important;
   height: 100%;
   z-index: 1000;
@@ -17,7 +30,9 @@ export const StyledSider = styled(Sider)<{ $collapsed?: boolean }>`
   display: flex;
   flex-direction: column;
   overflow: hidden; /* prevent double scrollbars */
-  transition: width 0.3s ease-in-out, transform 0.3s ease-in-out,
+  transition:
+    width 0.3s ease-in-out,
+    transform 0.3s ease-in-out,
     background-color 0.3s ease;
 
   ${({ $collapsed }) =>
@@ -38,8 +53,8 @@ export const StyledSider = styled(Sider)<{ $collapsed?: boolean }>`
     color: #374151;
     font-size: 18px;
     font-weight: bold;
-    background: #ffffff;
-    border-bottom: 1px solid #e5e7eb;
+    background: #fafafa;
+    border-bottom: 1px;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -67,7 +82,7 @@ export const StyledSider = styled(Sider)<{ $collapsed?: boolean }>`
     bottom: 0;
     width: 100%;
     background: #fefefe;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px;
     padding: 12px 8px;
     text-align: center;
     display: flex;
@@ -123,7 +138,7 @@ export const StyledSider = styled(Sider)<{ $collapsed?: boolean }>`
   /* Tooltip Style for Collapsed State */
   .ant-tooltip-inner {
     background-color: #fa8c16 !important;
-    color: #fff !important;
+    color: #fafafa !important;
     font-weight: bold !important;
     font-size: 14px !important;
     border-radius: 6px;
@@ -154,7 +169,7 @@ export const StyledSider = styled(Sider)<{ $collapsed?: boolean }>`
     .sidebar-header {
       background: #001f3f;
       color: #f0f0f0;
-      border-bottom: 1px solid #334155;
+      border-bottom: 1px;
     }
 
     .ant-menu-light .ant-menu-item {
@@ -163,25 +178,25 @@ export const StyledSider = styled(Sider)<{ $collapsed?: boolean }>`
 
     .ant-menu-light .ant-menu-item:hover {
       background-color: rgb(0, 51, 102) !important;
-      color: #fff !important;
+      color: #fafafa !important;
 
       svg {
-        color: #fff !important;
+        color: #fafafa !important;
       }
     }
 
     .ant-menu-light .ant-menu-item-selected {
       background-color: #004080 !important;
-      color: #fff !important;
+      color: #fafafa !important;
 
       svg {
-        color: #fff !important;
+        color: #fafafa !important;
       }
     }
 
     .footer-container {
       background-color: #001f3f;
-      border-top: 1px solid #334155;
+      border-top: 1px;
 
       .footer-text {
         color: #cfd8dc;
@@ -198,7 +213,7 @@ export const StyledSider = styled(Sider)<{ $collapsed?: boolean }>`
 
     .ant-tooltip-inner {
       background-color: #004080 !important;
-      color: #fff !important;
+      color: #fafafa !important;
     }
 
     .ant-tooltip-arrow::before {
@@ -208,7 +223,7 @@ export const StyledSider = styled(Sider)<{ $collapsed?: boolean }>`
 `;
 
 export const StyledHeader = styled(Header)`
-  background-color: #ffffff;
+  background-color: #fafafa;
   width: 100%;
   padding: 0px !important;
   height: 80px !important;
@@ -224,9 +239,8 @@ export const StyledHeader = styled(Header)`
 `;
 
 export const StyledContent = styled(Content)`
-  margin: 1px;
-  padding: 24px;
-  background: #fff;
+  padding: 10px;
+  background-color: #fafafa !important;
   border-radius: 1px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow-y: auto; /* Only this scrolls */

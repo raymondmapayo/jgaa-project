@@ -67,7 +67,7 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
   const location = useLocation();
 
   const socket = useRef<Socket<DefaultEventsMap, DefaultEventsMap> | null>(
-    null
+    null,
   );
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -171,14 +171,14 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
 
         setAdmins((prev) =>
           prev.map((u) =>
-            u.user_id === selectedUser.user_id ? { ...u, unread_count: 0 } : u
-          )
+            u.user_id === selectedUser.user_id ? { ...u, unread_count: 0 } : u,
+          ),
         );
 
         setClients((prev) =>
           prev.map((u) =>
-            u.user_id === selectedUser.user_id ? { ...u, unread_count: 0 } : u
-          )
+            u.user_id === selectedUser.user_id ? { ...u, unread_count: 0 } : u,
+          ),
         );
       } catch (err) {
         console.error("Failed to mark messages read", err);
@@ -195,7 +195,7 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
 
       try {
         const res = await axios.get(
-          `${apiUrl}/getMessagesWorker/${workerIdNum}/${selectedUser.user_id}`
+          `${apiUrl}/getMessagesWorker/${workerIdNum}/${selectedUser.user_id}`,
         );
 
         const msgs: Message[] = res.data
@@ -216,7 +216,7 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
           updateSidebarLastMessage(
             lastMsg,
             selectedUser.user_id,
-            lastMsg.senderId!
+            lastMsg.senderId!,
           );
         }
       } catch (err) {
@@ -270,7 +270,7 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
       // Emit to Socket.io
       socket.current?.emit(
         "newMessageToWorker",
-        newMsg // server will emit back to this worker's room
+        newMsg, // server will emit back to this worker's room
       );
 
       onNewMessage?.(newMsg);
@@ -283,7 +283,7 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
   const updateSidebarLastMessage = (
     msg: Message,
     userId: number,
-    senderId: number
+    senderId: number,
   ) => {
     setAdmins((prev) =>
       prev.map((u) =>
@@ -294,8 +294,8 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
               last_message_time: msg.timestamp,
               last_sender_id: senderId,
             }
-          : u
-      )
+          : u,
+      ),
     );
     setClients((prev) =>
       prev.map((u) =>
@@ -306,8 +306,8 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
               last_message_time: msg.timestamp,
               last_sender_id: senderId,
             }
-          : u
-      )
+          : u,
+      ),
     );
   };
 
@@ -361,7 +361,7 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
 
       {/* Announcements Panel */}
       {showAnnouncements && !isMobile && (
-        <div className="w-full md:w-1/3 h-full flex-shrink-0 bg-white shadow-md p-4 rounded-lg transition-all duration-300">
+        <div className="w-full md:w-1/3 h-full flex-shrink-0 bg-[#fafafa] shadow-md p-4 rounded-lg transition-all duration-300">
           <WorkerAnnouncementView />
         </div>
       )}

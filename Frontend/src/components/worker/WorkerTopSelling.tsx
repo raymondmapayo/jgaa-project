@@ -15,13 +15,13 @@ const WorkerTopSelling = () => {
       .get(`${apiUrl}/top_selling`)
       .then((response) => setTopSelling(response.data))
       .catch((error) =>
-        console.error("Error fetching top selling data:", error)
+        console.error("Error fetching top selling data:", error),
       );
   }, []);
 
   const paginatedData = topSelling.slice(
     (currentPage - 1) * pageSize,
-    currentPage * pageSize
+    currentPage * pageSize,
   );
 
   const columns = [
@@ -44,7 +44,7 @@ const WorkerTopSelling = () => {
           />
 
           <div className="flex flex-col min-w-0">
-            <p className="font-semibold text-gray-700 dark:text-white text-xs sm:text-sm md:text-base break-words">
+            <p className="font-semibold text-gray-700 dark:text-[#fafafa] text-xs sm:text-sm md:text-base break-words">
               {text}
             </p>
             <div className="flex items-center mt-1">
@@ -59,7 +59,7 @@ const WorkerTopSelling = () => {
       dataIndex: "price",
       key: "price",
       render: (text: string) => (
-        <p className="font-semibold text-gray-700 dark:text-white text-xs sm:text-sm md:text-base">{`₱${text}`}</p>
+        <p className="font-semibold text-gray-700 dark:text-[#fafafa] text-xs sm:text-sm md:text-base">{`₱${text}`}</p>
       ),
     },
     {
@@ -67,7 +67,7 @@ const WorkerTopSelling = () => {
       dataIndex: "total_order_quantity",
       key: "total_order_quantity",
       render: (text: number) => (
-        <p className="font-semibold text-gray-700 dark:text-white text-xs sm:text-sm md:text-base">
+        <p className="font-semibold text-gray-700 dark:text-[#fafafa] text-xs sm:text-sm md:text-base">
           {text}
         </p>
       ),
@@ -77,17 +77,17 @@ const WorkerTopSelling = () => {
       dataIndex: "total_order_amount",
       key: "total_order_amount",
       render: (text: string) => (
-        <p className="font-semibold text-gray-700 dark:text-white text-xs sm:text-sm md:text-base">{`₱${text}`}</p>
+        <p className="font-semibold text-gray-700 dark:text-[#fafafa] text-xs sm:text-sm md:text-base">{`₱${text}`}</p>
       ),
     },
   ];
 
   return (
     <div className="relative -mx-6 sm:mx-0 h-full">
-      <div className="bg-white dark:bg-[#001f3f] rounded-lg shadow-lg w-full p-4 sm:p-6 flex flex-col transition-colors h-full">
+      <div className="bg-[#fafafa] dark:bg-[#001f3f] rounded-lg shadow-lg w-full p-4 sm:p-6 flex flex-col transition-colors h-full">
         {/* Header */}
         <div className="flex flex-wrap justify-between items-center mb-2 border-b border-dotted pb-2 gap-3">
-          <h2 className="text-base sm:text-lg md:text-xl font-semibold text-gray-800 dark:text-white flex-1">
+          <h2 className="text-base sm:text-lg md:text-xl font-semibold text-gray-800 dark:text-[#fafafa] flex-1">
             Top Selling Menu
           </h2>
         </div>
@@ -105,7 +105,7 @@ const WorkerTopSelling = () => {
           [&_.ant-table-row:hover]:!bg-gray-100
           dark:[&_.ant-table-thead>tr>th]:bg-[#0d1a26]
           dark:[&_.ant-table-row:hover]:!bg-[#112d4e]
-          dark:[&_.ant-table]:text-white
+          dark:[&_.ant-table]:text-[#fafafa]
         "
             rowClassName="!py-1"
           />
@@ -119,7 +119,7 @@ const WorkerTopSelling = () => {
             total={topSelling.length}
             onChange={(page) => setCurrentPage(page)}
             showTotal={(total, range) => (
-              <span className="whitespace-nowrap text-xs sm:text-sm md:text-base dark:text-white">
+              <span className="whitespace-nowrap text-xs sm:text-sm md:text-base dark:text-[#fafafa]">
                 Showing {range[0]}-{range[1]} of {total} Results
               </span>
             )}

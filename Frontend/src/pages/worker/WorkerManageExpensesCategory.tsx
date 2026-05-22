@@ -17,7 +17,7 @@ import ArchiveExpensesCategoryModal from "./Archive/ArchiveExpensesCategoryModal
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  background-color: #fff;
+  background-color: #fafafa;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
@@ -27,7 +27,7 @@ const StyledContainer = styled.div`
 
   .dark & {
     background-color: #001f3f;
-    color: white;
+    color: #fafafa !important;
   }
 
   @media (max-width: 1024px) {
@@ -189,8 +189,8 @@ const WorkerManageExpensesCategory = () => {
       prevData.map((cat) =>
         cat.expenses_category_id === updatedCategory.expenses_category_id
           ? updatedCategory
-          : cat
-      )
+          : cat,
+      ),
     );
     setCurrentPage(1);
   };
@@ -212,11 +212,11 @@ const WorkerManageExpensesCategory = () => {
         try {
           setDataSource((prevData) =>
             prevData.filter(
-              (item) => item.expenses_category_id !== expenses_category_id
-            )
+              (item) => item.expenses_category_id !== expenses_category_id,
+            ),
           );
           await axios.delete(
-            `${apiUrl}/categories_expenses_delete/${expenses_category_id}`
+            `${apiUrl}/categories_expenses_delete/${expenses_category_id}`,
           );
         } catch (error) {
           console.error("Error archiving category:", error);
@@ -311,12 +311,12 @@ const WorkerManageExpensesCategory = () => {
           <Input
             placeholder="Search categories"
             prefix={<SearchOutlined />}
-            className="w-full sm:w-1/4 bg-gray-100 dark:bg-[#1f2937] dark:text-white custom-placeholder"
+            className="w-full sm:w-1/4 bg-gray-100 dark:bg-[#1f2937] dark:text-[#fafafa] custom-placeholder"
           />
 
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button
-              className="bg-red-500 text-white hover:bg-red-600 focus:ring-4 focus:ring-red-300 rounded-md w-full sm:w-[170px]"
+              className="bg-red-500 text-[#fafafa] hover:bg-red-600 focus:ring-4 focus:ring-red-300 rounded-md w-full sm:w-[170px]"
               icon={<FolderOutlined />}
               onClick={() => setIsArchivedModalVisible(true)}
               size="middle"

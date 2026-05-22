@@ -74,8 +74,8 @@ const MonthlySalesChart = () => {
 
             <Tooltip
               labelFormatter={(label) => `Month: ${label}`}
-              contentStyle={{ backgroundColor: "#333", color: "#fff" }}
-              labelStyle={{ color: "#fff" }}
+              contentStyle={{ backgroundColor: "#333", color: "#fafafa" }}
+              labelStyle={{ color: "#fafafa" }}
               cursor={{ fill: "#fa8c16", opacity: 0.1 }}
             />
 

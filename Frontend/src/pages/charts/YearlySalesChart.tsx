@@ -61,8 +61,8 @@ const YearlySalesChart = () => {
             />
             <Tooltip
               labelFormatter={(label) => `Year: ${label}`}
-              contentStyle={{ backgroundColor: "#333", color: "#fff" }}
-              labelStyle={{ color: "#fff" }}
+              contentStyle={{ backgroundColor: "#333", color: "#fafafa" }}
+              labelStyle={{ color: "#fafafa" }}
               cursor={{ stroke: "#fa8c16", strokeWidth: 1, opacity: 0.2 }}
             />
             <Line

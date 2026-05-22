@@ -20,6 +20,8 @@ import Register from "./routes/Register";
 import { RegistrationSuccess } from "./routes/RegistrationSuccess"; // adjust the path to where you keep your VirifyRoutes
 import ResetPassword from "./routes/ResetPassword";
 import { WorkerRoutes } from "./routes/WorkerRoutes";
+import LoginLayouts from "./routes/LoginLayouts";
+import RegisterLayouts from "./routes/RegisterLayouts";
 function App() {
   const loading = useLoading(3000);
 
@@ -40,10 +42,10 @@ function App() {
         ))}
         {/* Public Routes with Client Layout */}
 
-        <Route path="login" element={<Login />} />
+        <Route path="login" element={<LoginLayouts />} />
         <Route path="verify-email/:token" element={<ConfirmationPage />} />
         <Route path="reset-password/:token" element={<ResetPassword />} />
-        <Route path="register" element={<Register />} />
+        <Route path="register" element={<RegisterLayouts />} />
         <Route path="/" element={<ClientLayout />}>
           <Route path="/" element={<LandingPage />} />
         </Route>

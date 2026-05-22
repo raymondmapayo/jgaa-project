@@ -16,7 +16,7 @@ import ViewDetailsModal from "../WorkerModals/ViewDetailsModal";
 import dayjs from "dayjs";
 const StyledContainer = styled.div`
   width: 100%;
-  background-color: #fff;
+  background-color: #fafafa;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
@@ -26,7 +26,7 @@ const StyledContainer = styled.div`
 
   .dark & {
     background-color: #001f3f;
-    color: white;
+    color: #fafafa !important;
   }
 
   @media (max-width: 1024px) {
@@ -165,7 +165,7 @@ const WorkerManageMenu = () => {
   // Updated Save Edit handler
   const handleSaveEdit = async (values: MenuItem) => {
     const updatedData = dataSource.map((item) =>
-      item.menu_id === selectedItem?.menu_id ? { ...item, ...values } : item
+      item.menu_id === selectedItem?.menu_id ? { ...item, ...values } : item,
     );
 
     setDataSource(updatedData); // update table
@@ -269,7 +269,7 @@ const WorkerManageMenu = () => {
             <Input
               placeholder="Search categories"
               prefix={<SearchOutlined />}
-              className="w-full md:w-1/3 bg-gray-100 dark:bg-[#1f2937] dark:text-white custom-placeholder"
+              className="w-full md:w-1/3 bg-gray-100 dark:bg-[#1f2937] dark:text-[#fafafa] custom-placeholder"
             />
 
             {/* Actions */}

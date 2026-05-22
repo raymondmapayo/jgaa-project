@@ -18,7 +18,7 @@ import ExpensesFilterModal from "../WorkerModals/ExpensesFilterModal";
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  background-color: #fff;
+  background-color: #fafafa;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
@@ -28,7 +28,7 @@ const StyledContainer = styled.div`
 
   .dark & {
     background-color: #001f3f;
-    color: white;
+    color: #fafafa !important;
   }
 
   @media (max-width: 1024px) {
@@ -128,7 +128,7 @@ const WorkerManageExpenses: React.FC = () => {
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<ExpenseItem | null>(
-    null
+    null,
   );
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -148,7 +148,7 @@ const WorkerManageExpenses: React.FC = () => {
         res.data.map((item: any) => ({
           ...item,
           key: item.expenses_id.toString(),
-        }))
+        })),
       );
     } catch (err) {
       console.error("Error fetching expenses:", err);
@@ -161,7 +161,7 @@ const WorkerManageExpenses: React.FC = () => {
     if (dates[0] && dates[1]) {
       fetchExpenses(
         dates[0].format("YYYY-MM-DD"),
-        dates[1].format("YYYY-MM-DD")
+        dates[1].format("YYYY-MM-DD"),
       );
     }
   }, []);
@@ -198,7 +198,7 @@ const WorkerManageExpenses: React.FC = () => {
       try {
         await axios.delete(`${apiUrl}/expenses/${record.expenses_id}`);
         setExpenseBreakdown((prev) =>
-          prev.filter((item) => item.expenses_id !== record.expenses_id)
+          prev.filter((item) => item.expenses_id !== record.expenses_id),
         );
         message.success("Deleted successfully");
       } catch (err) {
@@ -275,7 +275,7 @@ const WorkerManageExpenses: React.FC = () => {
         {/* ===== ROW 1: Title + Filter + Reset ===== */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
           {/* Left: Title */}
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white tracking-wide">
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-[#fafafa] tracking-wide">
             Expenses Management
           </h1>
 
@@ -300,7 +300,7 @@ const WorkerManageExpenses: React.FC = () => {
           <div className="flex gap-2 w-full sm:w-auto flex-col sm:flex-row">
             <Button
               icon={<PlusOutlined />}
-              className="!bg-orange-500 !text-white px-6 !h-11 hover:!bg-orange-600 rounded-xl shadow-md w-full sm:w-auto"
+              className="!bg-orange-500 !text-[#fafafa] px-6 !h-11 hover:!bg-orange-600 rounded-xl shadow-md w-full sm:w-auto"
               onClick={() => setModalVisible(true)}
             >
               Add Expense
@@ -308,7 +308,7 @@ const WorkerManageExpenses: React.FC = () => {
 
             <Button
               icon={<FilePdfOutlined />}
-              className="!bg-red-500 !text-white px-6 !h-11 hover:!bg-red-600 rounded-xl shadow-md w-full sm:w-auto"
+              className="!bg-red-500 !text-[#fafafa] px-6 !h-11 hover:!bg-red-600 rounded-xl shadow-md w-full sm:w-auto"
             >
               Export PDF
             </Button>
@@ -318,7 +318,7 @@ const WorkerManageExpenses: React.FC = () => {
 
       {/* EXPENSE BREAKDOWN TABLE */}
       <div className="border-l-4 border-blue-500 pl-4 mb-4 mt-6">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-[#fafafa]">
           Expense Breakdown (Detailed)
         </h2>
       </div>
@@ -357,8 +357,8 @@ const WorkerManageExpenses: React.FC = () => {
             prev.map((item) =>
               item.expenses_id === updatedExpense.expenses_id
                 ? { ...item, ...updatedExpense }
-                : item
-            )
+                : item,
+            ),
           );
         }}
       />

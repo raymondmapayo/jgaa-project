@@ -51,10 +51,10 @@ const TopSellingProductsChart = () => {
 
   return (
     <div className="relative -mx-6 sm:mx-0 h-full">
-      <div className="bg-white dark:bg-[#001f3f] rounded-lg shadow-lg p-6 flex flex-col transition-colors h-full">
+      <div className="bg-[#fafafa] dark:bg-[#001f3f] rounded-lg shadow-lg p-6 flex flex-col transition-colors h-full">
         {/* Header */}
         <div className="flex justify-between items-center mb-4 border-b border-dotted pb-2">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-[#fafafa]">
             Top-Selling Menu Chart
           </h2>
         </div>
@@ -115,7 +115,7 @@ const TopSellingProductsChart = () => {
                     <Tooltip
                       formatter={(value, name) => [`${value} sales`, name]}
                       contentStyle={{
-                        backgroundColor: "#ffffff",
+                        backgroundColor: "#fafafa",
                         border: "1px solid #e5e7eb",
                         borderRadius: "8px",
                         color: "#374151",

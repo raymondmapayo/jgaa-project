@@ -12,7 +12,7 @@ import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  background-color: #fff;
+  background-color: #fafafa;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
@@ -22,7 +22,7 @@ const StyledContainer = styled.div`
 
   .dark & {
     background-color: #001f3f;
-    color: white;
+    color: #fafafa !important;
   }
 
   @media (max-width: 1024px) {
@@ -202,7 +202,7 @@ const WorkerManageIngredientsInventory = () => {
         <Input
           placeholder="Search food"
           prefix={<SearchOutlined />}
-          className="w-full sm:w-1/4 bg-gray-100 dark:bg-[#1f2937] dark:text-white custom-placeholder"
+          className="w-full sm:w-1/4 bg-gray-100 dark:bg-[#1f2937] dark:text-[#fafafa] custom-placeholder"
         />
         <Dropdown
           overlay={

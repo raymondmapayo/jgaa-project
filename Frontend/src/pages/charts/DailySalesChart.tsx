@@ -35,7 +35,7 @@ const DailySalesChart = () => {
         cy={cy}
         r={5}
         fill={isLow ? "#ffa940" : "#fa8c16"}
-        stroke="#fff"
+        stroke="#fafafa"
         strokeWidth={1}
       />
     );
@@ -85,8 +85,8 @@ const DailySalesChart = () => {
 
             <Tooltip
               labelFormatter={(label) => `Date: ${label}`}
-              contentStyle={{ backgroundColor: "#333", color: "#fff" }}
-              labelStyle={{ color: "#fff" }}
+              contentStyle={{ backgroundColor: "#333", color: "#fafafa" }}
+              labelStyle={{ color: "#fafafa" }}
               cursor={{ stroke: "#fa8c16", strokeWidth: 1, opacity: 0.2 }}
             />
             <Line

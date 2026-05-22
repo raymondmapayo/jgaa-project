@@ -229,7 +229,7 @@ const WorkerDashboard = () => {
   return (
     <div
       className="space-y-6 
-  bg-white dark:bg-[rgb(0,51,102)] text-black dark:text-white
+  bg-[#fafafa] dark:bg-[rgb(0,51,102)] text-black dark:text-[#fafafa]
   p-0 rounded-none w-full"
     >
       {/* 🔸 Header */}
@@ -327,23 +327,23 @@ const WorkerDashboard = () => {
       </div>
 
       {/* 🔸 Cards */}
-      <div className="bg-white dark:bg-[#1e293b] flex flex-wrap justify-center gap-6 p-6 rounded-lg shadow-md">
+      <div className="bg-[#fafafa] dark:bg-[#1e293b] flex flex-wrap justify-center gap-6 p-6 rounded-lg ">
         {cardData.map((card, index) => (
           <div
             key={index}
-            className="group rounded-2xl bg-white dark:bg-[rgb(0,51,102)] p-4 flex-1 min-w-[200px] max-w-[250px] shadow-md hover:bg-[rgb(0,51,102)] dark:hover:bg-[rgb(0,41,82)] transition-colors duration-300"
+            className="group rounded-2xl bg-[#fafafa] dark:bg-[rgb(0,51,102)] p-4 flex-1 min-w-[200px] max-w-[250px] shadow-md hover:bg-[rgb(0,51,102)] dark:hover:bg-[rgb(0,41,82)] transition-colors duration-300"
           >
             <div className="flex justify-between items-center">
               <div className="font-bold">
-                <h1 className="capitalize text-sm font-medium text-gray-500 group-hover:text-white dark:text-white">
+                <h1 className="capitalize text-sm font-medium text-gray-500 group-hover:text-[#fafafa] dark:text-[#fafafa]">
                   {card.title}
                 </h1>
-                <p className="text-2xl font-semibold my-4 group-hover:text-white dark:text-white">
+                <p className="text-2xl font-semibold my-4 group-hover:text-[#fafafa] dark:text-[#fafafa]">
                   {card.value}
                 </p>
               </div>
               <div
-                className={`text-3xl ${card.color} bg-gray-100 dark:bg-transparent p-4 rounded-md group-hover:bg-transparent group-hover:text-white dark:text-white transition-colors`}
+                className={`text-3xl ${card.color} bg-gray-100 dark:bg-transparent p-4 rounded-md group-hover:bg-transparent group-hover:text-[#fafafa] dark:text-[#fafafa] transition-colors`}
               >
                 {card.icon}
               </div>
@@ -352,13 +352,13 @@ const WorkerDashboard = () => {
               <p
                 className={`text-[10px] px-2 py-1 rounded-full ${
                   card.changeType === "up" ? "text-green-500" : "text-red-500"
-                } group-hover:text-white dark:text-white`}
+                } group-hover:text-[#fafafa] dark:text-[#fafafa]`}
               >
                 {card.change}
               </p>
               {card.onClick ? (
                 <button
-                  className="px-2 py-1 rounded-full text-green-600 group-hover:text-white dark:text-white"
+                  className="px-2 py-1 rounded-full text-green-600 group-hover:text-[#fafafa] dark:text-[#fafafa]"
                   onClick={card.onClick}
                 >
                   {card.link}
@@ -366,7 +366,7 @@ const WorkerDashboard = () => {
               ) : (
                 <a
                   href="#"
-                  className="px-2 py-1 rounded-full text-green-600 group-hover:text-white dark:text-white"
+                  className="px-2 py-1 rounded-full text-green-600 group-hover:text-[#fafafa] dark:text-[#fafafa]"
                 >
                   {card.link}
                 </a>

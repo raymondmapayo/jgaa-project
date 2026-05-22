@@ -215,7 +215,7 @@ ${analyticsText}
           ? dayjs(item.date).format("MMM YYYY")
           : dayjs(item.date).format("MMM DD, YYYY");
       return (
-        <div className="bg-white dark:bg-gray-800 p-2 border rounded shadow-md text-sm">
+        <div className="bg-[#fafafa] dark:bg-gray-800 p-2 border rounded shadow-md text-sm">
           <p>{dateLabel}</p>
           <p>Sales: ₱{item.sales}</p>
         </div>
@@ -226,9 +226,9 @@ ${analyticsText}
 
   return (
     <div className="relative -mx-6 sm:mx-0">
-      <div className="bg-white dark:bg-[#001f3f] rounded-lg shadow-lg sm:w-full h-full p-6 flex flex-col transition-colors">
+      <div className="bg-[#fafafa] dark:bg-[#001f3f] rounded-lg shadow-lg sm:w-full h-full p-6 flex flex-col transition-colors">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 border-b border-dotted pb-2">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-[#fafafa]">
             Total Sales (
             {filterType.charAt(0).toUpperCase() + filterType.slice(1)})
           </h2>

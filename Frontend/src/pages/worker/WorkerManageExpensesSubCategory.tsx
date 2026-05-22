@@ -18,7 +18,7 @@ import ArchiveExpensesSubCategoryModal from "./Archive/ArchiveExpensesSubCategor
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  background-color: #fff;
+  background-color: #fafafa;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
@@ -28,7 +28,7 @@ const StyledContainer = styled.div`
 
   .dark & {
     background-color: #001f3f;
-    color: white;
+    color: #fafafa !important;
   }
 
   @media (max-width: 1024px) {
@@ -190,8 +190,8 @@ const WorkerManageExpensesSubCategory = () => {
         cat.expenses_subcategory_id ===
         updatedSubCategory.expenses_subcategory_id
           ? updatedSubCategory
-          : cat
-      )
+          : cat,
+      ),
     );
     setCurrentPage(1);
   };
@@ -213,16 +213,17 @@ const WorkerManageExpensesSubCategory = () => {
         try {
           setDataSource((prevData) =>
             prevData.filter(
-              (item) => item.expenses_subcategory_id !== expenses_subcategory_id
-            )
+              (item) =>
+                item.expenses_subcategory_id !== expenses_subcategory_id,
+            ),
           );
           await axios.delete(
-            `${apiUrl}/subcategories_expenses_delete/${expenses_subcategory_id}`
+            `${apiUrl}/subcategories_expenses_delete/${expenses_subcategory_id}`,
           );
         } catch (error) {
           console.error("Error archiving subcategory:", error);
           const response = await axios.get(
-            `${apiUrl}/get_expenses_subcategories`
+            `${apiUrl}/get_expenses_subcategories`,
           );
           setDataSource(response.data);
         }
@@ -317,12 +318,12 @@ const WorkerManageExpensesSubCategory = () => {
           <Input
             placeholder="Search categories"
             prefix={<SearchOutlined />}
-            className="w-full sm:w-1/4 bg-gray-100 dark:bg-[#1f2937] dark:text-white custom-placeholder"
+            className="w-full sm:w-1/4 bg-gray-100 dark:bg-[#1f2937] dark:text-[#fafafa] custom-placeholder"
           />
 
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button
-              className="bg-red-500 text-white hover:bg-red-600 focus:ring-4 focus:ring-red-300 rounded-md w-full sm:w-[170px]"
+              className="bg-red-500 text-[#fafafa] hover:bg-red-600 focus:ring-4 focus:ring-red-300 rounded-md w-full sm:w-[170px]"
               icon={<FolderOutlined />}
               onClick={handleShowArchived}
               size="middle"

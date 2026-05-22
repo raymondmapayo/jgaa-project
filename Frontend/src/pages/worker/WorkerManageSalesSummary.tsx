@@ -10,7 +10,7 @@ import SalesPdfModal from "./Pdf/SalesPdfModal";
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
   width: 100%;
-  background-color: #fff;
+  background-color: #fafafa;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
@@ -20,7 +20,7 @@ const StyledContainer = styled.div`
 
   .dark & {
     background-color: #001f3f;
-    color: white;
+    color: #fafafa !important;
   }
 
   @media (max-width: 1024px) {
@@ -44,7 +44,7 @@ const StyledContainer = styled.div`
 const StyledCard = styled(Card)`
   border-radius: 16px !important;
   padding: 20px !important;
-  background: #ffffffcc !important;
+  background: #fafafa !important;
   backdrop-filter: blur(6px);
 
   .dark & {
@@ -124,7 +124,7 @@ const WorkerManageSalesSummary: React.FC = () => {
       setDates([start, end]);
       fetchFinancialSummary(
         start.format("YYYY-MM-DD"),
-        end.format("YYYY-MM-DD")
+        end.format("YYYY-MM-DD"),
       );
     }
   };
@@ -159,7 +159,7 @@ const WorkerManageSalesSummary: React.FC = () => {
 
           <Button
             icon={<FilePdfOutlined />}
-            className="bg-red-500 text-white hover:bg-red-600 shadow-md rounded-md h-11 px-6 w-full sm:w-auto"
+            className="bg-red-500 text-[#fafafa] hover:bg-red-600 shadow-md rounded-md h-11 px-6 w-full sm:w-auto"
             onClick={handleExportPDF}
           >
             Export PDF
@@ -220,7 +220,7 @@ const WorkerManageSalesSummary: React.FC = () => {
                 <SummaryItem
                   label="Total Orders"
                   value={`${summary.total_orders.toLocaleString()}`}
-                  color="text-gray-800 dark:text-white"
+                  color="text-gray-800 dark:text-[#fafafa]"
                 />
               </div>
             </>
