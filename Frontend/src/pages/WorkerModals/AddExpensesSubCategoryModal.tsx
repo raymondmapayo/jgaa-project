@@ -32,17 +32,17 @@ const AddExpensesSubCategoryModal: React.FC<
   useEffect(() => {
     if (visible) fetchSubCategories();
   }, [visible]);
-
   const fetchSubCategories = async () => {
     try {
-      const res = await axios.get(`${apiUrl}/get_expenses_subcategories`);
-      setExistingCategories(res.data);
-    } catch (err) {
-      console.error("Error fetching categories:", err);
+      const response = await axios.get(`${apiUrl}/get_expenses_subcategories`);
+
+      setExistingCategories(response.data);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+
       message.error("Failed to fetch existing categories.");
     }
   };
-
   // Reset modal
   const handleCancel = () => {
     form.resetFields();
@@ -55,7 +55,7 @@ const AddExpensesSubCategoryModal: React.FC<
     const isDuplicate = existingCategories.some(
       (subcat) =>
         subcat.subcategory.toLowerCase().trim() ===
-        values.subcategory.toLowerCase().trim()
+        values.subcategory.toLowerCase().trim(),
     );
 
     if (isDuplicate) {
@@ -64,7 +64,6 @@ const AddExpensesSubCategoryModal: React.FC<
     }
 
     try {
-      // ✅ Send plain JSON instead of FormData
       const response = await axios.post(`${apiUrl}/add_expenses_subcategory`, {
         subcategory: values.subcategory,
         status: "Active",
@@ -72,13 +71,19 @@ const AddExpensesSubCategoryModal: React.FC<
       });
 
       if (response.data.success) {
-        message.success("SubCategory added successfully!");
-        fetchSubCategories();
-        form.resetFields();
+        // Update parent table
         onFinish(response.data);
+
+        // Fetch latest data
+        await fetchSubCategories();
+
+        form.resetFields();
+
+        message.success("SubCategory added successfully!");
       }
-    } catch (err) {
-      console.error("Error adding subcategory:", err);
+    } catch (error) {
+      console.error("Error adding subcategory:", error);
+
       message.error("Failed to add subcategory. Try again.");
     }
   };
@@ -89,17 +94,17 @@ const AddExpensesSubCategoryModal: React.FC<
       existingCategories.some(
         (cat) =>
           cat.subcategory.toLowerCase().trim() ===
-          values.subcategory.toLowerCase().trim()
+          values.subcategory.toLowerCase().trim(),
       ) ||
       queueList.some(
         (cat) =>
           cat.subcategory.toLowerCase().trim() ===
-          values.subcategory.toLowerCase().trim()
+          values.subcategory.toLowerCase().trim(),
       );
 
     if (isDuplicate) {
       message.error(
-        `"${values.subcategory}" already exists in DB or in your queue.`
+        `"${values.subcategory}" already exists in DB or in your queue.`,
       );
       return;
     }
@@ -117,19 +122,39 @@ const AddExpensesSubCategoryModal: React.FC<
   // Insert all queued categories to DB
   const handleInsertAll = async () => {
     try {
+      const addedSubCategories = [];
+
       for (const item of queueList) {
-        await axios.post(`${apiUrl}/add_expenses_subcategory`, {
-          subcategory: item.subcategory,
-          status: "Active",
-          created_by: user_id,
-        });
+        const response = await axios.post(
+          `${apiUrl}/add_expenses_subcategory`,
+          {
+            subcategory: item.subcategory,
+            status: "Active",
+            created_by: user_id,
+          },
+        );
+
+        if (response.data.success) {
+          addedSubCategories.push(response.data);
+        }
       }
-      message.success("All queued categories added successfully!");
+
+      // Update parent table, same as Add One
+      for (const subcategory of addedSubCategories) {
+        onFinish(subcategory);
+      }
+
+      // Fetch latest database data
+      await fetchSubCategories();
+
+      // Clear queue
       setQueueList([]);
-      fetchSubCategories();
-    } catch (err) {
-      console.error("Error inserting queued categories:", err);
-      message.error("Failed to insert queued categories. Try again.");
+
+      message.success("All queued subcategories added successfully!");
+    } catch (error) {
+      console.error("Error inserting queued subcategories:", error);
+
+      message.error("Failed to insert queued subcategories. Try again.");
     }
   };
 
@@ -148,6 +173,26 @@ const AddExpensesSubCategoryModal: React.FC<
       ),
     },
   ];
+
+  const handleAddOneClick = async () => {
+    try {
+      const values = await form.validateFields();
+
+      await handleAddOne(values);
+    } catch (error) {
+      // Validation error
+    }
+  };
+
+  const handleAddToListClick = async () => {
+    try {
+      const values = await form.validateFields();
+
+      handleAddToList(values);
+    } catch (error) {
+      // Validation error
+    }
+  };
 
   return (
     <Modal
@@ -171,27 +216,10 @@ const AddExpensesSubCategoryModal: React.FC<
             <Button onClick={handleCancel}>Cancel</Button>
           </Col>
           <Col>
-            <Button
-              onClick={() => {
-                form
-                  .validateFields()
-                  .then((values) => handleAddOne(values))
-                  .catch(() => {});
-              }}
-            >
-              Add One
-            </Button>
+            <Button onClick={handleAddOneClick}>Add One</Button>
           </Col>
           <Col>
-            <Button
-              type="primary"
-              onClick={() => {
-                form
-                  .validateFields()
-                  .then((values) => handleAddToList(values))
-                  .catch(() => {});
-              }}
-            >
+            <Button type="primary" onClick={handleAddToListClick}>
               Add to List
             </Button>
           </Col>

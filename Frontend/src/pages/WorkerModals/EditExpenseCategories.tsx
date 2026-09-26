@@ -2,15 +2,17 @@ import { Button, Form, Input, Modal, notification } from "antd";
 import axios from "axios";
 import { useEffect } from "react";
 
-interface EditSupplyCategoriesProps {
+interface EditExpenseCategoriesProps {
   isEditModalVisible: boolean;
   setIsEditModalVisible: (visible: boolean) => void;
   selectedItem: any;
+
+  // 🔥 ADD THESE TWO (IMPORTANT)
   setDataSource: any;
   setCurrentPage: any;
 }
 
-const EditSupplyCategories: React.FC<EditSupplyCategoriesProps> = ({
+const EditExpenseCategories: React.FC<EditExpenseCategoriesProps> = ({
   isEditModalVisible,
   setIsEditModalVisible,
   selectedItem,
@@ -19,41 +21,43 @@ const EditSupplyCategories: React.FC<EditSupplyCategoriesProps> = ({
 }) => {
   const [form] = Form.useForm();
   const apiUrl = import.meta.env.VITE_API_URL;
-  // ✅ When modal opens, fill form fields with selected item
+
+  // ✅ REPLACE THIS PART (THIS IS THE CORRECT PLACE)
   useEffect(() => {
-    if (selectedItem) {
+    if (isEditModalVisible && selectedItem) {
       form.setFieldsValue({
-        supply_cat_name: selectedItem.supply_cat_name,
+        category: selectedItem.category,
       });
     }
-  }, [selectedItem, form]);
+  }, [isEditModalVisible, selectedItem]);
+  // ✅ END FIX
 
   // ✅ Handle form submit
   const handleFinish = async (values: any) => {
     try {
-      const updated_by = sessionStorage.getItem("user_id"); // ✅ from session storage
+      const user_id = sessionStorage.getItem("user_id");
+
       const response = await axios.put(
-        `${apiUrl}/update_supply_category/${selectedItem.cat_supply_id}`,
+        `${apiUrl}/update_expenses_category/${selectedItem.expenses_category_id}`,
         {
-          supply_cat_name: values.supply_cat_name,
-          updated_by, // ✅ include the updater ID
+          expenses_category_name: values.category,
+          updated_by: user_id,
         },
       );
 
-      if (response.data) {
-        const updatedItem = response.data.updatedCategory;
-
-        // ✅ UPDATE TABLE WITHOUT RELOAD
-        setDataSource((prev: any[]) =>
-          prev.map((item: any) =>
-            item.cat_supply_id === selectedItem.cat_supply_id
+      if (response.data.success) {
+        // 🔥 ================================
+        // ✅ THIS IS THE FIX (NO RELOAD NEEDED)
+        // 🔥 UPDATE TABLE STATE IMMEDIATELY
+        // 🔥 ================================
+        setDataSource((prevData: any[]) =>
+          prevData.map((cat: any) =>
+            cat.expenses_category_id === selectedItem.expenses_category_id
               ? {
-                  ...item,
-                  supply_cat_name: values.supply_cat_name,
-                  updated_by: updated_by,
-                  updated_at: updatedItem?.updated_at,
+                  ...cat,
+                  category: values.category, // update UI instantly
                 }
-              : item,
+              : cat,
           ),
         );
 
@@ -61,28 +65,25 @@ const EditSupplyCategories: React.FC<EditSupplyCategoriesProps> = ({
 
         notification.success({
           message: "Success",
-          description: "Supply category updated successfully!",
+          description: "Expense category updated successfully!",
         });
 
         setIsEditModalVisible(false);
-      } else {
-        notification.error({
-          message: "Error",
-          description: "Failed to update supply category. Please try again.",
-        });
+        form.resetFields();
       }
     } catch (error) {
-      console.error("Error updating category:", error);
+      console.error(error);
+
       notification.error({
         message: "Error",
-        description: "An error occurred while updating the supply category.",
+        description: "Failed to update expense category.",
       });
     }
   };
 
   return (
     <Modal
-      title="Edit Supply Category"
+      title="Edit Expense Category"
       open={isEditModalVisible}
       onCancel={() => setIsEditModalVisible(false)}
       footer={null}
@@ -93,15 +94,15 @@ const EditSupplyCategories: React.FC<EditSupplyCategoriesProps> = ({
         layout="vertical"
         onFinish={handleFinish}
         initialValues={{
-          supply_cat_name: selectedItem?.supply_cat_name || "",
+          expenses_category_name: selectedItem?.category || "",
         }}
       >
         <Form.Item
           label="Category Name"
-          name="supply_cat_name"
+          name="category"
           rules={[{ required: true, message: "Please enter a category name!" }]}
         >
-          <Input placeholder="Enter supply category name" />
+          <Input placeholder="Enter expense category name" />
         </Form.Item>
 
         <Form.Item>
@@ -114,4 +115,4 @@ const EditSupplyCategories: React.FC<EditSupplyCategoriesProps> = ({
   );
 };
 
-export default EditSupplyCategories;
+export default EditExpenseCategories;

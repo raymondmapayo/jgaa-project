@@ -81,7 +81,7 @@ const AdminAnnouncement: React.FC<AdminAnnouncementProps> = ({
           updatedState[workerId] = updatedState[workerId].map((announcement) =>
             announcement.announcement_id === announcementId
               ? { ...announcement, status }
-              : announcement
+              : announcement,
           );
         } else {
           updatedState[workerId] = [
@@ -115,26 +115,29 @@ const AdminAnnouncement: React.FC<AdminAnnouncementProps> = ({
 
   // Fetch worker announcements
   useEffect(() => {
-    setLoading(true);
-    axios
-      .get("http://localhost:8081/get_workers_read_and_unread")
-      .then((res) => setWorkerAnnouncements(res.data))
-      .catch((err) =>
+    const fetchWorkerAnnouncements = async () => {
+      try {
+        setLoading(true);
+
+        const response = await axios.get(
+          "http://localhost:8081/get_workers_read_and_unread",
+        );
+
+        setWorkerAnnouncements(response.data);
+      } catch (error: any) {
         notification.error({
           message: "Failed to load announcements status",
-          description: err.message,
-        })
-      )
-      .finally(() => setLoading(false));
+          description:
+            error.response?.data?.error ||
+            error.message ||
+            "Failed to load announcements status.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const interval = setInterval(() => {
-      axios
-        .get("http://localhost:8081/get_workers_read_and_unread")
-        .then((res) => setWorkerAnnouncements(res.data))
-        .catch((err) => console.error(err));
-    }, 10000);
-
-    return () => clearInterval(interval);
+    fetchWorkerAnnouncements();
   }, []);
 
   // Fetch workers
@@ -161,9 +164,9 @@ const AdminAnnouncement: React.FC<AdminAnnouncementProps> = ({
   const filteredWorkers = useMemo(
     () =>
       workersData.filter((worker) =>
-        worker.name.toLowerCase().includes(searchTerm.toLowerCase())
+        worker.name.toLowerCase().includes(searchTerm.toLowerCase()),
       ),
-    [searchTerm, workersData]
+    [searchTerm, workersData],
   );
 
   const allSelected =
@@ -193,7 +196,7 @@ const AdminAnnouncement: React.FC<AdminAnnouncementProps> = ({
     } else {
       const filteredIds = filteredWorkers.map((w) => w.id);
       setSelectedWorkerIds((prev) =>
-        prev.filter((id) => !filteredIds.includes(id))
+        prev.filter((id) => !filteredIds.includes(id)),
       );
     }
   };
@@ -201,7 +204,7 @@ const AdminAnnouncement: React.FC<AdminAnnouncementProps> = ({
   const handleFormChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    >,
   ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -236,7 +239,7 @@ const AdminAnnouncement: React.FC<AdminAnnouncementProps> = ({
     try {
       const response = await axios.post(
         "http://localhost:8081/send_announcement_to_worker",
-        announcementData
+        announcementData,
       );
       const newAnnouncement = response.data; // this should be the created announcement
 
@@ -436,7 +439,7 @@ const AdminAnnouncement: React.FC<AdminAnnouncementProps> = ({
                               >
                                 {title} — <em>{status.toUpperCase()}</em>
                               </li>
-                            )
+                            ),
                           )}
                         </ul>
                       )}

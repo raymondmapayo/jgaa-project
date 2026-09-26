@@ -19,34 +19,35 @@ const WorkerAnnouncement: React.FC = () => {
   const workerId = sessionStorage.getItem("user_id");
 
   useEffect(() => {
-    if (!workerId) {
-      console.error("Worker ID not found in session storage");
-      return;
-    }
+    const fetchAnnouncements = async () => {
+      if (!workerId) {
+        console.error("Worker ID not found in session storage");
+        return;
+      }
 
-    const fetchAnnouncements = () => {
-      fetch(`${apiUrl}/get_announcements_for_worker/${workerId}`)
-        .then((response) => response.json())
-        .then((data) => {
-          setAnnouncements(data);
-        })
-        .catch((error) => {
-          console.error("Failed to fetch announcements:", error);
-          notification.error({
-            message: "Error",
-            description: "Failed to load announcements.",
-          });
+      try {
+        const response = await fetch(
+          `${apiUrl}/get_announcements_for_worker/${workerId}`,
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch announcements");
+        }
+
+        const data = await response.json();
+
+        setAnnouncements(data);
+      } catch (error) {
+        console.error("Failed to fetch announcements:", error);
+
+        notification.error({
+          message: "Error",
+          description: "Failed to load announcements.",
         });
+      }
     };
 
-    // Initial fetch
     fetchAnnouncements();
-
-    // Set up interval
-    const intervalId = setInterval(fetchAnnouncements, 1000); // 30000 ms = 30 seconds
-
-    // Cleanup on component unmount
-    return () => clearInterval(intervalId);
   }, [workerId]);
 
   const toggleRead = async (announcement_id: string) => {

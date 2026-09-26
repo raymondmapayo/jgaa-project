@@ -13,6 +13,7 @@ import styled from "styled-components";
 import dayjs from "dayjs";
 import AddExpensesCategoryModal from "../WorkerModals/AddExpensesCategoryModal";
 import ArchiveExpensesCategoryModal from "./Archive/ArchiveExpensesCategoryModal";
+import EditExpenseCategories from "../WorkerModals/EditExpenseCategories";
 
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
@@ -136,12 +137,17 @@ const WorkerManageExpensesCategory = () => {
     { key: "2", label: "Sort by Name" },
   ];
 
-  // Fetch function to get updated expense categories
+  // Fetch expense categories
   const fetchCategories = async () => {
     try {
+      setIsLoading(true);
+
       const response = await axios.get(`${apiUrl}/get_expenses_categories`, {
-        headers: { "Cache-Control": "no-cache" },
+        headers: {
+          "Cache-Control": "no-cache",
+        },
       });
+
       setDataSource(response.data);
     } catch (error) {
       console.error("Error fetching expense categories:", error);
@@ -150,23 +156,8 @@ const WorkerManageExpensesCategory = () => {
     }
   };
 
-  // Polling function to refresh data
   useEffect(() => {
-    let isMounted = true;
-
-    const loadCategories = async () => {
-      if (isMounted) {
-        await fetchCategories();
-      }
-    };
-
-    loadCategories();
-    const interval = setInterval(loadCategories, 10000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    fetchCategories();
   }, [apiUrl]);
 
   const handleAddCategory = async () => {
@@ -389,7 +380,13 @@ const WorkerManageExpensesCategory = () => {
           </div>
         )}
       </Modal>
-
+      <EditExpenseCategories
+        isEditModalVisible={isEditModalVisible}
+        setIsEditModalVisible={setIsEditModalVisible}
+        selectedItem={selectedItem}
+        setDataSource={setDataSource} // ✅ ADD THIS
+        setCurrentPage={setCurrentPage} // ✅ ADD THIS
+      />
       <ArchiveExpensesCategoryModal
         isArchivedModalVisible={isArchivedModalVisible}
         onClose={() => setIsArchivedModalVisible(false)}

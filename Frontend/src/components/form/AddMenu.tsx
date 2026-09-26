@@ -72,10 +72,10 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
     const normalize = (name: string) => name.toLowerCase().trim();
     const isDuplicate =
       existingMenus.some(
-        (menu) => normalize(menu.item_name) === normalize(values.item_name)
+        (menu) => normalize(menu.item_name) === normalize(values.item_name),
       ) ||
       menuList.some(
-        (menu) => normalize(menu.item_name) === normalize(values.item_name)
+        (menu) => normalize(menu.item_name) === normalize(values.item_name),
       );
 
     if (isDuplicate) {
@@ -108,41 +108,53 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
 
   // Submit one item immediately
   const handleSubmitOne = async (values: any) => {
-    const file = values.menu_img?.fileList?.[0]?.originFileObj;
-    if (!file) {
-      notification.error({
-        message: "Error",
-        description: "Menu image is required.",
-      });
-      return;
-    }
-
-    // ✅ Duplicate check (DB only)
-    const normalize = (name: string) => name.toLowerCase().trim();
-    const isDuplicate = existingMenus.some(
-      (menu) => normalize(menu.item_name) === normalize(values.item_name)
-    );
-    if (isDuplicate) {
-      notification.error({
-        message: "Duplicate Food Name",
-        description: `"${values.item_name}" already exists in the database.`,
-      });
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("item_name", values.item_name);
-    formData.append("price", values.price);
-    formData.append("description", values.description || "");
-    formData.append("categories_id", values.categories_id);
-    formData.append("quantity", values.quantity);
-    formData.append("created_by", user_id || "");
-    formData.append("menu_img", file);
-
     try {
-      const response = await axios.post(`${apiUrl}/add_menu`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      const file = values.menu_img?.[0]?.originFileObj;
+
+      if (!file) {
+        notification.error({
+          message: "Error",
+          description: "Menu image is required.",
+        });
+        return;
+      }
+
+      const normalize = (name: string) => name.toLowerCase().trim();
+
+      const isDuplicate = existingMenus.some(
+        (menu) => normalize(menu.item_name) === normalize(values.item_name),
+      );
+
+      if (isDuplicate) {
+        notification.error({
+          message: "Duplicate Food Name",
+          description: `"${values.item_name}" already exists in the database.`,
+        });
+        return;
+      }
+
+      const formData = new FormData();
+
+      formData.append("item_name", values.item_name);
+      formData.append("price", values.price);
+      formData.append("description", values.description || "");
+      formData.append("categories_id", values.categories_id);
+      formData.append("created_by", user_id || "");
+      formData.append("menu_img", file);
+
+      console.log("Submitting menu...");
+      console.log({
+        item_name: values.item_name,
+        price: values.price,
+        description: values.description,
+        categories_id: values.categories_id,
+        created_by: user_id,
+        file: file.name,
       });
+
+      const response = await axios.post(`${apiUrl}/add_menu`, formData);
+
+      console.log("ADD MENU RESPONSE:", response.data);
 
       notification.success({
         message: "Menu Added Successfully",
@@ -159,13 +171,38 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
 
       form.resetFields();
       setSelectedCategory(null);
+
       onAddMenu(response.data);
-    } catch (error) {
-      console.error("Error adding menu:", error);
-      notification.error({
-        message: "Error",
-        description: "Failed to add menu. Please try again.",
-      });
+
+      const menuRes = await axios.get(`${apiUrl}/menu_items`);
+      setExistingMenus(menuRes.data);
+    } catch (error: any) {
+      console.error("ADD MENU ERROR:", error);
+
+      if (error.response) {
+        console.error("STATUS:", error.response.status);
+        console.error("DATA:", error.response.data);
+
+        notification.error({
+          message: "Failed to Add Menu",
+          description:
+            error.response.data?.error ||
+            error.response.data?.message ||
+            `Server error: ${error.response.status}`,
+        });
+      } else if (error.request) {
+        console.error("No response from server:", error.request);
+
+        notification.error({
+          message: "Server Error",
+          description: "The server did not respond.",
+        });
+      } else {
+        notification.error({
+          message: "Error",
+          description: error.message || "Failed to add menu.",
+        });
+      }
     }
   };
 
@@ -306,6 +343,8 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
             <Form.Item
               label="Menu Image"
               name="menu_img"
+              valuePropName="fileList"
+              getValueFromEvent={(e) => e?.fileList}
               rules={[{ required: true, message: "Menu image is required" }]}
             >
               <Upload

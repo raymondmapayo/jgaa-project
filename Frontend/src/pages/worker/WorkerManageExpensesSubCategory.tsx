@@ -14,6 +14,7 @@ import dayjs from "dayjs";
 
 import AddExpensesSubCategoryModal from "../WorkerModals/AddExpensesSubCategoryModal";
 import ArchiveExpensesSubCategoryModal from "./Archive/ArchiveExpensesSubCategoryModal";
+import EditExpenseSubCategories from "../WorkerModals/EditExpenseSubCategories";
 
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
@@ -182,18 +183,6 @@ const WorkerManageExpensesSubCategory = () => {
   const handleEdit = (record: ExpensesSubCategoryItem) => {
     setSelectedItem(record);
     setIsEditModalVisible(true);
-  };
-
-  const handleSaveEdit = (updatedSubCategory: ExpensesSubCategoryItem) => {
-    setDataSource((prevData) =>
-      prevData.map((cat) =>
-        cat.expenses_subcategory_id ===
-        updatedSubCategory.expenses_subcategory_id
-          ? updatedSubCategory
-          : cat,
-      ),
-    );
-    setCurrentPage(1);
   };
 
   const handleViewDetails = (record: any) => {
@@ -396,6 +385,14 @@ const WorkerManageExpensesSubCategory = () => {
           </div>
         )}
       </Modal>
+
+      <EditExpenseSubCategories
+        isEditModalVisible={isEditModalVisible}
+        setIsEditModalVisible={setIsEditModalVisible}
+        selectedItem={selectedItem}
+        setDataSource={setDataSource} // ✅ ADD THIS
+        setCurrentPage={setCurrentPage} // ✅ ADD THIS
+      />
 
       <ArchiveExpensesSubCategoryModal
         isArchivedModalVisible={isArchivedModalVisible}

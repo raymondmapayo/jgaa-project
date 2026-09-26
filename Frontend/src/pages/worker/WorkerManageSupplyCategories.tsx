@@ -347,6 +347,8 @@ const WorkerManageSupplyCategories = () => {
         isEditModalVisible={isEditModalVisible}
         setIsEditModalVisible={setIsEditModalVisible}
         selectedItem={selectedItem}
+        setDataSource={setDataSource} // 🔥 ADD
+        setCurrentPage={setCurrentPage} // 🔥 ADD
       />
 
       {/* Add Supply Category Modal */}

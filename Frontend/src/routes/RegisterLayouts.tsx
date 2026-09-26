@@ -5,7 +5,7 @@ const RegisterLayouts = () => {
   return (
     <div className="min-h-screen w-full flex overflow-hidden">
       {/* LEFT SIDE */}
-      <div className="hidden lg:flex lg:w-[100%] bg-[#1F262A]">
+      <div className="hidden lg:flex lg:w-[100%] bg-[#1F262A] rounded-r-3xl overflow-hidden">
         <LoginUi />
       </div>
 

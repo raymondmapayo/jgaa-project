@@ -114,54 +114,97 @@ db.connect((err) => {
   if (err) console.error("❌ Database connection failed:", err);
   else console.log("✅ Connected to MySQL (Clever Cloud)");
 });
-
+const promiseDb = db.promise();
 //==========================MENUS INSERT ===============================================
 //========================== MENUS INSERT (Cloudinary) ===============================================
-app.post("/add_menu", upload.single("menu_img"), (req, res) => {
-  const { item_name, price, description, categories_id, created_by } = req.body;
+app.post("/add_menu", upload.single("menu_img"), async (req, res) => {
+  console.log("========== ADD MENU ==========");
+  console.log("BODY:", req.body);
+  console.log("FILE:", req.file);
 
-  // ✅ Get Cloudinary URL
-  const menu_img = req.file?.path || "";
+  try {
+    const { item_name, price, description, categories_id, created_by } =
+      req.body;
 
-  // Fetch category name first
-  const fetchCategorySql =
-    "SELECT categories_name FROM categories_tbl WHERE categories_id = ?";
+    const menu_img = req.file?.path || "";
 
-  db.query(fetchCategorySql, [categories_id], (error, results) => {
-    if (error) {
-      console.error(error);
-      return res.status(500).json({ error: "Internal Server Error" });
+    console.log("ADD MENU BODY:", req.body);
+    console.log("UPLOADED FILE:", req.file);
+
+    if (!item_name || !price || !categories_id || !created_by) {
+      return res.status(400).json({
+        error: "Required fields are missing.",
+      });
     }
 
-    if (results.length === 0) {
-      return res.status(404).json({ error: "Category not found" });
+    if (!req.file) {
+      return res.status(400).json({
+        error: "Menu image is required.",
+      });
     }
 
-    const categories_name = results[0].categories_name;
+    const fetchCategorySql = `
+      SELECT categories_name
+      FROM categories_tbl
+      WHERE categories_id = ?
+    `;
 
-    const sql =
-      'INSERT INTO menu_tbl (item_name, menu_img, description, price, availability, categories_id, categories_name, created_by) VALUES (?, ?, ?, ?, "Pending", ?, ?, ?)';
+    // ✅ USE promiseDb HERE
+    const [categoryResults] = await promiseDb.query(fetchCategorySql, [
+      categories_id,
+    ]);
 
-    db.query(
-      sql,
-      [
+    if (categoryResults.length === 0) {
+      return res.status(404).json({
+        error: "Category not found",
+      });
+    }
+
+    const categories_name = categoryResults[0].categories_name;
+
+    const sql = `
+      INSERT INTO menu_tbl
+      (
         item_name,
         menu_img,
         description,
         price,
+        availability,
         categories_id,
         categories_name,
-        created_by,
-      ],
-      (err, result) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ error: "Internal Server Error" });
-        }
-        res.send("Menu item added successfully with Cloudinary image!");
-      },
-    );
-  });
+        created_by
+      )
+      VALUES (?, ?, ?, ?, "Pending", ?, ?, ?)
+    `;
+
+    // ✅ USE promiseDb HERE TOO
+    const [result] = await promiseDb.query(sql, [
+      item_name,
+      menu_img,
+      description || "",
+      price,
+      categories_id,
+      categories_name,
+      created_by,
+    ]);
+
+    console.log("MENU INSERTED:", result);
+
+    return res.status(201).json({
+      message: "Menu item added successfully",
+      menu_id: result.insertId,
+      item_name,
+      menu_img,
+      categories_name,
+    });
+  } catch (error) {
+    console.error("========== ADD MENU ERROR ==========");
+    console.error(error);
+
+    return res.status(500).json({
+      error: error.message || "Failed to add menu.",
+    });
+  }
 });
 //========================== Edit start MENUS ===========================================
 
@@ -362,30 +405,46 @@ app.post("/notifications/read/:id", (req, res) => {
 
 //========================== ADD CATEGORIES ===============================================
 
-app.post("/add_categories", upload.single("categories_img"), (req, res) => {
-  const { categories_name, description, status } = req.body;
+app.post(
+  "/add_categories",
+  upload.single("categories_img"),
+  async (req, res) => {
+    const { categories_name, description, status } = req.body;
 
-  // ✅ Use Cloudinary URL (req.file.path) instead of local filename
-  const categories_img = req.file ? req.file.path : "";
+    // Cloudinary URL
+    const categories_img = req.file ? req.file.path : "";
 
-  const sql = `
-    INSERT INTO categories_tbl (categories_name, categories_img, description, status)
-    VALUES (?, ?, ?, 'active')
-  `;
+    try {
+      const sql = `
+      INSERT INTO categories_tbl
+      (
+        categories_name,
+        categories_img,
+        description,
+        status
+      )
+      VALUES (?, ?, ?, 'active')
+    `;
 
-  db.query(
-    sql,
-    [categories_name, categories_img, description, status],
-    (err, result) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: "Internal Server Error" });
-      }
+      const [result] = await db
+        .promise()
+        .query(sql, [categories_name, categories_img, description]);
 
-      res.send("Category added successfully with Cloudinary image!");
-    },
-  );
-});
+      return res.json({
+        success: true,
+        message: "Category added successfully with Cloudinary image!",
+        id: result.insertId,
+      });
+    } catch (error) {
+      console.error("Error adding category:", error);
+
+      return res.status(500).json({
+        success: false,
+        error: "Internal Server Error",
+      });
+    }
+  },
+);
 
 app.post("/add_ingredients", (req, res) => {
   const { ingredients_name, unit, category, measurement, created_by } =
@@ -499,35 +558,63 @@ app.get("/ingredients_by_category/:menu_id", (req, res) => {
 });
 
 // --- Add new expense category ---
-app.post("/add_expenses_category", (req, res) => {
-  const { category, created_by, status = "Active" } = req.body; // default to 'Active'
+app.post("/add_expenses_category", async (req, res) => {
+  const { category, created_by, status = "Active" } = req.body;
 
   if (!category) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Category is required" });
+    return res.status(400).json({
+      success: false,
+      message: "Category is required",
+    });
   }
 
-  const query =
-    "INSERT INTO expenses_category_tbl (category, created_by, status) VALUES (?, ?, ?)";
-  db.query(query, [category, created_by, status], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err });
-    res.json({
+  try {
+    const query = `
+      INSERT INTO expenses_category_tbl
+      (category, created_by, status)
+      VALUES (?, ?, ?)
+    `;
+
+    const [result] = await db
+      .promise()
+      .query(query, [category, created_by, status]);
+
+    return res.json({
       success: true,
       message: "Expense category added",
       id: result.insertId,
     });
-  });
+  } catch (error) {
+    console.error("Error adding expense category:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
 });
 
 // --- Get all expense categories ---
-app.get("/get_expenses_categories", (req, res) => {
-  const query =
-    "SELECT * FROM expenses_category_tbl WHERE status='Active'   AND status != 'deleted'";
-  db.query(query, (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err });
-    res.json(results);
-  });
+app.get("/get_expenses_categories", async (req, res) => {
+  try {
+    const query = `
+      SELECT *
+      FROM expenses_category_tbl
+      WHERE status = 'Active'
+        AND status != 'deleted'
+    `;
+
+    const [results] = await db.promise().query(query);
+
+    return res.json(results);
+  } catch (error) {
+    console.error("Error fetching expense categories:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
 });
 app.delete("/categories_expenses_delete/:id", (req, res) => {
   const serveId = req.params.id;
@@ -583,37 +670,63 @@ app.post("/restore_category_expenses/:id", (req, res) => {
 });
 
 // --- Add new expense subcategory ---
-app.post("/add_expenses_subcategory", (req, res) => {
+app.post("/add_expenses_subcategory", async (req, res) => {
   const { subcategory, created_by, status = "Active" } = req.body;
 
   if (!subcategory) {
-    return res
-      .status(400)
-      .json({ success: false, message: "SubCategory is required" });
+    return res.status(400).json({
+      success: false,
+      message: "SubCategory is required",
+    });
   }
 
-  const query =
-    "INSERT INTO expenses_subcategory_tbl (subcategory, created_by, status) VALUES (?, ?, ?)";
-  db.query(query, [subcategory, created_by, status], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err });
-    res.json({
+  try {
+    const query = `
+      INSERT INTO expenses_subcategory_tbl
+      (subcategory, created_by, status)
+      VALUES (?, ?, ?)
+    `;
+
+    const [result] = await db
+      .promise()
+      .query(query, [subcategory, created_by, status]);
+
+    return res.json({
       success: true,
       message: "Expense subcategory added",
       id: result.insertId,
     });
-  });
-});
+  } catch (error) {
+    console.error("Error adding subcategory:", error);
 
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
 // --- Get all expense subcategories ---
-app.get("/get_expenses_subcategories", (req, res) => {
-  const query =
-    "SELECT * FROM expenses_subcategory_tbl WHERE status='Active' AND status != 'deleted'";
-  db.query(query, (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err });
-    res.json(results);
-  });
-});
+app.get("/get_expenses_subcategories", async (req, res) => {
+  try {
+    const query = `
+      SELECT *
+      FROM expenses_subcategory_tbl
+      WHERE status = 'Active'
+        AND status != 'deleted'
+    `;
 
+    const [results] = await db.promise().query(query);
+
+    return res.json(results);
+  } catch (error) {
+    console.error("Error fetching subcategories:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
 app.delete("/subcategories_expenses_delete/:id", (req, res) => {
   const serveId = req.params.id;
 
@@ -1144,20 +1257,33 @@ app.get("/categories", (request, response) => {
   });
 });
 
-app.get("/get_categories", (req, res) => {
-  const sql =
-    "SELECT categories_id, categories_name, categories_img, description, status FROM categories_tbl WHERE status = 'active'"; // Filter categories with 'active' status
+app.get("/get_categories", async (req, res) => {
+  try {
+    const sql = `
+      SELECT
+        categories_id,
+        categories_name,
+        categories_img,
+        description,
+        status
+      FROM categories_tbl
+      WHERE status = 'active'
+    `;
 
-  db.query(sql, (error, data) => {
-    if (error) {
-      console.error("Error fetching categories:", error);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
+    const [data] = await db.promise().query(sql);
+
     console.log("Fetched active categories:", data);
-    return res.json(data); // Return fetched active categories
-  });
-});
 
+    return res.json(data);
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
+});
 app.delete("/categories/:id", (req, res) => {
   const serveId = req.params.id;
 
@@ -1848,58 +1974,71 @@ app.put("/update_supply/:supply_id", (req, res) => {
 // Get all categories
 
 // Insert category
-app.post("/add_supply_category", (req, res) => {
+app.post("/add_supply_category", async (req, res) => {
   const { supply_cat_name, created_by } = req.body;
 
-  const sql = `
-    INSERT INTO supply_categories (supply_cat_name, status, created_at, created_by)
-    VALUES (?,'Available', NOW(), ?)
-  `;
+  try {
+    const sql = `
+      INSERT INTO supply_categories
+      (
+        supply_cat_name,
+        status,
+        created_at,
+        created_by
+      )
+      VALUES (?, 'Available', NOW(), ?)
+    `;
 
-  db.query(sql, [supply_cat_name, created_by], (err, result) => {
-    if (err) {
-      console.error("Error inserting supply category:", err);
-      return res.status(500).json({ error: "Failed to add supply category" });
-    }
+    const [result] = await db
+      .promise()
+      .query(sql, [supply_cat_name, created_by]);
 
-    // Fetch the inserted row to return full data
     const fetchSql = `
-      SELECT cat_supply_id, supply_cat_name, created_at, status
+      SELECT
+        cat_supply_id,
+        supply_cat_name,
+        created_at,
+        status
       FROM supply_categories
       WHERE cat_supply_id = ?
     `;
-    db.query(fetchSql, [result.insertId], (err2, rows) => {
-      if (err2) {
-        console.error("Error fetching inserted row:", err2);
-        return res
-          .status(500)
-          .json({ error: "Failed to fetch inserted category" });
-      }
 
-      res.json(rows[0]); // return the full row
+    const [rows] = await db.promise().query(fetchSql, [result.insertId]);
+
+    return res.json(rows[0]);
+  } catch (error) {
+    console.error("Error adding supply category:", error);
+
+    return res.status(500).json({
+      error: "Failed to add supply category",
     });
-  });
+  }
 });
 
 // Get all categories
-app.get("/get_supply_categories", (req, res) => {
-  const sql = `
-    SELECT cat_supply_id, supply_cat_name, created_at, status
-    FROM supply_categories
-     WHERE status != 'deleted'      -- <--- ADD THIS LINE
-    ORDER BY cat_supply_id ASC
-  `;
+app.get("/get_supply_categories", async (req, res) => {
+  try {
+    const sql = `
+      SELECT
+        cat_supply_id,
+        supply_cat_name,
+        created_at,
+        status
+      FROM supply_categories
+      WHERE status != 'deleted'
+      ORDER BY cat_supply_id ASC
+    `;
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching supply categories:", err);
-      return res
-        .status(500)
-        .json({ error: "Failed to fetch supply categories" });
-    }
+    const [results] = await db.promise().query(sql);
 
-    res.json(results);
-  });
+    return res.json(results);
+  } catch (error) {
+    console.error("Error fetching supply categories:", error);
+
+    return res.status(500).json({
+      error: "Failed to fetch supply categories",
+    });
+  }
 });
 
 // Edit category
@@ -1907,7 +2046,7 @@ app.get("/get_supply_categories", (req, res) => {
 // ✅ Update supply category and sync changes to inventory_tbl + supply_tbl
 app.put("/update_supply_category/:id", (req, res) => {
   const { id } = req.params;
-  const { supply_cat_name, created_by } = req.body;
+  const { supply_cat_name, updated_by } = req.body;
 
   // ✅ Step 1: Get old category name first
   const getOldCategorySql = `
@@ -1931,11 +2070,11 @@ app.put("/update_supply_category/:id", (req, res) => {
     // ✅ Step 2: Update supply_categories
     const updateSql = `
       UPDATE supply_categories 
-      SET supply_cat_name = ?, created_by = ?
+      SET supply_cat_name = ?, updated_by = ?, updated_at = NOW()
       WHERE cat_supply_id = ?
     `;
 
-    db.query(updateSql, [supply_cat_name, created_by, id], (err2) => {
+    db.query(updateSql, [supply_cat_name, updated_by, id], (err2) => {
       if (err2) {
         console.error("❌ Error updating supply category:", err2);
         return res.status(500).json({ error: "Failed to update category" });
@@ -2043,6 +2182,63 @@ app.delete("/delete_supply/:supply_id", (req, res) => {
         .json({ success: false, message: "DB delete supply error" });
     }
     res.json({ success: true, message: "Supply deleted successfully" });
+  });
+});
+
+app.put("/update_expenses_category/:id", (req, res) => {
+  const { expenses_category_name, updated_by } = req.body;
+  const { id } = req.params;
+
+  const sql = `
+    UPDATE expenses_category_tbl
+    SET
+      category = ?,
+      updated_by = ?,
+      updated_at = NOW()
+    WHERE expenses_category_id = ?
+  `;
+
+  db.query(sql, [expenses_category_name, updated_by, id], (err, result) => {
+    if (err) {
+      console.error("Update Error:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Database error",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Expense category updated successfully",
+    });
+  });
+});
+app.put("/update_expenses_subcategory/:id", (req, res) => {
+  const { expenses_subcategory_name, updated_by } = req.body;
+  const { id } = req.params;
+
+  const sql = `
+    UPDATE expenses_subcategory_tbl
+    SET
+      subcategory = ?,
+      updated_by = ?,
+      updated_at = NOW()
+    WHERE expenses_subcategory_id = ?
+  `;
+
+  db.query(sql, [expenses_subcategory_name, updated_by, id], (err, result) => {
+    if (err) {
+      console.error("Update Error:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Database error",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Expense category updated successfully",
+    });
   });
 });
 
@@ -6123,44 +6319,58 @@ app.get("/get_client", (request, response) => {
 });
 
 // @ts-ignore
-app.get("/get_announcements_for_worker/:user_id", (req, res) => {
-  const { user_id } = req.params; // This is the worker's user_id
+app.get("/get_announcements_for_worker/:user_id", async (req, res) => {
+  const { user_id } = req.params;
 
   if (!user_id) {
-    return res.status(400).json({ error: "User ID is required" });
+    return res.status(400).json({
+      error: "User ID is required",
+    });
   }
 
-  // Make sure the user is a worker
-  const checkRoleSql = "SELECT role FROM user_tbl WHERE user_id = ?";
-  db.query(checkRoleSql, [user_id], (roleError, roleData) => {
-    if (roleError) {
-      console.error("Error checking user role:", roleError);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
+  try {
+    // Check if user is a worker
+    const checkRoleSql = `
+      SELECT role
+      FROM user_tbl
+      WHERE user_id = ?
+    `;
+
+    const [roleData] = await db.promise().query(checkRoleSql, [user_id]);
 
     if (roleData.length === 0 || roleData[0].role !== "worker") {
-      return res
-        .status(403)
-        .json({ error: "Access denied. Only workers can view announcements." });
+      return res.status(403).json({
+        error: "Access denied. Only workers can view announcements.",
+      });
     }
 
-    // Fetch the announcements for the worker
+    // Get announcements
     const sql = `
-      SELECT announcement_id, title, message, sender_id, recipient_id, created_at, status
+      SELECT
+        announcement_id,
+        title,
+        message,
+        sender_id,
+        recipient_id,
+        created_at,
+        status
       FROM announcement_tbl
       WHERE recipient_id = ?
-      ORDER BY created_at DESC`;
+      ORDER BY created_at DESC
+    `;
 
-    db.query(sql, [user_id], (error, data) => {
-      if (error) {
-        console.error("Error fetching announcements:", error);
-        return res.status(500).json({ error: "Internal Server Error" });
-      }
+    const [data] = await db.promise().query(sql, [user_id]);
 
-      console.log("Fetched announcements for worker:", user_id, data);
-      return res.json(data); // Send the announcements to the frontend
+    console.log("Fetched announcements for worker:", user_id, data);
+
+    return res.json(data);
+  } catch (error) {
+    console.error("Error fetching announcements:", error);
+
+    return res.status(500).json({
+      error: "Internal Server Error",
     });
-  });
+  }
 });
 // @ts-ignore
 app.post("/update_announcement_status", (req, res) => {

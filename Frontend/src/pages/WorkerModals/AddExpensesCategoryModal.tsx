@@ -37,10 +37,12 @@ const AddExpensesCategoryModal: React.FC<AddExpensesCategoryModalProps> = ({
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get(`${apiUrl}/get_expenses_categories`);
-      setExistingCategories(res.data);
-    } catch (err) {
-      console.error("Error fetching categories:", err);
+      const response = await axios.get(`${apiUrl}/get_expenses_categories`);
+
+      setExistingCategories(response.data);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+
       message.error("Failed to fetch existing categories.");
     }
   };
@@ -57,7 +59,7 @@ const AddExpensesCategoryModal: React.FC<AddExpensesCategoryModalProps> = ({
     const isDuplicate = existingCategories.some(
       (cat) =>
         cat.category.toLowerCase().trim() ===
-        values.category.toLowerCase().trim()
+        values.category.toLowerCase().trim(),
     );
 
     if (isDuplicate) {
@@ -66,7 +68,6 @@ const AddExpensesCategoryModal: React.FC<AddExpensesCategoryModalProps> = ({
     }
 
     try {
-      // ✅ Send plain JSON instead of FormData
       const response = await axios.post(`${apiUrl}/add_expenses_category`, {
         category: values.category,
         status: "Active",
@@ -74,13 +75,19 @@ const AddExpensesCategoryModal: React.FC<AddExpensesCategoryModalProps> = ({
       });
 
       if (response.data.success) {
-        message.success("Category added successfully!");
-        fetchCategories();
-        form.resetFields();
+        // Update parent immediately
         onFinish(response.data);
+
+        // Refresh local categories
+        await fetchCategories();
+
+        form.resetFields();
+
+        message.success("Category added successfully!");
       }
-    } catch (err) {
-      console.error("Error adding category:", err);
+    } catch (error) {
+      console.error("Error adding category:", error);
+
       message.error("Failed to add category. Try again.");
     }
   };
@@ -90,17 +97,17 @@ const AddExpensesCategoryModal: React.FC<AddExpensesCategoryModalProps> = ({
       existingCategories.some(
         (cat) =>
           cat.category.toLowerCase().trim() ===
-          values.category.toLowerCase().trim()
+          values.category.toLowerCase().trim(),
       ) ||
       queueList.some(
         (cat) =>
           cat.category.toLowerCase().trim() ===
-          values.category.toLowerCase().trim()
+          values.category.toLowerCase().trim(),
       );
 
     if (isDuplicate) {
       message.error(
-        `"${values.category}" already exists in DB or in your queue.`
+        `"${values.category}" already exists in DB or in your queue.`,
       );
       return;
     }
@@ -119,18 +126,35 @@ const AddExpensesCategoryModal: React.FC<AddExpensesCategoryModalProps> = ({
   // Insert all queued categories to DB
   const handleInsertAll = async () => {
     try {
+      const addedCategories = [];
+
       for (const item of queueList) {
-        await axios.post(`${apiUrl}/add_expenses_category`, {
+        const response = await axios.post(`${apiUrl}/add_expenses_category`, {
           category: item.category,
           status: "Active",
           created_by: user_id,
         });
+
+        if (response.data.success) {
+          addedCategories.push(response.data);
+        }
       }
-      message.success("All queued categories added successfully!");
+
+      // Update parent table just like Add One
+      for (const category of addedCategories) {
+        onFinish(category);
+      }
+
+      // Fetch latest data from database
+      await fetchCategories();
+
+      // Clear queue
       setQueueList([]);
-      fetchCategories();
-    } catch (err) {
-      console.error("Error inserting queued categories:", err);
+
+      message.success("All queued categories added successfully!");
+    } catch (error) {
+      console.error("Error inserting queued categories:", error);
+
       message.error("Failed to insert queued categories. Try again.");
     }
   };
@@ -150,6 +174,25 @@ const AddExpensesCategoryModal: React.FC<AddExpensesCategoryModalProps> = ({
       ),
     },
   ];
+  const handleAddOneClick = async () => {
+    try {
+      const values = await form.validateFields();
+
+      await handleAddOne(values);
+    } catch (error) {
+      // Validation error
+    }
+  };
+
+  const handleAddToListClick = async () => {
+    try {
+      const values = await form.validateFields();
+
+      handleAddToList(values);
+    } catch (error) {
+      // Validation error
+    }
+  };
 
   return (
     <Modal
@@ -173,27 +216,10 @@ const AddExpensesCategoryModal: React.FC<AddExpensesCategoryModalProps> = ({
             <Button onClick={handleCancel}>Cancel</Button>
           </Col>
           <Col>
-            <Button
-              onClick={() => {
-                form
-                  .validateFields()
-                  .then((values) => handleAddOne(values))
-                  .catch(() => {});
-              }}
-            >
-              Add One
-            </Button>
+            <Button onClick={handleAddOneClick}>Add One</Button>
           </Col>
           <Col>
-            <Button
-              type="primary"
-              onClick={() => {
-                form
-                  .validateFields()
-                  .then((values) => handleAddToList(values))
-                  .catch(() => {});
-              }}
-            >
+            <Button type="primary" onClick={handleAddToListClick}>
               Add to List
             </Button>
           </Col>

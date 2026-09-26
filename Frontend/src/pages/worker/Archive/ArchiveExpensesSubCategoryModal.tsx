@@ -29,34 +29,29 @@ const ArchiveExpensesSubCategoryModal = ({
   const apiUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
-    let isMounted = true;
+    if (!isArchivedModalVisible) return;
 
     const fetchUsedCategories = async () => {
       try {
+        setIsLoading(true);
+
         const response = await axios.get(
           `${apiUrl}/get_archive_expenses_subcategories`,
           {
             headers: { "Cache-Control": "no-cache" },
-          }
+          },
         );
-        if (isMounted) {
-          setUsedCategories(response.data);
-        }
+
+        setUsedCategories(response.data);
       } catch (error) {
         console.error("Error fetching used categories:", error);
       } finally {
-        if (isMounted) setIsLoading(false);
+        setIsLoading(false);
       }
     };
 
     fetchUsedCategories();
-    const interval = setInterval(fetchUsedCategories, 10000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [apiUrl]);
+  }, [apiUrl, isArchivedModalVisible]);
 
   const handleRestore = async (expenses_subcategory_id: number) => {
     Modal.confirm({
@@ -68,13 +63,14 @@ const ArchiveExpensesSubCategoryModal = ({
       onOk: async () => {
         try {
           await axios.post(
-            `${apiUrl}/restore_subcategory_expenses/${expenses_subcategory_id}`
+            `${apiUrl}/restore_subcategory_expenses/${expenses_subcategory_id}`,
           );
 
           setUsedCategories((prev) =>
             prev.filter(
-              (item) => item.expenses_subcategory_id !== expenses_subcategory_id
-            )
+              (item) =>
+                item.expenses_subcategory_id !== expenses_subcategory_id,
+            ),
           );
 
           // ✅ Notify parent to refresh main table

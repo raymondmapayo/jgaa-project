@@ -27,9 +27,13 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
   onAddCategory,
 }) => {
   const [form] = Form.useForm();
+
   const [categoryList, setCategoryList] = useState<any[]>([]);
   const [existingCategories, setExistingCategories] = useState<any[]>([]);
   const apiUrl = import.meta.env.VITE_API_URL;
+  const [isAddingToList, setIsAddingToList] = useState(false);
+  const [isInsertingSingle, setIsInsertingSingle] = useState(false);
+  const [isInsertingAll, setIsInsertingAll] = useState(false);
   // Fetch existing categories when modal opens
   useEffect(() => {
     if (isAddModalVisible) {
@@ -58,6 +62,10 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
 
   // Add one to list (not inserted yet)
   const handleAddToTable = async () => {
+    if (isAddingToList || isInsertingSingle || isInsertingAll) return;
+
+    setIsAddingToList(true);
+
     try {
       const values = await form.validateFields();
 
@@ -69,17 +77,16 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
         return;
       }
 
-      // ✅ Check duplicate (DB + queue)
       const isDuplicate =
         existingCategories.some(
           (cat: any) =>
             cat.categories_name.toLowerCase().trim() ===
-            values.categories_name.toLowerCase().trim()
+            values.categories_name.toLowerCase().trim(),
         ) ||
         categoryList.some(
           (cat) =>
             cat.categories_name.toLowerCase().trim() ===
-            values.categories_name.toLowerCase().trim()
+            values.categories_name.toLowerCase().trim(),
         );
 
       if (isDuplicate) {
@@ -95,17 +102,24 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
         description: values.description,
         categories_img: values.categories_img.fileList[0],
       };
+
       setCategoryList((prev) => [...prev, newCategory]);
       form.resetFields();
     } catch (err) {
       console.log("Validation failed:", err);
+    } finally {
+      setIsAddingToList(false);
     }
   };
-
   // Insert only one immediately
   const handleInsertSingle = async () => {
+    if (isAddingToList || isInsertingSingle || isInsertingAll) return;
+
+    setIsInsertingSingle(true);
+
     try {
       const values = await form.validateFields();
+
       if (!values.categories_img?.fileList?.[0]) {
         notification.error({
           message: "Error",
@@ -115,35 +129,43 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
       }
 
       const formData = new FormData();
+
       formData.append("categories_name", values.categories_name);
       formData.append("description", values.description || "");
+
       formData.append(
         "categories_img",
-        values.categories_img.fileList[0].originFileObj
+        values.categories_img.fileList[0].originFileObj,
       );
 
       const response = await axios.post(`${apiUrl}/add_categories`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
-      onAddCategory(response.data);
+      if (response.data.success) {
+        onAddCategory(response.data.data);
 
-      notification.success({
-        message: "Category Added",
-        description: "The category has been added successfully!",
-      });
+        notification.success({
+          message: "Category Added",
+          description: "The category has been added successfully!",
+        });
 
-      form.resetFields();
-      handleCancel(); // close modal after single insert
+        form.resetFields();
+        handleCancel();
+      }
     } catch (error) {
       console.error("Error adding category:", error);
+
       notification.error({
         message: "Error",
         description: "Failed to add category. Please try again later.",
       });
+    } finally {
+      setIsInsertingSingle(false);
     }
   };
-
   // Delete row from list
   const handleDeleteRow = (index: number) => {
     setCategoryList((prev) => prev.filter((_, i) => i !== index));
@@ -151,6 +173,8 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
 
   // Insert all from list
   const handleInsertAll = async () => {
+    if (isAddingToList || isInsertingSingle || isInsertingAll) return;
+
     if (categoryList.length === 0) {
       notification.error({
         message: "Error",
@@ -159,9 +183,12 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
       return;
     }
 
+    setIsInsertingAll(true);
+
     try {
       for (const cat of categoryList) {
         const formData = new FormData();
+
         formData.append("categories_name", cat.categories_name);
         formData.append("description", cat.description || "");
         formData.append("categories_img", cat.categories_img.originFileObj);
@@ -169,10 +196,16 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
         const response = await axios.post(
           `${apiUrl}/add_categories`,
           formData,
-          { headers: { "Content-Type": "multipart/form-data" } }
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          },
         );
 
-        onAddCategory(response.data);
+        if (response.data.success) {
+          onAddCategory(response.data.data);
+        }
       }
 
       notification.success({
@@ -185,10 +218,13 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
       onClose();
     } catch (error) {
       console.error("Error adding categories:", error);
+
       notification.error({
         message: "Error",
         description: "Failed to add categories. Please try again later.",
       });
+    } finally {
+      setIsInsertingAll(false);
     }
   };
 
@@ -298,13 +334,23 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
         {/* Buttons side by side */}
         <Row justify="end" gutter={16}>
           <Col>
-            <Button onClick={handleAddToTable} type="dashed">
-              Add to List
+            <Button
+              onClick={handleAddToTable}
+              type="dashed"
+              loading={isAddingToList}
+              disabled={isInsertingSingle || isInsertingAll}
+            >
+              {isAddingToList ? "Adding..." : "Add to List"}
             </Button>
           </Col>
           <Col>
-            <Button type="primary" onClick={handleInsertSingle}>
-              Insert Now
+            <Button
+              type="primary"
+              onClick={handleInsertSingle}
+              loading={isInsertingSingle}
+              disabled={isAddingToList || isInsertingAll}
+            >
+              {isInsertingSingle ? "Inserting..." : "Insert Now"}
             </Button>
           </Col>
         </Row>
@@ -329,8 +375,13 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
               <Button onClick={handleCancel}>Cancel</Button>
             </Col>
             <Col>
-              <Button type="primary" onClick={handleInsertAll}>
-                Insert All
+              <Button
+                type="primary"
+                onClick={handleInsertAll}
+                loading={isInsertingAll}
+                disabled={isAddingToList || isInsertingSingle}
+              >
+                {isInsertingAll ? "Inserting All..." : "Insert All"}
               </Button>
             </Col>
           </Row>
