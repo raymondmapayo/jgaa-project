@@ -67,8 +67,8 @@ const ChatWindow = ({
                   selectedUser.profile_pic?.startsWith("http")
                     ? selectedUser.profile_pic
                     : selectedUser.profile_pic
-                    ? `${apiUrl}/uploads/images/${selectedUser.profile_pic}`
-                    : "/avatar.jpg"
+                      ? `${apiUrl}/uploads/images/${selectedUser.profile_pic}`
+                      : "/avatar.jpg"
                 }
                 className="w-10 h-10 rounded-full"
               />
@@ -81,10 +81,10 @@ const ChatWindow = ({
                   {selectedUser.user_login_time
                     ? "Active" // user is currently logged in
                     : selectedUser.last_active_time
-                    ? `Active ${formatRelativeTime(
-                        selectedUser.last_active_time
-                      )}`
-                    : "No activity"}
+                      ? `Active ${formatRelativeTime(
+                          selectedUser.last_active_time,
+                        )}`
+                      : "No activity"}
                 </span>
               </div>
             </>
@@ -118,8 +118,8 @@ const ChatWindow = ({
                     selectedWorker.profile_pic?.startsWith("http")
                       ? selectedWorker.profile_pic
                       : selectedWorker.profile_pic
-                      ? `${apiUrl}/uploads/images/${selectedWorker.profile_pic}`
-                      : "/avatar.jpg"
+                        ? `${apiUrl}/uploads/images/${selectedWorker.profile_pic}`
+                        : "/avatar.jpg"
                   }
                   alt="worker-avatar"
                   className="w-6 h-6 rounded-full mr-2"
@@ -131,8 +131,8 @@ const ChatWindow = ({
                     selectedUser.profile_pic?.startsWith("http")
                       ? selectedUser.profile_pic
                       : selectedUser.profile_pic
-                      ? `${apiUrl}/uploads/images/${selectedUser.profile_pic}`
-                      : "/avatar.jpg"
+                        ? `${apiUrl}/uploads/images/${selectedUser.profile_pic}`
+                        : "/avatar.jpg"
                   }
                   alt="user-avatar"
                   className="w-6 h-6 rounded-full mr-2"

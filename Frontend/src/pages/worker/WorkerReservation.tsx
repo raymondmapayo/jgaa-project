@@ -78,8 +78,8 @@ const StyledTable = styled(Table)`
 
   .ant-table-content {
     width: 100%;
-    min-width: 0 !important; /* allow table to shrink */
-    overflow-x: auto; /* horizontal scroll only if needed */
+    min-width: 0 !important;
+    overflow-x: auto;
   }
 
   .ant-table-thead > tr > th {
@@ -123,41 +123,41 @@ const ActionButton = styled(Button)`
 interface Reservation {
   reservation_id: number;
   user_id: number;
+
   full_name: string;
   email: string;
   pnum: string;
-  table_ids: string;
+
   reservation_date: string;
   reservation_time: string;
+  num_of_people: number;
+  status: string;
+  payment_status: string;
   table_status: string;
-}
-
-interface Client {
-  user_id: number;
-  full_name: string;
-  email: string;
-  pnum: string;
+  special_request: string;
+  reservation_type: string;
+  reservation_status: string;
 }
 
 // ====================== Component ======================
 const WorkerReservation = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isArchivedModalVisible, setIsArchivedModalVisible] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [currentReservation, setCurrentReservation] =
     useState<Reservation | null>(null);
-  const [currentClient, setCurrentClient] = useState<Client | null>(null);
-  // In WorkerReservation component
+
   const [reservationEnabled, setReservationEnabled] = useState<boolean>(false);
-  const [canceledModalVisible, setCanceledModalVisible] = useState(false); // ✅ added
+
+  const [canceledModalVisible, setCanceledModalVisible] = useState(false);
+
   const apiUrl = import.meta.env.VITE_API_URL;
 
   const handleEditReservation = (record: Reservation) => {
     setCurrentReservation(record);
-    setCanceledModalVisible(true); // ✅ open canceled modal
+    setCanceledModalVisible(true);
   };
 
   useEffect(() => {
@@ -165,7 +165,9 @@ const WorkerReservation = () => {
       try {
         const res = await axios.get(`${apiUrl}/get_reservation_status`);
         const status = res.data?.reservation_enabled === 1;
+
         setReservationEnabled(status);
+
         console.log("🔁 Current reservation status:", status);
       } catch (error) {
         console.error("❌ Failed to fetch reservation status:", error);
@@ -175,41 +177,38 @@ const WorkerReservation = () => {
     fetchReservationStatus();
   }, [apiUrl]);
 
-  const fetchData = async () => {
+  const fetchReservations = async (showLoading = true) => {
     try {
-      const [resReservations, resClients] = await Promise.all([
-        axios.get(`${apiUrl}/get_reservation`), // ✅ backend already auto-updates
-        axios.get(`${apiUrl}/get_clients`),
-      ]);
+      if (showLoading) setIsLoading(true);
 
-      setReservations(resReservations.data);
-      setClients(resClients.data);
+      const response = await axios.get(`${apiUrl}/get_reservation`);
+      setReservations(response.data);
     } catch (error) {
-      console.error("❌ Fetch error:", error);
+      console.error("❌ Failed to fetch reservations:", error);
+      message.error("Failed to load reservations.");
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   };
 
-  // =======================
-  // LOAD DATA ONCE
-  // =======================
   useEffect(() => {
-    fetchData();
+    fetchReservations();
+
+    // fetch balik inig balik sa tab (walay interval)
+    const onFocus = () => fetchReservations(false);
+    window.addEventListener("focus", onFocus);
+
+    return () => window.removeEventListener("focus", onFocus);
   }, [apiUrl]);
 
   // ✅ Toggle reservation status
   const handleToggleReservation = async (checked: boolean) => {
     try {
-      setReservationEnabled(checked);
-
       await axios.put(`${apiUrl}/update_reservation_status`, {
         reservation_enabled: checked ? 1 : 0,
       });
 
-      // 🔥 re-sync with backend
-      const res = await axios.get(`${apiUrl}/get_reservation_status`);
-      setReservationEnabled(res.data.reservation_enabled === 1);
+      setReservationEnabled(checked);
 
       message.success(
         checked
@@ -217,33 +216,38 @@ const WorkerReservation = () => {
           : "🚫 Online reservations have been disabled.",
       );
     } catch (error) {
-      console.error(error);
+      console.error("Error updating reservation status:", error);
+
       message.error("Failed to update reservation status.");
     }
   };
 
-  const handleDeleteReservation = (reservation_id: number) => {
+  const handleDeleteReservation = async (reservation_id: number) => {
     const reservation = reservations.find(
       (r) => r.reservation_id === reservation_id,
     );
+
     if (!reservation) return;
-    axios
-      .delete(
+
+    try {
+      await axios.delete(
         `${apiUrl}/delete_reservation/${reservation.user_id}/${reservation_id}`,
-      )
-      .then(() => {
-        setReservations((prev) =>
-          prev.filter((r) => r.reservation_id !== reservation_id),
-        );
-        Swal.fire("Deleted!", "The reservation has been deleted.", "success");
-      })
-      .catch(() =>
-        Swal.fire("Error", "Failed to delete reservation.", "error"),
       );
+
+      setReservations((prev) =>
+        prev.filter((r) => r.reservation_id !== reservation_id),
+      );
+
+      Swal.fire("Deleted!", "The reservation has been deleted.", "success");
+    } catch (error) {
+      console.error("Error deleting reservation:", error);
+
+      Swal.fire("Error", "Failed to delete reservation.", "error");
+    }
   };
 
-  const confirmDelete = (reservation_id: number) => {
-    Swal.fire({
+  const confirmDelete = async (reservation_id: number) => {
+    const result = await Swal.fire({
       title: "Are you sure?",
       text: "This action is permanent and cannot be undone.",
       icon: "warning",
@@ -252,15 +256,15 @@ const WorkerReservation = () => {
       cancelButtonColor: "#3085d6",
       confirmButtonText: "Yes, delete it!",
       cancelButtonText: "Cancel",
-    }).then((result) => {
-      if (result.isConfirmed) handleDeleteReservation(reservation_id);
     });
+
+    if (result.isConfirmed) {
+      await handleDeleteReservation(reservation_id);
+    }
   };
 
   const handleRowClick = (record: Reservation) => {
     setCurrentReservation(record);
-    const client = clients.find((c) => c.user_id === record.user_id) || null;
-    setCurrentClient(client);
     setModalVisible(true);
   };
 
@@ -272,10 +276,31 @@ const WorkerReservation = () => {
       render: (_: any, record: any) =>
         `R${record.reservation_id.toString().padStart(3, "0")}`,
     },
-    { title: "Name", dataIndex: "full_name", key: "full_name" },
-    { title: "Email", dataIndex: "email", key: "email" },
-    { title: "Phone", dataIndex: "pnum", key: "pnum" },
-    { title: "Table", dataIndex: "table_ids", key: "table_ids" },
+
+    {
+      title: "Name",
+      dataIndex: "full_name",
+      key: "full_name",
+    },
+
+    {
+      title: "Email",
+      dataIndex: "email",
+      key: "email",
+    },
+
+    {
+      title: "Phone",
+      dataIndex: "pnum",
+      key: "pnum",
+    },
+
+    {
+      title: "Table",
+      dataIndex: "table_ids",
+      key: "table_ids",
+    },
+
     {
       title: "Date",
       dataIndex: "reservation_date",
@@ -283,6 +308,7 @@ const WorkerReservation = () => {
       render: (_: any, record: any) =>
         dayjs(record.reservation_date).format("YYYY-MM-DD"),
     },
+
     {
       title: "Time",
       dataIndex: "reservation_time",
@@ -290,24 +316,29 @@ const WorkerReservation = () => {
       render: (_: any, record: any) =>
         dayjs(record.reservation_time, "HH:mm:ss").format("h:mm A"),
     },
+
     {
       title: "Status",
       dataIndex: "table_status",
       key: "table_status",
       render: (status: string) => {
         let color = "";
+
         switch (status) {
           case "Reserved":
-            color = "orange"; // Reserved → Orange
+            color = "orange";
             break;
+
           case "Canceled":
-            color = "red"; // Canceled → Red
+            color = "red";
             break;
+
           case "Completed":
-            color = "green"; // Completed → Green
+            color = "green";
             break;
+
           default:
-            color = "default"; // fallback color
+            color = "default";
         }
 
         return <Badge color={color} text={status} />;
@@ -326,13 +357,15 @@ const WorkerReservation = () => {
               onClick={() => handleRowClick(record)}
             />
           </Tooltip>
+
           <Tooltip title="Edit Reservation">
             <ActionButton
               type="primary"
               icon={<EditOutlined />}
-              onClick={() => handleEditReservation(record)} // ✅ opens canceled modal
+              onClick={() => handleEditReservation(record)}
             />
           </Tooltip>
+
           <Tooltip title="Delete Reservation">
             <ActionButton
               type="primary"
@@ -350,6 +383,7 @@ const WorkerReservation = () => {
     <StyledContainer>
       <div className="mb-6">
         <h2 className="text-xl font-bold">Reservations</h2>
+
         <p className="text-gray-500 text-sm">Manage and track reservations</p>
       </div>
 
@@ -369,6 +403,7 @@ const WorkerReservation = () => {
             <span className="font-semibold text-gray-700 whitespace-nowrap">
               Online Reservation:
             </span>
+
             <Switch
               checkedChildren="Enabled"
               unCheckedChildren="Disabled"
@@ -381,6 +416,7 @@ const WorkerReservation = () => {
             overlay={
               <Menu>
                 <Menu.Item key="1">Sort by Date</Menu.Item>
+
                 <Menu.Item key="2">Sort by Status</Menu.Item>
               </Menu>
             }
@@ -390,7 +426,6 @@ const WorkerReservation = () => {
           </Dropdown>
 
           {/* 🗂️ Archive Button */}
-          {/* Archived */}
           <Button
             className="bg-red-500 text-[#fafafa] hover:bg-red-600 focus:ring-4 focus:ring-red-300 rounded-md w-full sm:w-[170px]"
             icon={<FolderOutlined />}
@@ -411,7 +446,10 @@ const WorkerReservation = () => {
         )}
         columns={columns}
         rowKey="reservation_id"
-        pagination={{ pageSize: 5, showSizeChanger: false }}
+        pagination={{
+          pageSize: 5,
+          showSizeChanger: false,
+        }}
         loading={isLoading}
         scroll={{ x: true }}
       />
@@ -419,7 +457,6 @@ const WorkerReservation = () => {
       <WorkerReservationModal
         visible={modalVisible}
         reservation={currentReservation}
-        client={currentClient}
         apiUrl={apiUrl}
         onClose={() => setModalVisible(false)}
       />
@@ -428,7 +465,6 @@ const WorkerReservation = () => {
       <ArchiveReservationModal
         isArchivedModalVisible={isArchivedModalVisible}
         onClose={() => setIsArchivedModalVisible(false)}
-        onRestore={() => fetchData()} // Add this callback
       />
 
       <ReservationCanceledModal
@@ -439,7 +475,7 @@ const WorkerReservation = () => {
           setReservations((prev) =>
             prev.map((r) =>
               r.reservation_id === updated.reservation_id
-                ? { ...r, ...updated } // ✅ merge with existing reservation
+                ? { ...r, ...updated }
                 : r,
             ),
           );

@@ -12,7 +12,7 @@ import type { CheckboxChangeEvent } from "antd/es/checkbox";
 import axios from "axios";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-
+const apiUrl = import.meta.env.VITE_API_URL;
 type Worker = {
   id: string;
   name: string;
@@ -238,12 +238,14 @@ const AdminAnnouncement: React.FC<AdminAnnouncementProps> = ({
 
     try {
       const response = await axios.post(
-        "http://localhost:8081/send_announcement_to_worker",
+        `${apiUrl}/send_announcement_to_worker`,
         announcementData,
       );
-      const newAnnouncement = response.data; // this should be the created announcement
 
-      onNewAnnouncement?.(newAnnouncement); // <-- this updates the list & badge immediately
+      const newAnnouncement = response.data;
+
+      onNewAnnouncement?.(newAnnouncement);
+
       socket.current.emit("send_announcement", announcementData);
 
       notification.open({
@@ -255,7 +257,11 @@ const AdminAnnouncement: React.FC<AdminAnnouncementProps> = ({
       });
 
       setTimeout(() => {
-        setFormData({ title: "", message: "", audience: "all" });
+        setFormData({
+          title: "",
+          message: "",
+          audience: "all",
+        });
         setSelectedWorkerIds([]);
       }, 3000);
     } catch (error: any) {

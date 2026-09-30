@@ -16,6 +16,7 @@ const Login = () => {
   const [isChecked, setIsChecked] = useState(false); // Track checkbox state
   const [isForgotPasswordVisible, setIsForgotPasswordVisible] = useState(false);
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
   const onFinish = async (values: T_LoginPayload) => {
     // Check if the checkbox is checked
@@ -23,8 +24,13 @@ const Login = () => {
       message.error(
         "You must agree to the Terms of Service and Privacy Policy to proceed.",
       );
-      return; // Prevent form submission
+      return;
     }
+
+    if (isLoading) return;
+
+    setIsLoading(true);
+
     try {
       const response = await axios.post<T_LoginResponse>(
         `${apiUrl}/login`,
@@ -37,23 +43,22 @@ const Login = () => {
         if (
           !user ||
           !user.fname ||
-          !user.lname || // Check for last name
+          !user.lname ||
           !user.email ||
           !user.role ||
           !user.user_id ||
-          !user.pnum || // Ensure pnum is not null or empty
-          user.pnum.trim() === "" || // Additional check to make sure pnum is not empty
-          user.lname.trim() === "" // Additional check to make sure lname is not empty
+          !user.pnum ||
+          user.pnum.trim() === "" ||
+          user.lname.trim() === ""
         ) {
           console.error("Missing user data in response:", response.data);
           alert("Login failed: Missing user data.");
           return;
         }
 
-        // ✅ Log user data to console
         console.log("Logged in user:", user);
-        console.log("Phone number:", user.pnum); // Log the phone number separately
-        console.log("Full name:", user.fname, user.lname); // Log full name
+        console.log("Phone number:", user.pnum);
+        console.log("Full name:", user.fname, user.lname);
 
         if (user.role === "admin") {
           saveadminInfo(user);
@@ -63,7 +68,6 @@ const Login = () => {
           saveworkerInfo(user);
         }
 
-        // ✅ Store authentication status, JWT, and user details
         sessionStorage.setItem("isAuthenticated", "true");
         sessionStorage.setItem("token", token);
         sessionStorage.setItem("userRole", user.role);
@@ -71,9 +75,8 @@ const Login = () => {
         sessionStorage.setItem("email", user.email);
         sessionStorage.setItem("phone", user.pnum);
         sessionStorage.setItem("lname", user.lname);
-        sessionStorage.setItem("user_id", user.user_id.toString()); // ✅ Save user_id as string
+        sessionStorage.setItem("user_id", user.user_id.toString());
 
-        // ✅ Redirect based on role
         if (user.role === "admin") {
           navigate("/Admin/Dashboard");
         } else if (user.role === "worker") {
@@ -89,6 +92,8 @@ const Login = () => {
     } catch (error) {
       console.error("Login error:", error);
       alert("Login failed. Check API response.");
+    } finally {
+      setIsLoading(false);
     }
   };
   return (
@@ -238,9 +243,9 @@ const Login = () => {
                 size="large"
                 className="text-xl h-14 rounded-lg shadow-md"
                 htmlType="submit"
-                disabled={!isChecked}
+                disabled={!isChecked || isLoading}
               >
-                Sign In
+                {isLoading ? "⟳  Signing In..." : "Sign In"}
               </Button>
             </Form.Item>
 

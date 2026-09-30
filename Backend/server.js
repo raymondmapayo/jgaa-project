@@ -2246,31 +2246,27 @@ app.put("/update_expenses_subcategory/:id", (req, res) => {
 
 //==========================  LOGIN COMPONENTS ============================
 // User Login Route
-app.post("/login", (req, res) => {
+app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   console.log("Login Request Received:", { email, password });
 
-  // Hash the input password before comparing
-  const hashedPassword = crypto
-    .createHash("sha256")
-    .update(password)
-    .digest("hex");
+  try {
+    // Hash the input password before comparing
+    const hashedPassword = crypto
+      .createHash("sha256")
+      .update(password)
+      .digest("hex");
 
-  // Query database for user
-  const sql = "SELECT * FROM user_tbl WHERE email = ?";
-  db.query(sql, [email], (error, results) => {
-    if (error) {
-      console.error("Database error:", error);
-      return res
-        .status(500)
-        .json({ success: false, message: "Database error" });
-    }
+    // Query database for user
+    const sql = "SELECT * FROM user_tbl WHERE email = ?";
+    const [results] = await db.promise().query(sql, [email]);
 
     if (results.length === 0) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid email or password" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
     }
 
     const user = results[0];
@@ -2279,46 +2275,54 @@ app.post("/login", (req, res) => {
 
     // Compare hashed password
     if (hashedPassword !== user.password) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid email or password" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
     }
 
-    // Check if account is active (if email is verified)
+    // Check if account is active
     if (user.status !== "active") {
       return res.status(403).json({
         success: false,
         message: "Please verify your email account in your email inbox",
       });
     }
-    // Set user_login_time
-    const updateLoginSql = `
-  UPDATE user_tbl 
-  SET user_login_time = NOW(),
-      last_active_time = NOW()
-  WHERE user_id = ?
-`;
-    db.query(updateLoginSql, [user.user_id], (err) => {
-      if (err) console.error("Error updating login times:", err);
-    });
 
-    // Debug JWT_SECRET
+    // Check JWT secret before generating token
     console.log("JWT Secret:", process.env.JWT_SECRET);
 
-    // Generate JWT token
     if (!process.env.JWT_SECRET) {
-      return res
-        .status(500)
-        .json({ success: false, message: "JWT secret is not defined" });
+      return res.status(500).json({
+        success: false,
+        message: "JWT secret is not defined",
+      });
     }
 
+    // Update login times
+    const updateLoginSql = `
+      UPDATE user_tbl
+      SET user_login_time = NOW(),
+          last_active_time = NOW()
+      WHERE user_id = ?
+    `;
+
+    await db.promise().query(updateLoginSql, [user.user_id]);
+
+    // Generate JWT token
     const token = jwt.sign(
-      { user_id: user.user_id, role: user.role },
+      {
+        user_id: user.user_id,
+        role: user.role,
+      },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" },
+      {
+        expiresIn: "1h",
+      },
     );
 
-    res.json({
+    // Send response
+    return res.json({
       success: true,
       message: "Login successful",
       user: {
@@ -2331,7 +2335,14 @@ app.post("/login", (req, res) => {
       },
       token,
     });
-  });
+  } catch (error) {
+    console.error("Login Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
 });
 // Node.js / Express
 
@@ -2600,83 +2611,128 @@ app.post("/register", async (req, res) => {
 });
 
 // ==================== Forgot Password ====================
-app.post("/forgot_password", (req, res) => {
+app.post("/forgot_password", async (req, res) => {
   const { email } = req.body;
 
-  const sql = "SELECT * FROM user_tbl WHERE email = ?";
-  db.query(sql, [email], async (err, results) => {
-    if (err) return res.status(500).json({ message: "DB error" });
-    if (results.length === 0)
-      return res.status(404).json({ message: "User not found" });
+  try {
+    // Find user by email
+    const sql = "SELECT * FROM user_tbl WHERE email = ?";
+    const [results] = await db.promise().query(sql, [email]);
+
+    if (results.length === 0) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
 
     const user = results[0];
+
+    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetExpiry = new Date(Date.now() + 3600 * 1000); // 1 hour
 
-    const updateSql =
-      "UPDATE user_tbl SET reset_token = ?, reset_expiry = ? WHERE user_id = ?";
-    db.query(
-      updateSql,
-      [resetToken, resetExpiry, user.user_id],
-      async (err2) => {
-        if (err2) return res.status(500).json({ message: "DB update error" });
+    // Token expires after 1 hour
+    const resetExpiry = new Date(Date.now() + 3600 * 1000);
 
-        const resetUrl = `https://jgaa-project.vercel.app/reset-password/${resetToken}`;
-        try {
-          await sendResetEmail(user, resetUrl);
-          return res.json({ success: true, message: "Reset email sent!" });
-        } catch (emailErr) {
-          console.error("Email error:", emailErr);
-          return res
-            .status(500)
-            .json({ message: "Failed to send reset email" });
-        }
-      },
-    );
-  });
+    // Save reset token and expiry
+    const updateSql = `
+      UPDATE user_tbl
+      SET reset_token = ?,
+          reset_expiry = ?
+      WHERE user_id = ?
+    `;
+
+    await db
+      .promise()
+      .query(updateSql, [resetToken, resetExpiry, user.user_id]);
+
+    // Create reset URL
+    const resetUrl = `https://jgaa-project.vercel.app/reset-password/${resetToken}`;
+
+    // Send reset email
+    await sendResetEmail(user, resetUrl);
+
+    return res.json({
+      success: true,
+      message: "Reset email sent!",
+    });
+  } catch (error) {
+    console.error("Forgot Password Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to process forgot password request",
+    });
+  }
 });
-
 // ==================== Reset Password ====================
-app.post("/reset-password/:token", (req, res) => {
+app.post("/reset-password/:token", async (req, res) => {
   const { token } = req.params;
   const { password } = req.body;
 
-  if (!password)
-    return res.status(400).json({ message: "Password is required" });
+  if (!password) {
+    return res.status(400).json({
+      message: "Password is required",
+    });
+  }
 
-  const sql =
-    "SELECT * FROM user_tbl WHERE reset_token = ? AND reset_expiry > NOW()";
-  db.query(sql, [token], (err, results) => {
-    if (err) return res.status(500).json({ message: "DB error" });
-    if (results.length === 0)
-      return res.status(400).json({ message: "Invalid or expired token" });
+  try {
+    // Check if reset token is valid and not expired
+    const sql = `
+      SELECT * 
+      FROM user_tbl 
+      WHERE reset_token = ?
+        AND reset_expiry > NOW()
+    `;
 
-    try {
-      const hashedPassword = crypto
-        .createHash("sha256")
-        .update(password)
-        .digest("hex");
-      const updateSql =
-        "UPDATE user_tbl SET password = ?, reset_token = NULL, reset_expiry = NULL WHERE reset_token = ?";
-      db.query(updateSql, [hashedPassword, token], (err2) => {
-        if (err2)
-          return res.status(500).json({ message: "Failed to reset password" });
-        return res.json({ message: "Password reset successful!" });
+    const [results] = await db.promise().query(sql, [token]);
+
+    if (results.length === 0) {
+      return res.status(400).json({
+        message: "Invalid or expired token",
       });
-    } catch (hashErr) {
-      return res.status(500).json({ message: "Password hashing failed" });
     }
-  });
+
+    // Hash the new password
+    const hashedPassword = crypto
+      .createHash("sha256")
+      .update(password)
+      .digest("hex");
+
+    // Update password and clear reset token
+    const updateSql = `
+      UPDATE user_tbl
+      SET password = ?,
+          reset_token = NULL,
+          reset_expiry = NULL
+      WHERE reset_token = ?
+    `;
+
+    await db.promise().query(updateSql, [hashedPassword, token]);
+
+    return res.json({
+      success: true,
+      message: "Password reset successful!",
+    });
+  } catch (error) {
+    console.error("Reset Password Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to reset password",
+    });
+  }
 });
 // Update Password Route (using app.put directly)
 // @ts-ignore
 // Update Password Route (app.put)
-app.put("/update_password/:id", (req, res) => {
-  const { password } = req.body; // New password from the request body
-  const userId = req.params.id; // User ID from the URL parameter
+app.put("/update_password/:id", async (req, res) => {
+  const { password } = req.body;
+  const userId = req.params.id;
 
   if (!password) {
-    return res.status(400).json({ message: "Password is required" });
+    return res.status(400).json({
+      message: "Password is required",
+    });
   }
 
   try {
@@ -2686,61 +2742,78 @@ app.put("/update_password/:id", (req, res) => {
       .update(password)
       .digest("hex");
 
-    // SQL query to update the user's password in the database
-    const sql = "UPDATE user_tbl SET password = ? WHERE user_id = ?";
+    // Update user's password
+    const sql = `
+      UPDATE user_tbl
+      SET password = ?
+      WHERE user_id = ?
+    `;
 
-    db.query(sql, [hashedPassword, userId], (error, result) => {
-      if (error) {
-        console.error("Error updating password:", error);
-        return res.status(500).json({ error: "Internal Server Error" });
-      }
+    const [result] = await db.promise().query(sql, [hashedPassword, userId]);
 
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "User not found" });
-      }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
 
-      return res
-        .status(200)
-        .json({ message: "Password updated successfully!" });
+    return res.status(200).json({
+      success: true,
+      message: "Password updated successfully!",
     });
   } catch (error) {
-    console.error("Error hashing password:", error);
-    return res.status(500).json({ message: "Error updating password" });
+    console.error("Error updating password:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error updating password",
+    });
   }
 });
 
 // Fetch user details based on user_id
 
-app.get("/user_details/:user_id", (req, res) => {
+app.get("/user_details/:user_id", async (req, res) => {
   const userId = req.params.user_id;
 
-  // Log the received user_id to verify it's correct
-  console.log("Received user_id:", userId); // Log user_id for debugging
+  // Log the received user_id
+  console.log("Received user_id:", userId);
 
-  // SQL query to fetch the user details
-  const sql =
-    "SELECT user_id,notes, city, country, fname, lname, pnum, email FROM user_tbl WHERE user_id = ?";
+  try {
+    // Fetch user details
+    const sql = `
+      SELECT 
+        user_id,
+        notes,
+        city,
+        country,
+        fname,
+        lname,
+        pnum,
+        email
+      FROM user_tbl
+      WHERE user_id = ?
+    `;
 
-  db.query(sql, [userId], (error, results) => {
-    if (error) {
-      console.error("Error fetching user details:", error);
-      return res
-        .status(500)
-        .json({ success: false, message: "Error fetching user details" });
-    }
+    const [results] = await db.promise().query(sql, [userId]);
 
-    // Log the query result for debugging
-    console.log("Query results:", results); // Log the result for debugging
+    // Log query result
+    console.log("Query results:", results);
 
+    // Check if user exists
     if (results.length === 0) {
-      console.log("No user found with user_id:", userId); // Log if no user is found
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      console.log("No user found with user_id:", userId);
+
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
-    // If the user is found, format the response data
+    // Get first user
     const user = results[0];
+
+    // Format response data
     const responseData = {
       fname: user.fname || "",
       lname: user.lname || "",
@@ -2751,98 +2824,143 @@ app.get("/user_details/:user_id", (req, res) => {
       city: user.city || "",
     };
 
-    // Log the final response data for debugging
+    // Log final response
     console.log("Returning user details:", responseData);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      data: responseData, // Send the formatted user data
+      data: responseData,
     });
-  });
+  } catch (error) {
+    console.error("Error fetching user details:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching user details",
+    });
+  }
 });
 
 // @ts-ignore
-app.put("/update_save_billing_details/:id", (req, res) => {
-  const user_id = req.params.id; // Get the user ID from the URL parameter
-  const { city, country, notes } = req.body; // Extract city, country, and notes from the request body
+app.put("/update_save_billing_details/:id", async (req, res) => {
+  const user_id = req.params.id;
+  const { city, country, notes } = req.body;
 
-  console.log("Received request to update user:", user_id); // Log the user_id for debugging
-  console.log("Data to update:", { city, country, notes }); // Log the data being sent in the request
+  console.log("Received request to update user:", user_id);
+  console.log("Data to update:", { city, country, notes });
 
   if (!city || !country) {
-    return res.status(400).json({ message: "City and Country are required" });
+    return res.status(400).json({
+      message: "City and Country are required",
+    });
   }
 
-  // If notes is undefined or empty, set it to null for optional handling
+  // If notes is undefined or empty, set it to null
   const notesToUpdate = notes || null;
 
-  console.log("Updating with notes:", notesToUpdate); // Log the final value of notes to be used
+  console.log("Updating with notes:", notesToUpdate);
 
-  const sql =
-    "UPDATE user_tbl SET city = ?, country = ?, notes = ? WHERE user_id = ?";
-  const params = [city, country, notesToUpdate, user_id];
+  try {
+    const sql = `
+      UPDATE user_tbl
+      SET city = ?,
+          country = ?,
+          notes = ?
+      WHERE user_id = ?
+    `;
 
-  db.query(sql, params, (error, result) => {
-    if (error) {
-      console.error("Error executing SQL query:", error); // Log the SQL query error
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
+    const params = [city, country, notesToUpdate, user_id];
+
+    const [result] = await db.promise().query(sql, params);
 
     if (result.affectedRows === 0) {
-      console.log("No rows updated for user_id:", user_id); // Log if no rows were updated
-      return res.status(404).json({ message: "User not found" });
+      console.log("No rows updated for user_id:", user_id);
+
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
-    console.log("User details updated successfully:", result); // Log success message
+    console.log("User details updated successfully:", result);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Billing details updated successfully",
-      data: { city, country, notes: notesToUpdate },
+      data: {
+        city,
+        country,
+        notes: notesToUpdate,
+      },
     });
-  });
+  } catch (error) {
+    console.error("Error executing SQL query:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
 });
 
 // @ts-ignore
-app.put("/update_save_billing_details/:id", (req, res) => {
-  const user_id = req.params.id; // Get the user ID from the URL parameter
-  const { city, country, notes } = req.body; // Extract city, country, and notes from the request body
+app.put("/update_save_billing_details/:id", async (req, res) => {
+  const user_id = req.params.id;
+  const { city, country, notes } = req.body;
 
-  console.log("Received request to update user:", user_id); // Log the user_id for debugging
-  console.log("Data to update:", { city, country, notes }); // Log the data being sent in the request
+  console.log("Received request to update user:", user_id);
+  console.log("Data to update:", { city, country, notes });
 
   if (!city || !country) {
-    return res.status(400).json({ message: "City and Country are required" });
+    return res.status(400).json({
+      message: "City and Country are required",
+    });
   }
 
-  // If notes is undefined or empty, set it to null for optional handling
+  // If notes is undefined or empty, set it to null
   const notesToUpdate = notes || null;
 
-  console.log("Updating with notes:", notesToUpdate); // Log the final value of notes to be used
+  console.log("Updating with notes:", notesToUpdate);
 
-  const sql =
-    "UPDATE user_tbl SET city = ?, country = ?, notes = ? WHERE user_id = ?";
-  const params = [city, country, notesToUpdate, user_id];
+  try {
+    const sql = `
+      UPDATE user_tbl
+      SET city = ?,
+          country = ?,
+          notes = ?
+      WHERE user_id = ?
+    `;
 
-  db.query(sql, params, (error, result) => {
-    if (error) {
-      console.error("Error executing SQL query:", error); // Log the SQL query error
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
+    const params = [city, country, notesToUpdate, user_id];
+
+    const [result] = await db.promise().query(sql, params);
 
     if (result.affectedRows === 0) {
-      console.log("No rows updated for user_id:", user_id); // Log if no rows were updated
-      return res.status(404).json({ message: "User not found" });
+      console.log("No rows updated for user_id:", user_id);
+
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
-    console.log("User details updated successfully:", result); // Log success message
+    console.log("User details updated successfully:", result);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Billing details updated successfully",
-      data: { city, country, notes: notesToUpdate },
+      data: {
+        city,
+        country,
+        notes: notesToUpdate,
+      },
     });
-  });
+  } catch (error) {
+    console.error("Error executing SQL query:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
 });
 
 // This is CORRECT - no changes needed
@@ -2932,18 +3050,37 @@ app.get("/verify-email/:token", (req, res) => {
   });
 });
 
-app.get("/get_users", (request, response) => {
-  const sql =
-    "SELECT user_id, fname, lname,id_pic, profile_pic, status, email, password, pnum, address, role FROM user_tbl WHERE role = 'client'";
+app.get("/get_users", async (request, response) => {
+  const sql = `
+    SELECT
+      user_id,
+      fname,
+      lname,
+      id_pic,
+      profile_pic,
+      status,
+      email,
+      password,
+      pnum,
+      address,
+      role
+    FROM user_tbl
+    WHERE role = 'client'
+  `;
 
-  db.query(sql, (error, data) => {
-    if (error) {
-      console.error("Error fetching users:", error);
-      return response.status(500).json({ error: "Internal Server Error" });
-    }
+  try {
+    const [data] = await db.promise().query(sql);
+
     console.log("Fetched users:", data);
+
     return response.json(data);
-  });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+
+    return response.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
 });
 
 app.post(
@@ -2980,120 +3117,242 @@ app.post(
         .update(password)
         .digest("hex");
 
-      // Insert user into the database
-      const sql =
-        "INSERT INTO user_tbl (fname, lname, pnum, profile_pic, id_pic, email, password, address, role, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'worker', 'active')";
+      // Insert worker into database
+      const sql = `
+        INSERT INTO user_tbl
+        (
+          fname,
+          lname,
+          pnum,
+          profile_pic,
+          id_pic,
+          email,
+          password,
+          address,
+          role,
+          status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'worker', 'active')
+      `;
 
-      db.query(
-        sql,
-        [fname, lname, pnum, profilePic, idPic, email, hashedPassword, address],
-        (error) => {
-          if (error) {
-            console.error("Error adding worker:", error);
-            return res
-              .status(500)
-              .json({ success: false, error: "Internal Server Error" });
-          }
-          return res
-            .status(200)
-            .json({ success: true, message: "Worker successfully added" });
-        },
-      );
-    } catch (err) {
-      res
-        .status(500)
-        .json({ success: false, message: "Error hashing password" });
+      const [result] = await db
+        .promise()
+        .query(sql, [
+          fname,
+          lname,
+          pnum,
+          profilePic,
+          idPic,
+          email,
+          hashedPassword,
+          address,
+        ]);
+
+      console.log("Worker added successfully:", result);
+
+      return res.status(200).json({
+        success: true,
+        message: "Worker successfully added",
+      });
+    } catch (error) {
+      console.error("Error adding worker:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Error adding worker",
+      });
     }
   },
 );
 
-app.get("/get_workers", (request, response) => {
-  const sql =
-    "SELECT fname, lname,id_pic, profile_pic, status, email, password, pnum, address, role FROM user_tbl WHERE role = 'worker'";
+app.get("/get_workers", async (request, response) => {
+  const sql = `
+    SELECT
+      fname,
+      lname,
+      id_pic,
+      profile_pic,
+      status,
+      email,
+      pnum,
+      address,
+      role
+    FROM user_tbl
+    WHERE role = 'worker'
+  `;
 
-  db.query(sql, (error, data) => {
-    if (error) {
-      console.error("Error fetching workers:", error);
-      return response.status(500).json({ error: "Internal Server Error" });
-    }
+  try {
+    const [data] = await db.promise().query(sql);
+
     console.log("Fetched workers:", data);
+
     return response.json(data);
-  });
+  } catch (error) {
+    console.error("Error fetching workers:", error);
+
+    return response.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
 });
 
-app.delete("/worker/:id", (req, res) => {
+app.delete("/worker/:id", async (req, res) => {
   const workerId = req.params.id;
+
   const sql = "DELETE FROM user_tbl WHERE user_id = ?";
 
-  db.query(sql, [workerId], (error) => {
-    if (error) {
-      console.error("Error deleting worker:", error);
-      return res.status(500).send("Error deleting worker");
+  try {
+    const [result] = await db.promise().query(sql, [workerId]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Worker not found",
+      });
     }
-    res.send("Worker deleted successfully");
-  });
+
+    console.log("Worker deleted successfully:", workerId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Worker deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting worker:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error deleting worker",
+    });
+  }
 });
 
-app.put("/worker/:id", (req, res) => {
+app.put("/worker/:id", async (req, res) => {
   const workerId = req.params.id;
+
   const { fname, lname, email, pnum, address, status } = req.body;
 
-  const sql =
-    "UPDATE user_tbl SET fname = ?, lname = ?, email = ?, pnum = ?, address = ?, status = ? WHERE user_id = ?";
+  const sql = `
+    UPDATE user_tbl
+    SET fname = ?,
+        lname = ?,
+        email = ?,
+        pnum = ?,
+        address = ?,
+        status = ?
+    WHERE user_id = ?
+      AND role = 'worker'
+  `;
 
-  db.query(
-    sql,
-    [fname, lname, email, pnum, address, status, workerId],
-    (error) => {
-      if (error) {
-        console.error("Error updating worker:", error);
-        return res.status(500).send("Error updating worker");
-      }
-      res.send("Worker updated successfully");
-    },
-  );
+  try {
+    const [result] = await db
+      .promise()
+      .query(sql, [fname, lname, email, pnum, address, status, workerId]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Worker not found",
+      });
+    }
+
+    console.log("Worker updated successfully:", workerId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Worker updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating worker:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error updating worker",
+    });
+  }
 });
 //==========================  LOGIN COMPONENTS END ============================
 //==========================  ACCOUNT SETTINGS ============================
-app.get("/get_user/:id", (req, res) => {
+app.get("/get_user/:id", async (req, res) => {
   const userId = req.params.id;
-  const sql =
-    "SELECT user_id, fname, lname, pnum, email, profile_pic, address FROM user_tbl WHERE user_id = ?";
 
-  db.query(sql, [userId], (error, data) => {
-    if (error) {
-      console.error("Error fetching user:", error);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
+  const sql = `
+    SELECT
+      user_id,
+      fname,
+      lname,
+      pnum,
+      email,
+      profile_pic,
+      address
+    FROM user_tbl
+    WHERE user_id = ?
+  `;
 
-    console.log("Fetched user:", data); // Debugging log
+  try {
+    const [data] = await db.promise().query(sql, [userId]);
+
+    console.log("Fetched user:", data);
 
     if (data.length === 0) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
-    return res.json(data[0]); // Return the user data
-  });
+    return res.json(data[0]);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
 });
-app.put("/update_user/:id", upload.single("profile_pic"), (req, res) => {
+app.put("/update_user/:id", upload.single("profile_pic"), async (req, res) => {
   const { user_id, fname, lname, pnum, email, address } = req.body;
-  // Use Cloudinary URL if new file uploaded, otherwise preserve existing
+
+  // Use Cloudinary URL if a new file was uploaded,
+  // otherwise preserve the existing profile picture
   const profilePic = req.file ? req.file.path : req.body.profile_pic;
 
-  const sql =
-    "UPDATE user_tbl SET fname = ?, lname = ?, pnum = ?, email = ?, address = ?, profile_pic = ? WHERE user_id = ?";
+  const sql = `
+      UPDATE user_tbl
+      SET fname = ?,
+          lname = ?,
+          pnum = ?,
+          email = ?,
+          address = ?,
+          profile_pic = ?
+      WHERE user_id = ?
+    `;
 
-  db.query(
-    sql,
-    [fname, lname, pnum, email, address, profilePic, user_id],
-    (error, result) => {
-      if (error) {
-        console.error("Error updating user:", error);
-        return res.status(500).json({ error: "Internal Server Error" });
-      }
-      res.status(200).json({ message: "User updated successfully!" });
-    },
-  );
+  try {
+    const [result] = await db
+      .promise()
+      .query(sql, [fname, lname, pnum, email, address, profilePic, user_id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    console.log("User updated successfully:", user_id);
+
+    return res.status(200).json({
+      success: true,
+      message: "User updated successfully!",
+    });
+  } catch (error) {
+    console.error("Error updating user:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
 });
 
 //==========================  ACCOUNT SETTINGS END ============================
@@ -3135,41 +3394,68 @@ app.post("/sendMessageToWorkers", (req, res) => {
 });
 
 // Get workers endpoint
-app.get("/get_workers_info/:user_id", (req, res) => {
+app.get("/get_workers_info/:user_id", async (req, res) => {
   const { user_id } = req.params;
 
   const sql = `
-    SELECT u.user_id, u.fname, u.lname, u.profile_pic, u.status, u.last_active_time, u.user_login_time,
-           m.message AS last_message,
-           m.timestamp AS last_message_time,
-           m.sender_id AS last_sender_id
+    SELECT 
+      u.user_id,
+      u.fname,
+      u.lname,
+      u.profile_pic,
+      u.status,
+      u.last_active_time,
+      u.user_login_time,
+      m.message AS last_message,
+      m.timestamp AS last_message_time,
+      m.sender_id AS last_sender_id
     FROM user_tbl u
     LEFT JOIN (
-        SELECT t.sender_id, t.receiver_id, t.message, t.timestamp
-        FROM message_tbl t
-        INNER JOIN (
-            SELECT 
-                LEAST(sender_id, receiver_id) AS user1,
-                GREATEST(sender_id, receiver_id) AS user2,
-                MAX(timestamp) AS latest
-            FROM message_tbl
-            WHERE sender_id = ? OR receiver_id = ?
-            GROUP BY LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id)
-        ) lt ON 
-            LEAST(t.sender_id, t.receiver_id) = lt.user1 AND
-            GREATEST(t.sender_id, t.receiver_id) = lt.user2 AND
-            t.timestamp = lt.latest
-    ) m ON u.user_id = (CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END)
+      SELECT 
+        t.sender_id,
+        t.receiver_id,
+        t.message,
+        t.timestamp
+      FROM message_tbl t
+      INNER JOIN (
+        SELECT 
+          LEAST(sender_id, receiver_id) AS user1,
+          GREATEST(sender_id, receiver_id) AS user2,
+          MAX(timestamp) AS latest
+        FROM message_tbl
+        WHERE sender_id = ? OR receiver_id = ?
+        GROUP BY 
+          LEAST(sender_id, receiver_id),
+          GREATEST(sender_id, receiver_id)
+      ) lt ON
+        LEAST(t.sender_id, t.receiver_id) = lt.user1
+        AND GREATEST(t.sender_id, t.receiver_id) = lt.user2
+        AND t.timestamp = lt.latest
+    ) m ON u.user_id = (
+      CASE
+        WHEN m.sender_id = ? THEN m.receiver_id
+        ELSE m.sender_id
+      END
+    )
     WHERE u.role = 'worker'
   `;
 
-  db.query(sql, [user_id, user_id, user_id], (err, results) => {
-    if (err) {
-      console.error("Error fetching workers:", err.message);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
-    res.json(results);
-  });
+  try {
+    const [results] = await db
+      .promise()
+      .query(sql, [user_id, user_id, user_id]);
+
+    console.log("Fetched workers info:", results);
+
+    return res.json(results);
+  } catch (error) {
+    console.error("Error fetching workers:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
 });
 // Get messages for a specific worker (filtered by worker and admin only)
 app.get("/getMessagesForAdmin/:adminId/:workerId", (req, res) => {
@@ -3412,45 +3698,68 @@ app.get("/get_clients_profile_pic/:clientsId", (req, res) => {
 });
 
 // Get clients endpoint
-app.get("/get_clients_info/:user_id", (req, res) => {
+app.get("/get_clients_info/:user_id", async (req, res) => {
   const { user_id } = req.params;
 
   const sql = `
-    SELECT u.user_id, u.fname, u.lname, u.profile_pic, u.status,  u.last_active_time, u.user_login_time,
-           m.message AS last_message,
-           m.timestamp AS last_message_time,
-           m.sender_id AS last_sender_id
+    SELECT 
+      u.user_id,
+      u.fname,
+      u.lname,
+      u.profile_pic,
+      u.status,
+      u.last_active_time,
+      u.user_login_time,
+      m.message AS last_message,
+      m.timestamp AS last_message_time,
+      m.sender_id AS last_sender_id
     FROM user_tbl u
     LEFT JOIN (
-        SELECT t.sender_id, t.receiver_id, t.message, t.timestamp
+        SELECT 
+          t.sender_id,
+          t.receiver_id,
+          t.message,
+          t.timestamp
         FROM message_tbl t
         INNER JOIN (
             SELECT 
-                LEAST(sender_id, receiver_id) AS user1,
-                GREATEST(sender_id, receiver_id) AS user2,
-                MAX(timestamp) AS latest
+              LEAST(sender_id, receiver_id) AS user1,
+              GREATEST(sender_id, receiver_id) AS user2,
+              MAX(timestamp) AS latest
             FROM message_tbl
             WHERE sender_id = ? OR receiver_id = ?
-            GROUP BY LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id)
+            GROUP BY 
+              LEAST(sender_id, receiver_id),
+              GREATEST(sender_id, receiver_id)
         ) lt ON 
-            LEAST(t.sender_id, t.receiver_id) = lt.user1 AND
-            GREATEST(t.sender_id, t.receiver_id) = lt.user2 AND
-            t.timestamp = lt.latest
-    ) m ON u.user_id = (CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END)
+          LEAST(t.sender_id, t.receiver_id) = lt.user1
+          AND GREATEST(t.sender_id, t.receiver_id) = lt.user2
+          AND t.timestamp = lt.latest
+    ) m ON u.user_id = (
+      CASE 
+        WHEN m.sender_id = ? THEN m.receiver_id
+        ELSE m.sender_id
+      END
+    )
     WHERE u.role = 'client'
   `;
 
-  db.query(sql, [user_id, user_id, user_id], (err, results) => {
-    if (err) {
-      console.error("Error fetching clients:", err.message);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
-    res.json(results);
-  });
-});
+  try {
+    const [results] = await db
+      .promise()
+      .query(sql, [user_id, user_id, user_id]);
 
+    return res.json(results);
+  } catch (error) {
+    console.error("Error fetching clients:", error);
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
+});
 // GET /worker_notifications/:user_id
-app.get("/worker_notifications/:user_id", (req, res) => {
+app.get("/worker_notifications/:user_id", async (req, res) => {
   const { user_id } = req.params;
 
   const sql = `
@@ -3459,7 +3768,8 @@ app.get("/worker_notifications/:user_id", (req, res) => {
       m.message AS description,
       m.timestamp AS time,
       m.is_read,
-      u.profile_pic, user_id,
+      u.profile_pic,
+      u.user_id,
       'Message' AS title
     FROM message_tbl m
     LEFT JOIN user_tbl u ON u.user_id = m.sender_id
@@ -3467,22 +3777,23 @@ app.get("/worker_notifications/:user_id", (req, res) => {
     ORDER BY m.timestamp DESC
   `;
 
-  db.query(sql, [user_id], (err, results) => {
-    if (err) {
-      console.error("Error fetching notifications:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
+  try {
+    const [results] = await db.query(sql, [user_id]);
 
-    // ensure is_read is always lowercase
     const formatted = results.map((r) => ({
       ...r,
       is_read: r.is_read?.toLowerCase() === "read" ? "read" : "unread",
     }));
 
     res.json(formatted);
-  });
-});
+  } catch (err) {
+    console.error("Error fetching notifications:", err);
 
+    res.status(500).json({
+      error: "Database error",
+    });
+  }
+});
 //==========================  CHAT WORKER TO CLIENTS END ============================
 //==========================  CHAT CLIENT TO WORKER  ============================
 
@@ -3616,8 +3927,9 @@ app.post("/markMessagesAsRead", (req, res) => {
 //========================== SOCKET IO  END ============================
 //==========================  RESERVATION START  ============================
 // API endpoint to handle reservation submission
-app.post("/add_reservation/:user_id", (req, res) => {
+app.post("/add_reservation/:user_id", async (req, res) => {
   const { user_id } = req.params;
+
   const {
     full_name,
     email,
@@ -3629,38 +3941,66 @@ app.post("/add_reservation/:user_id", (req, res) => {
     table_ids,
   } = req.body;
 
-  // ⏰ Validate reservation time (8 AM – 1 AM)
-  const hour = parseInt(reservation_time.split(":")[0], 10);
-  const isPM = reservation_time.toLowerCase().includes("pm");
+  try {
+    // ⏰ Validate reservation time (8 AM – 1 AM)
+    const hour = parseInt(reservation_time.split(":")[0], 10);
+    const isPM = reservation_time.toLowerCase().includes("pm");
 
-  let hour24 = hour;
-  if (isPM && hour !== 12) hour24 += 12;
-  if (!isPM && hour === 12) hour24 = 0;
+    let hour24 = hour;
 
-  if (hour24 < 8 && hour24 !== 0 && hour24 !== 1) {
-    return res
-      .status(400)
-      .json({ error: "Reservations are only open from 8 AM to 1 AM." });
-  }
-
-  const fetchUserSql = "SELECT * FROM user_tbl WHERE user_id = ?";
-  db.query(fetchUserSql, [user_id], (error, results) => {
-    if (error) {
-      console.error("Error fetching user data:", error);
-      return res.status(500).json({ error: "Internal Server Error" });
+    if (isPM && hour !== 12) {
+      hour24 += 12;
     }
 
-    if (results.length === 0) {
-      return res.status(404).json({ error: "User not found" });
+    if (!isPM && hour === 12) {
+      hour24 = 0;
     }
 
-    const user = results[0];
+    if (hour24 < 8 && hour24 !== 0 && hour24 !== 1) {
+      return res.status(400).json({
+        error: "Reservations are only open from 8 AM to 1 AM.",
+      });
+    }
+
+    // Fetch user
+    const fetchUserSql = `
+      SELECT *
+      FROM user_tbl
+      WHERE user_id = ?
+    `;
+
+    const [userResults] = await db.promise().query(fetchUserSql, [user_id]);
+
+    if (userResults.length === 0) {
+      return res.status(404).json({
+        error: "User not found",
+      });
+    }
+
+    const user = userResults[0];
+
     const userFullName = full_name || `${user.fname} ${user.lname}`;
+
     const userPhone = pnum || user.pnum;
 
+    // Insert reservation
     const insertReservationSql = `
-       INSERT INTO reservation_tbl 
-      (user_id, email, full_name, reservation_date, reservation_time, pnum, num_of_people, status, payment_status, table_status, special_request, reservation_type, reservation_status)
+      INSERT INTO reservation_tbl 
+      (
+        user_id,
+        email,
+        full_name,
+        reservation_date,
+        reservation_time,
+        pnum,
+        num_of_people,
+        status,
+        payment_status,
+        table_status,
+        special_request,
+        reservation_type,
+        reservation_status
+      )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
@@ -3672,54 +4012,53 @@ app.post("/add_reservation/:user_id", (req, res) => {
       reservation_time,
       userPhone,
       num_of_people,
-      "pending", // status
-      "pending", // payment_status
-      "Reserved", // table_status ✅
+      "pending",
+      "pending",
+      "Reserved",
       special_request,
       "Reservation",
-      "Active", // reservation_status
+      "Active",
     ];
 
-    db.query(insertReservationSql, values, (err, result) => {
-      if (err) {
-        console.error("Error inserting reservation:", err);
-        return res.status(500).json({ error: "Internal Server Error" });
-      }
+    const [result] = await db.promise().query(insertReservationSql, values);
 
-      const reserveId = result.insertId;
+    const reserveId = result.insertId;
 
-      if (Array.isArray(table_ids) && table_ids.length > 0) {
-        const insertTableSql = `
-          INSERT INTO usertable_list (reservation_id, user_id, table_id)
-          VALUES ?
-        `;
-        const tableValues = table_ids.map((tableId) => [
-          reserveId,
-          user_id,
-          tableId,
-        ]);
+    // Insert selected tables
+    if (Array.isArray(table_ids) && table_ids.length > 0) {
+      const insertTableSql = `
+        INSERT INTO usertable_list
+        (reservation_id, user_id, table_id)
+        VALUES ?
+      `;
 
-        db.query(insertTableSql, [tableValues], (err2) => {
-          if (err2) {
-            console.error("Error inserting user tables:", err2);
-            return res.status(500).json({ error: "Internal Server Error" });
-          }
+      const tableValues = table_ids.map((tableId) => [
+        reserveId,
+        user_id,
+        tableId,
+      ]);
 
-          return res.json({
-            reserveId,
-            message: "Reservation and tables saved successfully.",
-          });
-        });
-      } else {
-        return res.json({
-          reserveId,
-          message: "Reservation saved (no tables selected).",
-        });
-      }
+      await db.promise().query(insertTableSql, [tableValues]);
+    }
+
+    // Return newly created reservation
+    return res.status(201).json({
+      success: true,
+      reserveId,
+      message:
+        table_ids?.length > 0
+          ? "Reservation and tables saved successfully."
+          : "Reservation saved (no tables selected).",
     });
-  });
-});
+  } catch (error) {
+    console.error("❌ Error adding reservation:", error);
 
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
+});
 // Mark Reserved tables as Completed if past reservation time
 
 app.put("/update_completed_tables", (req, res) => {
@@ -3752,164 +4091,215 @@ app.put("/update_completed_tables", (req, res) => {
 
 // ✅ Update reservation status to "Canceled"
 
-app.put("/update_reservation_canceled_status/:reservation_id", (req, res) => {
-  const { reservation_id } = req.params;
+app.put(
+  "/update_reservation_canceled_status/:reservation_id",
+  async (req, res) => {
+    const { reservation_id } = req.params;
 
-  if (!reservation_id) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Missing reservation_id" });
-  }
-
-  const numericResId = Number(reservation_id);
-
-  const updateQuery = `
-    UPDATE reservation_tbl
-    SET table_status = 'Canceled'
-    WHERE reservation_id = ? AND table_status != 'Completed'
-  `;
-
-  db.query(updateQuery, [numericResId], (err, result) => {
-    if (err) {
-      console.error("❌ Error updating reservation:", err);
-      return res.status(500).json({ success: false, error: err.message });
+    if (!reservation_id) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing reservation_id",
+      });
     }
 
-    console.log(`✅ Reservation ${numericResId} marked as 'Canceled'.`);
+    const numericResId = Number(reservation_id);
 
-    res.status(200).json({
-      success: true,
-      message: `Reservation ${numericResId} marked as 'Canceled'.`,
-    });
-  });
-});
-
-// ✅ Get reservation status
-// Get reservation status
-app.get("/get_reservation_status", (req, res) => {
-  db.query(
-    "SELECT reservation_enabled FROM reservation_settings WHERE id = 1",
-    (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json(result[0]);
-    },
-  );
-});
-
-// Update reservation status
-app.put("/update_reservation_status", (req, res) => {
-  const { reservation_enabled } = req.body;
-  db.query(
-    "UPDATE reservation_settings SET reservation_enabled = ? WHERE id = 1",
-    [reservation_enabled],
-    (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ success: true });
-    },
-  );
-});
-
-// DELETE reservation and related reservation_activity records
-app.delete("/delete_reservation/:user_id/:reservation_id", (req, res) => {
-  const { user_id, reservation_id } = req.params;
-
-  db.beginTransaction((err) => {
-    if (err) {
-      console.error("Transaction error:", err);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
-
-    // 1️⃣ Update reservation status instead of deleting
-    const updateReservationSql = `
+    const updateQuery = `
       UPDATE reservation_tbl
-      SET reservation_status = 'Deleted'
-      WHERE reservation_id = ? AND user_id = ?
+      SET table_status = 'Canceled'
+      WHERE reservation_id = ?
+        AND table_status != 'Completed'
     `;
 
-    db.query(updateReservationSql, [reservation_id, user_id], (err) => {
-      if (err) {
-        return db.rollback(() => {
-          console.error("Error archiving reservation:", err);
-          res.status(500).json({ error: "Failed to archive reservation" });
-        });
-      }
-
-      // 2️⃣ (Optional) also mark activities as deleted instead of deleting
-      const updateActivitySql = `
-        UPDATE reservation_activity_tbl
-        SET status = 'Deleted'
-        WHERE reservation_id = ? AND user_id = ?
-      `;
-
-      db.query(updateActivitySql, [reservation_id, user_id], (err) => {
-        if (err) {
-          return db.rollback(() => {
-            console.error("Error archiving reservation activity:", err);
-            res
-              .status(500)
-              .json({ error: "Failed to archive reservation activity" });
-          });
-        }
-
-        db.commit((err) => {
+    try {
+      const result = await new Promise((resolve, reject) => {
+        db.query(updateQuery, [numericResId], (err, result) => {
           if (err) {
-            return db.rollback(() => {
-              console.error("Transaction commit failed:", err);
-              res.status(500).json({ error: "Transaction commit failed" });
-            });
+            reject(err);
+          } else {
+            resolve(result);
           }
-
-          console.log(
-            `Archived reservation ${reservation_id} for user ${user_id}`,
-          );
-          res.json({
-            message: "Reservation archived successfully",
-          });
         });
       });
-    });
-  });
-});
 
-app.get("/get_clients", (req, res) => {
-  const sql =
-    "SELECT user_id, fname, lname, address FROM user_tbl WHERE role = 'client'";
+      console.log(`✅ Reservation ${numericResId} marked as 'Canceled'.`);
 
-  db.query(sql, (error, data) => {
-    if (error) {
-      console.error("Error fetching clients:", error);
-      return res.status(500).json({ error: "Internal Server Error" });
+      return res.status(200).json({
+        success: true,
+        message: `Reservation ${numericResId} marked as 'Canceled'.`,
+      });
+    } catch (err) {
+      console.error("❌ Error updating reservation:", err);
+
+      return res.status(500).json({
+        success: false,
+        error: err.message,
+      });
     }
+  },
+);
+// ✅ Get reservation status
+// Get reservation status
+app.get("/get_reservation_status", async (req, res) => {
+  try {
+    const [result] = await db
+      .promise()
+      .query(
+        "SELECT reservation_enabled FROM reservation_settings WHERE id = 1",
+      );
+
+    if (result.length === 0) {
+      return res.status(404).json({
+        error: "Reservation settings not found",
+      });
+    }
+
+    return res.status(200).json(result[0]);
+  } catch (error) {
+    console.error(
+      "Error fetching reservation status:",
+      error.sqlMessage || error,
+    );
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
+});
+// Update reservation status
+app.put("/update_reservation_status", async (req, res) => {
+  const { reservation_enabled } = req.body;
+
+  try {
+    await db
+      .promise()
+      .query(
+        "UPDATE reservation_settings SET reservation_enabled = ? WHERE id = 1",
+        [reservation_enabled],
+      );
+
+    return res.status(200).json({
+      success: true,
+    });
+  } catch (error) {
+    console.error(
+      "Error updating reservation status:",
+      error.sqlMessage || error,
+    );
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
+});
+// DELETE reservation and related reservation_activity records
+app.delete("/delete_reservation/:user_id/:reservation_id", async (req, res) => {
+  const { user_id, reservation_id } = req.params;
+
+  const connection = await db.promise().getConnection();
+
+  try {
+    // Start transaction
+    await connection.beginTransaction();
+
+    // 1️⃣ Archive reservation instead of deleting
+    const updateReservationSql = `
+        UPDATE reservation_tbl
+        SET reservation_status = 'Deleted'
+        WHERE reservation_id = ?
+          AND user_id = ?
+      `;
+
+    await connection.query(updateReservationSql, [reservation_id, user_id]);
+
+    // 2️⃣ Archive reservation activities
+    const updateActivitySql = `
+        UPDATE reservation_activity_tbl
+        SET status = 'Deleted'
+        WHERE reservation_id = ?
+          AND user_id = ?
+      `;
+
+    await connection.query(updateActivitySql, [reservation_id, user_id]);
+
+    // 3️⃣ Commit transaction
+    await connection.commit();
+
+    console.log(`Archived reservation ${reservation_id} for user ${user_id}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "Reservation archived successfully",
+    });
+  } catch (error) {
+    // Rollback if anything fails
+    await connection.rollback();
+
+    console.error("Error archiving reservation:", error.sqlMessage || error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to archive reservation",
+    });
+  } finally {
+    // Release connection back to pool
+    connection.release();
+  }
+});
+app.get("/get_clients", async (req, res) => {
+  const sql = `
+    SELECT user_id, fname, lname, address
+    FROM user_tbl
+    WHERE role = 'client'
+  `;
+
+  try {
+    const [data] = await db.promise().query(sql);
 
     if (data.length === 0) {
       console.log("No clients found in the database.");
-      return res.json({ message: "No clients found" }); // Send a message when no clients are found
+
+      return res.json({
+        message: "No clients found",
+      });
     }
 
     console.log("Fetched clients:", data);
-    return res.json(data); // Return all client data
-  });
+
+    return res.json(data);
+  } catch (error) {
+    console.error("Error fetching clients:", error);
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
 });
 // API endpoint to get reserved tables
 // API to get reserved tables (already defined)
-app.get("/get_reserved_tables", (req, res) => {
+app.get("/get_reserved_tables", async (req, res) => {
   const sql = `
     SELECT u.table_id
     FROM usertable_list u
-    JOIN reservation_tbl r ON u.reservation_id = r.reservation_id
+    JOIN reservation_tbl r 
+      ON u.reservation_id = r.reservation_id
     WHERE r.table_status = 'Reserved'
   `;
 
-  db.query(sql, (error, results) => {
-    if (error) {
-      console.error("Error fetching reserved tables:", error);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
+  try {
+    const [results] = await db.promise().query(sql);
 
-    // Return array of table_ids
     const reservedTables = results.map((row) => row.table_id);
-    return res.json(reservedTables);
-  });
+
+    return res.status(200).json(reservedTables);
+  } catch (error) {
+    console.error("Error fetching reserved tables:", error.sqlMessage || error);
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
 });
 /*
 const message = {
@@ -3933,36 +4323,30 @@ const sendEmail = async (message) => {
 };
 */
 // Endpoint to fetch reservations (for example)
-app.get("/get_reservation", (req, res) => {
+app.get("/get_reservation", async (req, res) => {
   const sql = `
     SELECT 
-      r.reservation_id,
-      r.user_id,
-      r.email,
-      r.full_name,
-      r.reservation_time,
-      r.reservation_date,
-      r.pnum,
-      r.num_of_people,
-      r.status,
-      r.payment_status,
-      r.table_status,
-      r.special_request,
-      GROUP_CONCAT(ut.table_id ORDER BY ut.table_id ASC) AS table_ids
+      r.*,
+      GROUP_CONCAT(ut.table_id) AS table_ids
     FROM reservation_tbl r
     LEFT JOIN usertable_list ut 
       ON r.reservation_id = ut.reservation_id
-        WHERE r.reservation_status != 'Deleted'  -- ✅ exclude deleted reservations
+    WHERE r.reservation_status != 'Deleted'
     GROUP BY r.reservation_id
+    ORDER BY r.reservation_id DESC
   `;
 
-  db.query(sql, (error, results) => {
-    if (error) {
-      console.error("Error fetching reservations:", error);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
-    return res.json(results);
-  });
+  try {
+    const [results] = await db.promise().query(sql);
+
+    return res.status(200).json(results);
+  } catch (error) {
+    console.error("Error fetching reservations:", error.sqlMessage || error);
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
 });
 /*
 // Endpoint to send reservation confirmation email
@@ -3991,60 +4375,70 @@ app.post("/send_reservation_email", (req, res) => {
     });
 });
 */
-app.post("/most_reserve", (req, res) => {
+app.post("/most_reserve", async (req, res) => {
   const { table_id, reservation_date } = req.body;
 
   // Validate required fields
   if (!table_id || !reservation_date) {
-    return res
-      .status(400)
-      .json({ error: "Missing table_id or reservation_date" });
+    return res.status(400).json({
+      error: "Missing table_id or reservation_date",
+    });
   }
 
-  // Check if there's already a record for this table on the given date
-  const checkSql = `SELECT * FROM most_reserve_tbl WHERE table_id = ? AND DATE(date_created) = ?`;
+  try {
+    // 1️⃣ Check if record already exists
+    const checkSql = `
+      SELECT *
+      FROM most_reserve_tbl
+      WHERE table_id = ?
+        AND DATE(date_created) = ?
+    `;
 
-  db.query(checkSql, [table_id, reservation_date], (err, result) => {
-    if (err) {
-      console.error("Error checking most_reserve_tbl:", err.sqlMessage || err);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
+    const [result] = await db
+      .promise()
+      .query(checkSql, [table_id, reservation_date]);
 
+    // 2️⃣ Record exists → increment most_reservation
     if (result.length > 0) {
-      // Record exists, increment most_reservation without changing date_created
       const updateSql = `
-        UPDATE most_reserve_tbl 
+        UPDATE most_reserve_tbl
         SET most_reservation = most_reservation + 1
-        WHERE table_id = ? AND DATE(date_created) = ?
+        WHERE table_id = ?
+          AND DATE(date_created) = ?
       `;
-      db.query(updateSql, [table_id, reservation_date], (err2) => {
-        if (err2) {
-          console.error(
-            "Error updating most_reserve_tbl:",
-            err2.sqlMessage || err2,
-          );
-          return res.status(500).json({ error: "Internal Server Error" });
-        }
-        res.json({ message: "Most Reserved Table Updated Successfully" });
-      });
-    } else {
-      // Record does not exist, insert new row with the given reservation_date
-      const insertSql = `
-        INSERT INTO most_reserve_tbl (table_id, most_reservation, date_created)
-        VALUES (?, ?, ?)
-      `;
-      db.query(insertSql, [table_id, 1, reservation_date], (err3) => {
-        if (err3) {
-          console.error(
-            "Error inserting into most_reserve_tbl:",
-            err3.sqlMessage || err3,
-          );
-          return res.status(500).json({ error: "Internal Server Error" });
-        }
-        res.json({ message: "Most Reserved Table Created Successfully" });
+
+      await db.promise().query(updateSql, [table_id, reservation_date]);
+
+      return res.json({
+        success: true,
+        message: "Most Reserved Table Updated Successfully",
       });
     }
-  });
+
+    // 3️⃣ Record does not exist → create new record
+    const insertSql = `
+      INSERT INTO most_reserve_tbl
+      (table_id, most_reservation, date_created)
+      VALUES (?, ?, ?)
+    `;
+
+    await db.promise().query(insertSql, [table_id, 1, reservation_date]);
+
+    return res.json({
+      success: true,
+      message: "Most Reserved Table Created Successfully",
+    });
+  } catch (error) {
+    console.error(
+      "Error processing most_reserve_tbl:",
+      error.sqlMessage || error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
 });
 
 //==========================  RESERVATION END  ============================
@@ -4964,49 +5358,57 @@ app.post("/activity_user/:user_id", (req, res) => {
 });
 
 // @ts-ignore
-app.post("/reservation_activity/:user_id", (req, res) => {
+app.post("/reservation_activity/:user_id", async (req, res) => {
   const userId = req.params.user_id;
   const { reservation_id, activity_date } = req.body;
 
+  // Validate required fields
   if (!userId || !reservation_id || !activity_date) {
-    return res.status(400).json({ error: "Missing required fields" });
+    return res.status(400).json({
+      error: "Missing required fields",
+    });
   }
 
-  const query = `
-    SELECT 
-      r.reservation_id,
-      r.user_id,
-      r.full_name,
-      r.reservation_type,
-      r.status,
-      GROUP_CONCAT(ut.table_id) AS table_ids
-    FROM reservation_tbl r
-    LEFT JOIN usertable_list ut ON r.reservation_id = ut.reservation_id
-    WHERE r.reservation_id = ? AND r.user_id = ?
-    GROUP BY r.reservation_id
-  `;
+  try {
+    // 1️⃣ Fetch reservation data
+    const query = `
+      SELECT 
+        r.reservation_id,
+        r.user_id,
+        r.full_name,
+        r.reservation_type,
+        r.status,
+        GROUP_CONCAT(ut.table_id) AS table_ids
+      FROM reservation_tbl r
+      LEFT JOIN usertable_list ut 
+        ON r.reservation_id = ut.reservation_id
+      WHERE r.reservation_id = ?
+        AND r.user_id = ?
+      GROUP BY r.reservation_id
+    `;
 
-  db.query(query, [reservation_id, userId], (err, result) => {
-    if (err) {
-      console.error("Error fetching reservation data:", err);
-      return res.status(500).json({ error: "Error fetching reservation data" });
-    }
+    const [result] = await db.promise().query(query, [reservation_id, userId]);
 
+    // 2️⃣ Check if reservation exists
     if (result.length === 0) {
-      return res
-        .status(404)
-        .json({ error: "No reservation found for this user" });
+      return res.status(404).json({
+        error: "No reservation found for this user",
+      });
     }
 
     const reservationData = result[0];
 
+    // 3️⃣ Check if tables exist
     if (!reservationData.table_ids) {
-      return res
-        .status(400)
-        .json({ error: "No tables found for this reservation" });
+      return res.status(400).json({
+        error: "No tables found for this reservation",
+      });
     }
 
+    // 4️⃣ Convert table IDs into array
     const tables = reservationData.table_ids.split(",");
+
+    // 5️⃣ Prepare activity records
     const values = tables.map((tableId) => [
       userId,
       activity_date,
@@ -5017,27 +5419,40 @@ app.post("/reservation_activity/:user_id", (req, res) => {
       reservation_id,
     ]);
 
+    // 6️⃣ Insert reservation activities
     const insertQuery = `
-      INSERT INTO reservation_activity_tbl 
-      (user_id, activity_date, full_name, reservation_type, status, table_id, reservation_id)
+      INSERT INTO reservation_activity_tbl
+      (
+        user_id,
+        activity_date,
+        full_name,
+        reservation_type,
+        status,
+        table_id,
+        reservation_id
+      )
       VALUES ?
     `;
 
-    db.query(insertQuery, [values], (err2) => {
-      if (err2) {
-        console.error("Error inserting reservation activity:", err2);
-        return res
-          .status(500)
-          .json({ error: "Error inserting reservation activity" });
-      }
+    await db.promise().query(insertQuery, [values]);
 
-      res
-        .status(200)
-        .json({ message: "Reservation activity added successfully." });
+    // 7️⃣ Success response
+    return res.status(200).json({
+      success: true,
+      message: "Reservation activity added successfully.",
     });
-  });
-});
+  } catch (error) {
+    console.error(
+      "Error processing reservation activity:",
+      error.sqlMessage || error,
+    );
 
+    return res.status(500).json({
+      success: false,
+      error: "Error inserting reservation activity",
+    });
+  }
+});
 // Fetch activity data for a user
 app.get("/fetch_activity_user/:user_id", (req, res) => {
   const userId = req.params.user_id; // Get user_id from the URL parameter
@@ -5076,10 +5491,9 @@ app.get("/fetch_activity_user/:user_id", (req, res) => {
 });
 
 // Fetch reservation-related activity data for a user
-app.get("/fetch_reservation_activity/:user_id", (req, res) => {
-  const userId = req.params.user_id; // Get user_id from the URL parameter
+app.get("/fetch_reservation_activity/:user_id", async (req, res) => {
+  const userId = req.params.user_id;
 
-  // Query to fetch reservation-related activity data for the user
   const query = `
     SELECT 
       user_id,
@@ -5089,26 +5503,27 @@ app.get("/fetch_reservation_activity/:user_id", (req, res) => {
       status,
       table_id,
       reservation_id
-    FROM 
-      reservation_activity_tbl
-    WHERE 
-      user_id = ?
+    FROM reservation_activity_tbl
+    WHERE user_id = ?
   `;
 
-  db.query(query, [userId], (err, result) => {
-    if (err) {
-      console.error("Error fetching activity data:", err); // Log detailed error
-      return res.status(500).json({ error: "Error fetching activity data" });
-    }
+  try {
+    const [result] = await db.promise().query(query, [userId]);
 
+    // No activity found → return empty array
     if (result.length === 0) {
-      // Instead of returning an error, return an empty array if no data is found
-      return res.status(200).json([]); // Return empty array for no data
+      return res.status(200).json([]);
     }
 
-    // Send back the fetched activity data
-    res.status(200).json(result);
-  });
+    // Return activity data
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching activity data:", error);
+
+    return res.status(500).json({
+      error: "Error fetching activity data",
+    });
+  }
 });
 
 // Fetch client-specific orders
@@ -6039,33 +6454,40 @@ app.get("/categories_list", (req, res) => {
 //========================== Announcement START ============================
 // @ts-ignore
 // Emit real-time notification after sending the announcement
-app.post("/send_announcement_to_worker", (req, res) => {
+app.post("/send_announcement_to_worker", async (req, res) => {
   const { title, message, sender_id, recipient_ids } = req.body;
 
-  recipient_ids.forEach((recipient_id) => {
-    db.query(
-      "INSERT INTO announcement_tbl (title, message, sender_id, recipient_id, created_at, status) VALUES (?, ?, ?, ?, ?, ?)",
-      [title, message, sender_id, recipient_id, new Date(), "unread"], // Default status is unread
-      (err, result) => {
-        if (err) {
-          console.error("Error inserting announcement:", err);
-          return;
-        }
+  try {
+    await Promise.all(
+      recipient_ids.map(async (recipient_id) => {
+        const [result] = await db.promise().query(
+          `INSERT INTO announcement_tbl 
+          (title, message, sender_id, recipient_id, created_at, status) 
+          VALUES (?, ?, ?, ?, ?, ?)`,
+          [title, message, sender_id, recipient_id, new Date(), "unread"],
+        );
 
-        // Emit event to update the status on frontend
+        // Emit event after successful insert
         io.to(`worker_${recipient_id}`).emit("announcement_status", {
           announcement_id: result.insertId,
           title,
-          status: "unread", // Assuming the initial status is unread
+          status: "unread",
           workerId: recipient_id,
         });
-      },
+      }),
     );
-  });
 
-  res
-    .status(200)
-    .json({ message: "Announcement sent to recipients successfully." });
+    res.status(200).json({
+      message: "Announcement sent to recipients successfully.",
+    });
+  } catch (error) {
+    console.error("Error inserting announcement:", error);
+
+    res.status(500).json({
+      message: "Failed to send announcement.",
+      error: error.message,
+    });
+  }
 });
 // server.js or routes/announcement.js
 app.get("/get_notifications_announcement/:id", async (req, res) => {

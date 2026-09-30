@@ -64,19 +64,20 @@ const Reservation = () => {
       setPhone(storedPhone || "");
       setIsAuthenticated(true);
 
-      // ✅ Show ReservationTermsConditionModal if user hasn't accepted yet
       const termsAccepted = sessionStorage.getItem(
         "reservation_terms_accepted",
       );
+
       if (!termsAccepted) {
-        setIsTermsModalVisible(true); // <-- show modal
+        setIsTermsModalVisible(true);
       }
     }
 
     const today = new Date();
-    const todayDate = today.toISOString().split("T")[0];
-    setReservationDate(todayDate);
+    setReservationDate(today.toISOString().split("T")[0]);
+  }, []);
 
+  useEffect(() => {
     if (isAuthenticated) {
       fetchReservedTables();
     }
@@ -122,7 +123,12 @@ const Reservation = () => {
   const fetchReservedTables = async () => {
     try {
       const response = await axios.get(`${apiUrl}/get_reserved_tables`);
-      setReservedTables(response.data);
+
+      const reservedTableIds = response.data.map((tableId: number | string) =>
+        String(tableId),
+      );
+
+      setReservedTables(reservedTableIds);
     } catch (error) {
       console.error("Error fetching reserved tables:", error);
     }
@@ -184,6 +190,7 @@ const Reservation = () => {
     e.preventDefault();
 
     const userId = sessionStorage.getItem("user_id");
+
     if (!isAuthenticated || !userId) {
       return notification.warning({
         message: "Login Required",
@@ -213,7 +220,7 @@ const Reservation = () => {
     }
 
     try {
-      // 1️⃣ Add reservation
+      // 1. Add reservation
       const reservationResponse = await axios.post(
         `${apiUrl}/add_reservation/${userId}`,
         {
@@ -226,51 +233,51 @@ const Reservation = () => {
           special_request: notes,
           table_ids: selectedTables,
         },
-        { headers: { "Content-Type": "application/json" } },
       );
 
       const reserveId = reservationResponse.data.reserveId;
+
+      // 2. Update most reserved
+      await Promise.all(
+        selectedTables.map((tableId) =>
+          axios.post(`${apiUrl}/most_reserve`, {
+            table_id: tableId,
+            reservation_date: reservationDate,
+          }),
+        ),
+      );
+
+      // 3. Add activity
+      await axios.post(`${apiUrl}/reservation_activity/${userId}`, {
+        reservation_id: reserveId,
+        activity_date: reservationDate,
+      });
+
+      // 4. Fetch latest data
+      await fetchReservedTables();
+
+      // 5. Clear
+      setSelectedTables([]);
+      setReservationDate(new Date().toISOString().split("T")[0]);
+      setReservationTime("");
+      setNumOfPeople(0);
+      setNotes("");
 
       notification.success({
         message: "Reservation Added",
         description: "Your reservation has been added successfully.",
       });
-
-      // 2️⃣ Update most_reserve per table
-      await Promise.all(
-        selectedTables.map((tableId) =>
-          axios.post(
-            `${apiUrl}/most_reserve`,
-            { table_id: tableId, reservation_date: reservationDate },
-            { headers: { "Content-Type": "application/json" } },
-          ),
-        ),
-      );
-
-      // 3️⃣ Add reservation activity
-      await axios.post(
-        `${apiUrl}/reservation_activity/${userId}`,
-        { reservation_id: reserveId, activity_date: reservationDate },
-        { headers: { "Content-Type": "application/json" } },
-      );
-
-      // 4️⃣ Reset selection & update reserved tables
-      setReservedTables((prev) => [...prev, ...selectedTables]);
-      setSelectedTables([]);
-
-      // ✅ Clear form inputs
-      setReservationDate(new Date().toISOString().split("T")[0]);
-      setReservationTime("");
-      setNumOfPeople(0);
-      setNotes("");
     } catch (err: any) {
       console.error(
         "Error during reservation:",
         err.response?.data || err.message,
       );
+
       notification.error({
         message: "Error",
-        description: "Failed to add reservation. Please try again later.",
+        description:
+          err.response?.data?.error ||
+          "Failed to add reservation. Please try again later.",
       });
     }
   };

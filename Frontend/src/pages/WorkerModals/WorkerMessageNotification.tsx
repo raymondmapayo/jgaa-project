@@ -1,7 +1,7 @@
 import { Avatar, List, Tag, Spin } from "antd";
 import dayjs from "dayjs";
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom"; // ✅ ADD THIS
+import { Link } from "react-router-dom";
 import axios from "axios";
 
 interface Notification {
@@ -33,12 +33,8 @@ const MessageNotification: React.FC<Props> = ({
     if (!userId) return;
 
     let isMounted = true;
-    let isFetching = false;
 
     const fetchNotifications = async () => {
-      if (isFetching) return;
-      isFetching = true;
-
       try {
         const res = await axios.get(`${apiUrl}/worker_notifications/${userId}`);
 
@@ -55,24 +51,23 @@ const MessageNotification: React.FC<Props> = ({
           setNotifications(data);
 
           const unread = data.filter((n) => n.is_read !== "read").length;
+
           onUnreadCountChange?.(unread);
         }
       } catch (err) {
         console.error("Failed to fetch messages:", err);
       } finally {
-        isFetching = false;
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     setLoading(true);
     fetchNotifications();
 
-    const intervalId = setInterval(fetchNotifications, 5000);
-
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
     };
   }, [apiUrl, userId, onUnreadCountChange]);
 
@@ -100,8 +95,11 @@ const MessageNotification: React.FC<Props> = ({
           <Link
             to="/Worker/Manage/Chats"
             state={{ selectedUserId: item.id }}
-            onClick={() => onCloseDropdown?.()} // ✅ CLOSE DRAWER ON CLICK
-            style={{ textDecoration: "none", color: "inherit" }}
+            onClick={() => onCloseDropdown?.()}
+            style={{
+              textDecoration: "none",
+              color: "inherit",
+            }}
           >
             <List.Item
               key={item.id + item.time}
@@ -130,7 +128,6 @@ const MessageNotification: React.FC<Props> = ({
                 }}
               />
 
-              {/* CONTENT */}
               <div className="flex flex-col flex-1 min-w-0 pl-2">
                 <div className="flex items-start justify-between w-full text-black dark:text-white">
                   <span className="text-sm md:text-base font-bold break-words text-black dark:text-white">

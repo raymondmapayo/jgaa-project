@@ -326,56 +326,58 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[559px] w-full bg-gray-50 gap-0 md:gap-4">
-      {/* Sidebar */}
-      {(!isMobile || (isMobile && !showChat)) && (
-        <div className="h-full flex-shrink-0 w-full md:w-auto">
-          <Sidebar
-            admins={admins}
-            clients={clients}
-            selectedUser={selectedUser}
-            onSelectUser={handleSelectUser}
-            currentWorkerId={workerIdNum}
-          />
-        </div>
-      )}
+    <div className="w-full h-[559px] bg-gray-50">
+      <div className="flex flex-col md:flex-row w-full h-full gap-4">
+        {/* Sidebar */}
+        {(!isMobile || (isMobile && !showChat)) && (
+          <div className="h-full w-full md:w-[280px] flex-shrink-0">
+            <Sidebar
+              admins={admins}
+              clients={clients}
+              selectedUser={selectedUser}
+              onSelectUser={handleSelectUser}
+              currentWorkerId={workerIdNum}
+            />
+          </div>
+        )}
 
-      {/* Chat Window */}
-      {(!isMobile || (isMobile && showChat)) && (
-        <div className="flex-1 h-full w-full md:w-auto">
-          <ChatWindow
-            messages={messages || []}
-            newMessage={newMessage}
-            selectedUser={selectedUser}
-            selectedWorker={selectedWorker}
-            chatEndRef={chatEndRef}
-            onSendMessage={handleSendMessage}
-            onMessageChange={setNewMessage}
-            formatTime={formatTime}
-            toggleAnnouncements={handleToggleAnnouncements}
-            isMobile={isMobile}
-            onBack={handleBackToSidebar}
-          />
-        </div>
-      )}
+        {/* Chat Window */}
+        {(!isMobile || (isMobile && showChat)) && (
+          <div className="flex-1 min-w-0 h-full">
+            <ChatWindow
+              messages={messages || []}
+              newMessage={newMessage}
+              selectedUser={selectedUser}
+              selectedWorker={selectedWorker}
+              chatEndRef={chatEndRef}
+              onSendMessage={handleSendMessage}
+              onMessageChange={setNewMessage}
+              formatTime={formatTime}
+              toggleAnnouncements={handleToggleAnnouncements}
+              isMobile={isMobile}
+              onBack={handleBackToSidebar}
+            />
+          </div>
+        )}
 
-      {/* Announcements Panel */}
-      {showAnnouncements && !isMobile && (
-        <div className="w-full md:w-1/3 h-full flex-shrink-0 bg-[#fafafa] shadow-md p-4 rounded-lg transition-all duration-300">
+        {/* Announcements Panel */}
+        {showAnnouncements && !isMobile && (
+          <div className="h-full flex-1 min-w-0">
+            <WorkerAnnouncementView />
+          </div>
+        )}
+
+        {/* Mobile modal */}
+        <Modal
+          open={modalVisible}
+          onCancel={() => setModalVisible(false)}
+          footer={null}
+          width="90%"
+          bodyStyle={{ padding: 0 }}
+        >
           <WorkerAnnouncementView />
-        </div>
-      )}
-
-      {/* Mobile modal */}
-      <Modal
-        open={modalVisible}
-        onCancel={() => setModalVisible(false)}
-        footer={null}
-        width="90%"
-        bodyStyle={{ padding: 0 }}
-      >
-        <WorkerAnnouncementView />
-      </Modal>
+        </Modal>
+      </div>
     </div>
   );
 };
