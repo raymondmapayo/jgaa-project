@@ -2,11 +2,11 @@ import { DefaultEventsMap } from "@socket.io/component-emitter";
 import { Modal } from "antd";
 import axios from "axios";
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
 import ChatWindow from "./Chat/ChatWindow";
 import Sidebar from "./Chat/Sidebar";
 import WorkerAnnouncementView from "./WorkerAnnouncement";
-import { useLocation } from "react-router-dom";
 
 export type Message = {
   id: number;
@@ -27,6 +27,7 @@ export type Admin = {
   last_message?: string;
   last_message_time?: string;
   last_sender_id?: number;
+  unread_count?: number;
 };
 
 export type Client = {
@@ -38,6 +39,7 @@ export type Client = {
   last_message?: string;
   last_message_time?: string;
   last_sender_id?: number;
+  unread_count?: number;
 };
 
 export type Worker = {
@@ -70,6 +72,11 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
     null,
   );
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  // Lets the socket listener see the open conversation without re-subscribing
+  const selectedUserRef = useRef<User | null>(null);
+  useEffect(() => {
+    selectedUserRef.current = selectedUser;
+  }, [selectedUser]);
 
   // Detect mobile
   useEffect(() => {
@@ -79,33 +86,58 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Connect socket and join worker room
+  // Connect socket, join worker room, listen for new messages
   useEffect(() => {
     if (!workerIdNum) return;
-    socket.current = io(`${apiUrl}`);
-    socket.current.emit("joinWorkerRoom", workerIdNum);
+    const s = io(`${apiUrl}`);
+    socket.current = s;
+    s.emit("joinWorkerRoom", workerIdNum);
+
+    const handleIncomingMessage = (raw: Message) => {
+      const msg: Message = {
+        ...raw,
+        sender: Number(raw.senderId) === workerIdNum ? "worker" : "admin",
+      };
+      const otherId =
+        Number(msg.senderId) === workerIdNum
+          ? Number(msg.receiverId)
+          : Number(msg.senderId);
+      const isOpenChat = selectedUserRef.current?.user_id === otherId;
+
+      // Only show it if it belongs to the conversation that's open, and skip echoes
+      if (isOpenChat) {
+        setMessages((prev) =>
+          prev.some(
+            (m) =>
+              (msg.id != null && m.id === msg.id) ||
+              (m.message === msg.message && m.timestamp === msg.timestamp),
+          )
+            ? prev
+            : [...prev, msg],
+        );
+        if (msg.sender !== "worker") {
+          axios
+            .post(`${apiUrl}/markMessagesRead`, {
+              sender_id: otherId,
+              read_by: user_id,
+            })
+            .catch(() => {});
+        }
+      }
+
+      updateSidebarLastMessage(msg, otherId, Number(msg.senderId), {
+        unread: msg.sender !== "worker" && !isOpenChat,
+      });
+    };
+
+    s.on("receive_message", handleIncomingMessage);
 
     return () => {
-      socket.current?.disconnect();
+      s.off("receive_message", handleIncomingMessage);
+      s.disconnect();
       socket.current = null;
     };
   }, [apiUrl, workerIdNum]);
-
-  // Listen for new messages
-  useEffect(() => {
-    if (!socket.current) return;
-
-    const handleIncomingMessage = (msg: Message) => {
-      setMessages((prev) => [...prev, msg]);
-      updateSidebarLastMessage(msg, msg.receiverId || 0, msg.senderId || 0);
-    };
-
-    socket.current.on("receive_message", handleIncomingMessage);
-
-    return () => {
-      socket.current?.off("receive_message", handleIncomingMessage);
-    };
-  }, []);
 
   // Fetch admins & clients
   useEffect(() => {
@@ -117,20 +149,20 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
           axios.get(`${apiUrl}/get_clients_info/${workerIdNum}`),
         ]);
 
-        const adminsData = aRes.data.map((a: any) => ({
-          ...a,
-          last_sender_id:
-            a.last_sender_id !== null ? Number(a.last_sender_id) : 0,
-        }));
-
-        const clientsData = cRes.data.map((c: any) => ({
-          ...c,
-          last_sender_id:
-            c.last_sender_id !== null ? Number(c.last_sender_id) : 0,
-        }));
-
-        setAdmins(adminsData);
-        setClients(clientsData);
+        setAdmins(
+          aRes.data.map((a: any) => ({
+            ...a,
+            last_sender_id:
+              a.last_sender_id !== null ? Number(a.last_sender_id) : 0,
+          })),
+        );
+        setClients(
+          cRes.data.map((c: any) => ({
+            ...c,
+            last_sender_id:
+              c.last_sender_id !== null ? Number(c.last_sender_id) : 0,
+          })),
+        );
       } catch (err) {
         console.error(err);
       }
@@ -169,17 +201,12 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
           read_by: user_id,
         });
 
-        setAdmins((prev) =>
-          prev.map((u) =>
+        const clear = <T extends User>(list: T[]) =>
+          list.map((u) =>
             u.user_id === selectedUser.user_id ? { ...u, unread_count: 0 } : u,
-          ),
-        );
-
-        setClients((prev) =>
-          prev.map((u) =>
-            u.user_id === selectedUser.user_id ? { ...u, unread_count: 0 } : u,
-          ),
-        );
+          );
+        setAdmins((prev) => clear(prev));
+        setClients((prev) => clear(prev));
       } catch (err) {
         console.error("Failed to mark messages read", err);
       }
@@ -190,24 +217,24 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
 
   // Fetch messages for selected user
   useEffect(() => {
-    const fetchMessages = async () => {
-      if (!workerIdNum || !selectedUser) return;
+    if (!workerIdNum || !selectedUser) return;
+    let cancelled = false;
 
+    const fetchMessages = async () => {
       try {
         const res = await axios.get(
           `${apiUrl}/getMessagesWorker/${workerIdNum}/${selectedUser.user_id}`,
         );
+        if (cancelled) return; // user switched conversations mid-request
 
-        const msgs: Message[] = res.data
-          .map((m: any) => ({
-            id: m.id,
-            message: m.message,
-            sender: m.sender_id === workerIdNum ? "worker" : "admin",
-            timestamp: m.timestamp,
-            senderId: Number(m.sender_id),
-            receiverId: Number(m.receiver_id),
-          }))
-          .reverse();
+        const msgs: Message[] = res.data.map((m: any) => ({
+          id: m.id,
+          message: m.message,
+          sender: m.sender_id === workerIdNum ? "worker" : "admin",
+          timestamp: m.timestamp,
+          senderId: Number(m.sender_id),
+          receiverId: Number(m.receiver_id),
+        }));
 
         setMessages(msgs);
 
@@ -224,9 +251,12 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
       }
     };
 
+    setMessages([]);
     fetchMessages();
-    // 🔥 No setInterval needed, messages arrive via Socket.io
-  }, [selectedUser, workerIdNum]);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUser?.user_id, workerIdNum]);
 
   // Fetch worker profile
   useEffect(() => {
@@ -240,7 +270,8 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
 
   // Send message
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedUser || !workerIdNum) return;
+    const text = newMessage.trim();
+    if (!text || !selectedUser || !workerIdNum) return;
 
     try {
       const endpoint =
@@ -249,14 +280,14 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
           : `${apiUrl}/sendMessageToClients`;
 
       const res = await axios.post(endpoint, {
-        message: newMessage,
+        message: text,
         sender_id: workerIdNum,
         recipient_id: selectedUser.user_id,
       });
 
       const newMsg: Message & { receiverId: number } = {
         id: res.data.message_id,
-        message: newMessage,
+        message: text,
         sender: "worker",
         timestamp: new Date().toISOString(),
         senderId: workerIdNum,
@@ -267,48 +298,36 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
       updateSidebarLastMessage(newMsg, selectedUser.user_id, workerIdNum);
       setNewMessage("");
 
-      // Emit to Socket.io
-      socket.current?.emit(
-        "newMessageToWorker",
-        newMsg, // server will emit back to this worker's room
-      );
-
+      socket.current?.emit("newMessageToWorker", newMsg);
       onNewMessage?.(newMsg);
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Update last message for sidebar
+  // Update last message (and optionally unread count) for sidebar
   const updateSidebarLastMessage = (
     msg: Message,
     userId: number,
     senderId: number,
+    opts?: { unread?: boolean },
   ) => {
-    setAdmins((prev) =>
-      prev.map((u) =>
+    const apply = <T extends User>(list: T[]) =>
+      list.map((u) =>
         u.user_id === userId
           ? {
               ...u,
               last_message: msg.message,
               last_message_time: msg.timestamp,
               last_sender_id: senderId,
+              unread_count: opts?.unread
+                ? (u.unread_count || 0) + 1
+                : u.unread_count,
             }
           : u,
-      ),
-    );
-    setClients((prev) =>
-      prev.map((u) =>
-        u.user_id === userId
-          ? {
-              ...u,
-              last_message: msg.message,
-              last_message_time: msg.timestamp,
-              last_sender_id: senderId,
-            }
-          : u,
-      ),
-    );
+      );
+    setAdmins((prev) => apply(prev));
+    setClients((prev) => apply(prev));
   };
 
   const formatTime = (t: string) =>
@@ -326,11 +345,11 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
   };
 
   return (
-    <div className="w-full h-[559px] bg-gray-50">
-      <div className="flex flex-col md:flex-row w-full h-full gap-4">
+    <div className="h-[559px] w-full">
+      <div className="flex h-full w-full flex-col gap-3 md:flex-row">
         {/* Sidebar */}
-        {(!isMobile || (isMobile && !showChat)) && (
-          <div className="h-full w-full md:w-[280px] flex-shrink-0">
+        {(!isMobile || !showChat) && (
+          <div className="h-full w-full flex-shrink-0 md:w-[300px]">
             <Sidebar
               admins={admins}
               clients={clients}
@@ -342,8 +361,8 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
         )}
 
         {/* Chat Window */}
-        {(!isMobile || (isMobile && showChat)) && (
-          <div className="flex-1 min-w-0 h-full">
+        {(!isMobile || showChat) && (
+          <div className="h-full min-w-0 flex-1">
             <ChatWindow
               messages={messages || []}
               newMessage={newMessage}
@@ -362,7 +381,7 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
 
         {/* Announcements Panel */}
         {showAnnouncements && !isMobile && (
-          <div className="h-full flex-1 min-w-0">
+          <div className="h-full min-w-0 flex-1">
             <WorkerAnnouncementView />
           </div>
         )}
@@ -373,7 +392,7 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
           onCancel={() => setModalVisible(false)}
           footer={null}
           width="90%"
-          bodyStyle={{ padding: 0 }}
+          styles={{ body: { padding: 0 } }}
         >
           <WorkerAnnouncementView />
         </Modal>

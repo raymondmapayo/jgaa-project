@@ -1,123 +1,60 @@
-import { Card, Typography, Grid } from "antd";
 import cardImg from "../../../public/assets/cards.png";
-import cardImge from "../../../public/assets/f1.jpeg";
-
-const { Title, Text } = Typography;
-const { useBreakpoint } = Grid;
 
 interface Props {
   fname: string;
 }
 
 const WelcomeCard = ({ fname }: Props) => {
-  const screens = useBreakpoint();
-  const isMobile = !screens.md;
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
 
   return (
-    <Card
-      bordered={false}
-      style={{
-        borderRadius: 16,
-        overflow: "hidden",
-        minHeight: isMobile ? 320 : 220,
-        background: "linear-gradient(145deg, #0a0a0a, #1a1a1a)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 12px 30px rgba(0,0,0,0.6)",
-      }}
-      styles={{
-        body: {
-          padding: isMobile ? 18 : 24,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: isMobile ? "center" : "flex-start",
-          textAlign: isMobile ? "center" : "left",
-          gap: 10,
-        },
-      }}
-    >
-      {/* TOP TEXT SECTION */}
-      <Title
-        style={{
-          color: "#fafafa",
-          marginBottom: 0,
-        }}
-        level={isMobile ? 4 : 3}
-      >
-        Welcome back 👋
-      </Title>
+    <section className="relative overflow-hidden rounded-3xl bg-white bg-[radial-gradient(circle_at_top_right,#dbeafe,transparent_55%),radial-gradient(circle_at_bottom_left,#ffedd5,transparent_50%)] p-6 shadow-[0_10px_40px_-12px_rgba(30,64,175,0.18)] ring-1 ring-blue-100 sm:p-8">
+      {/* soft decorative rings */}
+      <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full border border-blue-200/70" />
+      <div className="pointer-events-none absolute -right-3 -top-3 h-24 w-24 rounded-full border border-blue-200/70" />
 
-      <Title
-        style={{
-          color: "#fafafa",
-          marginTop: 0,
-        }}
-        level={isMobile ? 5 : 4}
-      >
-        {fname}
-      </Title>
+      <div className="relative flex flex-col items-center gap-6 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+        {/* Text */}
+        <div className="max-w-md">
+          <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
+            <span className="h-2 w-2 rounded-full bg-blue-500" />
+            {today}
+          </span>
 
-      <Text
-        style={{
-          color: "rgba(255,255,255,0.75)",
-          display: "block",
-          maxWidth: 420,
-        }}
-      >
-        Have a productive and great day ahead. Everything you need is ready in
-        your dashboard.
-      </Text>
+          <p className="m-0 mt-4 text-sm font-medium text-gray-500">
+            Welcome back
+          </p>
+          <h2 className="m-0 mt-1 text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+            {fname}
+          </h2>
+          <p className="m-0 mt-3 text-sm leading-relaxed text-gray-500 sm:text-base">
+            Have a productive and great day ahead. Everything you need is ready
+            in your dashboard.
+          </p>
+        </div>
 
-      {/* HUMAN IMAGE (NOW ALWAYS AT BOTTOM ON MOBILE) */}
-      <div
-        style={{
-          marginTop: isMobile ? 20 : 0,
-          width: "100%",
-          display: "flex",
-          justifyContent: isMobile ? "center" : "flex-end",
-          position: "relative",
-        }}
-      >
-        {/* decorative card image */}
-        <img
-          src={cardImg}
-          alt=""
-          style={{
-            position: "absolute",
-            width: isMobile ? 140 : 220,
-            bottom: 0,
-            opacity: 0.85,
-            transform: isMobile
-              ? "rotate(-10deg)"
-              : "translateX(-40px) rotate(-14deg)",
-          }}
-        />
+        {/* Illustration */}
+        <div className="relative flex h-40 w-full max-w-[260px] flex-shrink-0 items-end justify-center sm:h-48 sm:w-[260px]">
+          <div className="absolute bottom-0 h-36 w-36 rounded-full bg-blue-100/70 sm:h-44 sm:w-44" />
 
-        {/* main character */}
-        <img
-          src="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/illustrations/characters/character-present.webp"
-          alt=""
-          style={{
-            height: isMobile ? 140 : 160,
-            zIndex: 2,
-          }}
-        />
+          <img
+            src={cardImg}
+            alt=""
+            className="absolute bottom-1 left-2 w-28 -rotate-12 opacity-90 sm:w-32"
+          />
+
+          <img
+            src="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/illustrations/characters/character-present.webp"
+            alt=""
+            className="relative z-10 h-36 sm:h-44"
+          />
+        </div>
       </div>
-
-      {/* background decoration */}
-      <img
-        src={cardImge}
-        alt=""
-        style={{
-          position: "absolute",
-          left: -20,
-          bottom: -10,
-          width: isMobile ? 180 : 280,
-          opacity: 0.08,
-          transform: "rotate(10deg)",
-          pointerEvents: "none",
-        }}
-      />
-    </Card>
+    </section>
   );
 };
 

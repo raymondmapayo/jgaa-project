@@ -11,10 +11,10 @@ import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 
-import EditSupplyModal from "../WorkerModals/EditSupplyModal";
 import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 import WorkerHistoryInventoryModal from "./WorkerHistoryInventory";
 import AddSupplyDrinksModal from "../WorkerModals/AddSupplyDrinksModal";
+import EditDrinksSupplyModal from "../WorkerModals/EditDrinksSupplyModal";
 
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
@@ -135,27 +135,30 @@ const WorkerDrinksSupply = () => {
 
   const apiUrl = import.meta.env.VITE_API_URL;
 
-  useEffect(() => {
-    const fetchSupply = async () => {
-      try {
-        const response = await axios.get(`${apiUrl}/get_supply_drinks`);
-        if (response.data.success) {
-          setDataSource(response.data.data);
-        } else {
-          console.error("⚠️ Backend returned error:", response.data.message);
-        }
-      } catch (error) {
-        console.error("❌ Error fetching supply:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchdrinksSupply = async () => {
+    setIsLoading(true);
 
-    fetchSupply();
+    try {
+      const response = await axios.get(`${apiUrl}/get_supply_drinks`);
+
+      if (response.data.success) {
+        setDataSource(response.data.data);
+      } else {
+        console.error("⚠️ Backend returned error:", response.data.message);
+      }
+    } catch (error) {
+      console.error("❌ Error fetching supply:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchdrinksSupply();
   }, [apiUrl]);
 
-  const handleAddSupply = (values: any) => {
-    console.log("New Supply Added:", values);
+  const handleAddDrinksSupply = (values: any) => {
+    console.log("New drinks Supply Added:", values);
     setIsModalVisible(false);
   };
 
@@ -296,7 +299,8 @@ const WorkerDrinksSupply = () => {
       {/* ===== Modals ===== */}
       <AddSupplyDrinksModal
         visible={isModalVisible}
-        onFinish={handleAddSupply}
+        onFinish={handleAddDrinksSupply}
+        onSuccess={fetchdrinksSupply}
         onClose={() => setIsModalVisible(false)}
       />
 
@@ -309,14 +313,14 @@ const WorkerDrinksSupply = () => {
         }}
       />
 
-      <EditSupplyModal
+      <EditDrinksSupplyModal
         visible={editModalVisible}
         selectedItem={selectedItem}
         onClose={() => {
           setEditModalVisible(false);
           setSelectedItem(null);
         }}
-        onFinish={() => window.location.reload()}
+        onFinish={() => fetchdrinksSupply()}
       />
 
       <WorkerHistoryInventoryModal

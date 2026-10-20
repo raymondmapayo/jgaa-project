@@ -29,14 +29,14 @@ interface RevenueData {
   sales: number;
 }
 
+type FilterType = "daily" | "weekly" | "monthly" | "yearly";
+
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
   const [rawData, setRawData] = useState<RevenueData[]>([]);
   const [data, setData] = useState<RevenueData[]>([]);
-  const [filterType, setFilterType] = useState<"daily" | "weekly" | "monthly">(
-    "daily",
-  );
+  const [filterType, setFilterType] = useState<FilterType>("daily");
 
   const generateMonthDates = (start: Dayjs, end: Dayjs) => {
     const dates: string[] = [];
@@ -47,35 +47,64 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
   };
 
   useEffect(() => {
-    fetch(`${apiUrl}/get_payments`)
-      .then((res) => res.json())
-      .then((payments) => {
+    const fetchPayments = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/get_payments`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error: ${response.status}`);
+        }
+
+        const payments = await response.json();
+
+        if (!Array.isArray(payments)) {
+          console.error("Expected an array of payments:", payments);
+          throw new Error("Invalid payments response from server");
+        }
+
         const grouped: { [key: string]: number } = {};
+
         payments
           .filter((p: any) => p.payment_status === "paid")
           .forEach((p: any) => {
-            const date = dayjs(p.payment_date).format("YYYY-MM-DD");
-            grouped[date] = (grouped[date] || 0) + Number(p.amount_paid);
+            const parsedDate = dayjs(p.payment_date);
+
+            if (!parsedDate.isValid()) return;
+
+            const date = parsedDate.format("YYYY-MM-DD");
+
+            grouped[date] = (grouped[date] || 0) + Number(p.amount_paid || 0);
           });
 
         const allData: RevenueData[] = Object.keys(grouped)
           .sort((a, b) => dayjs(a).unix() - dayjs(b).unix())
-          .map((d) => ({ date: d, sales: grouped[d] }));
+          .map((date) => ({
+            date,
+            sales: grouped[date],
+          }));
 
         setRawData(allData);
 
-        // Default to current month
         const today = dayjs();
         const start = today.startOf("month");
         const end = today.endOf("month");
-        const monthData = generateMonthDates(start, end).map((d) => {
-          const item = allData.find((r) => r.date === d);
-          return { date: d, sales: item ? item.sales : 0 };
+
+        const monthData = generateMonthDates(start, end).map((date) => {
+          const item = allData.find((r) => r.date === date);
+
+          return {
+            date,
+            sales: item ? item.sales : 0,
+          };
         });
 
         setData(monthData);
-      })
-      .catch((err) => console.error("Error fetching payments:", err));
+      } catch (error) {
+        console.error("Error fetching payments:", error);
+      }
+    };
+
+    fetchPayments();
   }, []);
 
   useEffect(() => {
@@ -84,7 +113,7 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
 
   const groupData = (
     dataset: RevenueData[],
-    type: "daily" | "monthly",
+    type: "daily" | "monthly" | "yearly",
   ): RevenueData[] => {
     const sorted = [...dataset].sort((a, b) =>
       dayjs(a.date).diff(dayjs(b.date)),
@@ -113,6 +142,29 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
       }));
     }
 
+    // 📅 Yearly: total sales per year, every year in the range is shown
+    if (type === "yearly") {
+      if (sorted.length === 0) return [];
+
+      const grouped: { [key: string]: number } = {};
+      sorted.forEach((item) => {
+        const yearKey = dayjs(item.date).format("YYYY");
+        grouped[yearKey] = (grouped[yearKey] || 0) + item.sales;
+      });
+
+      const firstYear = dayjs(sorted[0].date).year();
+      const lastYear = dayjs(sorted[sorted.length - 1].date).year();
+
+      const years: RevenueData[] = [];
+      for (let y = firstYear; y <= lastYear; y++) {
+        years.push({
+          date: `${y}-01-01`,
+          sales: grouped[String(y)] || 0,
+        });
+      }
+      return years;
+    }
+
     return sorted;
   };
 
@@ -136,7 +188,11 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
     const diffDays = end.diff(start, "day") + 1;
     const diffMonths = end.diff(start, "month") + 1;
 
-    if (diffMonths > 1) {
+    if (diffMonths > 12) {
+      // more than a year selected → show one point per year
+      setFilterType("yearly");
+      setData(groupData(filtered, "yearly"));
+    } else if (diffMonths > 1) {
       setFilterType("monthly");
       setData(groupData(filtered, "monthly"));
     } else if (diffDays > 13) {
@@ -157,7 +213,16 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
 
     if (valid.length === 0) return "";
 
-    const recent = valid.slice(-2); // only keep the last 2 days
+    const isYearly = filterType === "yearly";
+    // In yearly view dates are shown as just the year
+    const fmt = (date: string, pattern = "MM/DD/YYYY") =>
+      dayjs(date).format(isYearly ? "YYYY" : pattern);
+    const periodText = isYearly
+      ? "this year and last year"
+      : "today and yesterday";
+    const averageText = isYearly ? "yearly" : "daily";
+
+    const recent = valid.slice(-2); // only keep the last 2 periods
     const highest = recent.reduce((a, b) => (a.sales > b.sales ? a : b));
     const lowest = recent.reduce((a, b) => (a.sales < b.sales ? a : b));
     const last = recent[recent.length - 1];
@@ -176,44 +241,43 @@ const WorkerTotalRevenue: React.FC<WorkerTotalRevenueProps> = ({ dates }) => {
     if (uniqueSales.length > 1) {
       const avgSales =
         recent.reduce((sum, v) => sum + v.sales, 0) / recent.length;
-      analyticsText = `\n📊 Analytics: The highest sales were recorded on ${dayjs(
+      analyticsText = `\n📊 Analytics: The highest sales were recorded on ${fmt(
         highest.date,
-      ).format("MMM DD, YYYY")} (₱${
-        highest.sales
-      }), while the lowest were on ${dayjs(lowest.date).format(
+        "MMM DD, YYYY",
+      )} (₱${highest.sales}), while the lowest were on ${fmt(
+        lowest.date,
         "MMM DD, YYYY",
       )} (₱${
         lowest.sales
-      }). On average, daily sales reached around ₱${avgSales.toFixed(
+      }). On average, ${averageText} sales reached around ₱${avgSales.toFixed(
         2,
-      )}, showing variable sales activity between today and yesterday.`;
+      )}, showing variable sales activity between ${periodText}.`;
     } else {
-      analyticsText =
-        "\n📊 Analytics: Sales were consistent between today and yesterday with no significant variation.";
+      analyticsText = `\n📊 Analytics: Sales were consistent between ${periodText} with no significant variation.`;
     }
 
     return `
-📅 ${dayjs(last.date).format("MM/DD/YYYY")}: (₱${last.sales}) — ${
+📅 ${fmt(last.date)}: (₱${last.sales}) — ${
       prev
-        ? `${changeText} compared to ${dayjs(prev.date).format(
-            "MM/DD/YYYY",
-          )}: (₱${prev.sales})`
+        ? `${changeText} compared to ${fmt(prev.date)}: (₱${prev.sales})`
         : "-"
     }
-🔼 Highest: ${dayjs(highest.date).format("MM/DD/YYYY")} — ₱${highest.sales}
-🔽 Lowest: ${dayjs(lowest.date).format("MM/DD/YYYY")} — ₱${lowest.sales}
+🔼 Highest: ${fmt(highest.date)} — ₱${highest.sales}
+🔽 Lowest: ${fmt(lowest.date)} — ₱${lowest.sales}
 💰 Total Sales: ₱${recent.reduce((sum, item) => sum + item.sales, 0)}
 ${analyticsText}
   `.trim();
-  }, [data]);
+  }, [data, filterType]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const item = payload[0].payload;
       const dateLabel =
-        filterType === "monthly"
-          ? dayjs(item.date).format("MMM YYYY")
-          : dayjs(item.date).format("MMM DD, YYYY");
+        filterType === "yearly"
+          ? dayjs(item.date).format("YYYY")
+          : filterType === "monthly"
+            ? dayjs(item.date).format("MMM YYYY")
+            : dayjs(item.date).format("MMM DD, YYYY");
       return (
         <div className="bg-[#fafafa] dark:bg-gray-800 p-2 border rounded shadow-md text-sm">
           <p>{dateLabel}</p>
@@ -250,7 +314,8 @@ ${analyticsText}
                 tick={{ fontSize: 10 }}
                 angle={-45}
                 textAnchor="end"
-                interval="preserveStartEnd"
+                interval={0}
+                height={70}
                 tickFormatter={(date) =>
                   filterType === "monthly"
                     ? dayjs(date).format("MMM")

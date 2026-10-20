@@ -1,4 +1,3 @@
-// OrderDetailsModal.tsx
 import { message, Modal, Spin } from "antd";
 import axios from "axios";
 import React, { useState } from "react";
@@ -21,15 +20,16 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [showGCash, setShowGCash] = useState(false);
-  const [orderId, setOrderId] = useState<number | null>(null);
 
   const client = useStore((state) => state.client) || {};
   const userId = sessionStorage.getItem("user_id");
   const apiUrl = import.meta.env.VITE_API_URL;
 
-  // Helper: create order only once
-  const createOrder = async (paymentMethod: "GCash") => {
-    if (orderId) return orderId; // Already created
+  // Create the order only when the payment form is submitted.
+  const createOrder = async (paymentMethod: "GCash"): Promise<number> => {
+    if (!userId) {
+      throw new Error("User ID not found. Please log in again.");
+    }
 
     const data = checkoutItems.map((item) => ({
       user_id: userId,
@@ -47,15 +47,48 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       payment_method: paymentMethod,
     });
 
-    const createdOrderId = response.data.orderId;
-    if (!createdOrderId) throw new Error("Failed to create order");
+    const createdOrderId = Number(response.data.orderId);
 
-    setOrderId(createdOrderId);
+    if (!Number.isInteger(createdOrderId) || createdOrderId <= 0) {
+      console.error("Invalid create_order response:", response.data);
+
+      throw new Error("The server did not return a valid order ID.");
+    }
+
     return createdOrderId;
   };
 
-  const handlePaymentSuccess = async () => {
+  // Called only after Submit Payment is clicked.
+  // Creates the order and its order items before saving the transaction.
+  const createOrderAndItems = async (): Promise<number> => {
+    const createdOrderId = await createOrder("GCash");
+
+    const orderItems = checkoutItems.map((item) => ({
+      order_id: createdOrderId,
+      user_id: userId,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      price: item.price,
+      menu_img: item.menu_img,
+      final_total: item.price * item.quantity,
+      size: item.size || "Normal size",
+      categories_name: item.categories_name || "Uncategorized",
+    }));
+
+    await axios.post(`${apiUrl}/create_order_items/${userId}`, {
+      orderItems,
+    });
+
+    return createdOrderId;
+  };
+
+  // Called after the GCash transaction and payment are saved.
+  // Do not create another order here.
+  const handlePaymentSuccess = async (
+    createdOrderId: number,
+  ): Promise<void> => {
     setLoading(true);
+
     try {
       const data = checkoutItems.map((item) => ({
         user_id: userId,
@@ -68,62 +101,52 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         size: item.size || "Normal size",
       }));
 
-      const createdOrderId = await createOrder("GCash");
-
-      const orderItems = data.map((item) => ({
-        order_id: createdOrderId,
-        user_id: userId,
-        item_name: item.item_name,
-        quantity: item.quantity,
-        price: item.price,
-        menu_img: item.menu_img,
-        final_total: item.final_total,
-        size: item.size,
-        categories_name: item.categories_name,
-      }));
-
-      await axios.post(`${apiUrl}/create_order_items/${userId}`, {
-        orderItems,
-      });
-
+      // 1. Save user activity using the same order ID.
       await axios.post(`${apiUrl}/activity_user/${userId}`, {
         user_id: userId,
         activity_date: new Date(),
         order_id: createdOrderId,
       });
 
-      await axios.post(`${apiUrl}/remove_from_cart/${userId}`, { items: data });
+      // 2. Remove purchased items from the cart.
+      await axios.post(`${apiUrl}/remove_from_cart/${userId}`, {
+        items: data,
+      });
 
-      console.log(
-        "GCash: order created and left as pending. Waiting for verification.",
-      );
+      // 3. Clear the cart and close the modal.
+      useStore.setState({
+        client: {
+          ...client,
+          cart: [],
+        },
+      });
 
+      setShowGCash(false);
       onCancel();
-      message.success("Order placed successfully and cart cleared!");
-      useStore.setState({ client: { ...client, cart: [] } });
+
+      message.success("Order submitted successfully!");
     } catch (error: any) {
       console.error(
-        "Payment process failed:",
+        "Order submission failed:",
         error?.response?.data || error?.message || error,
       );
+
       message.error(
-        error?.response?.data?.error ||
-          error?.response?.data?.message ||
-          error?.message ||
-          "An error occurred while processing your payment. Please try again.",
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          "Payment was submitted, but checkout cleanup failed. Please contact support if your cart was not updated.",
       );
+
+      throw error;
     } finally {
       setLoading(false);
     }
   };
-  const handleShowGCash = async () => {
-    try {
-      await createOrder("GCash");
-      setShowGCash(true);
-    } catch {
-      message.error("Failed to initiate GCash payment. Please try again.");
-    }
+
+  const handleShowGCash = () => {
+    setShowGCash(true);
   };
+
   return (
     <Modal
       open={visible}
@@ -137,7 +160,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       }}
     >
       <div className="bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl overflow-hidden select-none animate-[fadeIn_.25s_ease]">
-        {/* Scrollable Container */}
         <div className="max-h-[80vh] overflow-y-auto p-6 space-y-6 custom-scroll">
           {/* ORDER SUMMARY */}
           <div>
@@ -145,7 +167,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               Order Summary
             </h3>
 
-            {/** MOBILE + TABLET → SWIPER SLIDER */}
+            {/* MOBILE + TABLET */}
             <div className="block lg:hidden">
               <Swiper
                 spaceBetween={12}
@@ -172,12 +194,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         <p className="font-medium text-gray-800 dark:text-gray-100">
                           {product.item_name}
                         </p>
+
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           Qty: {product.quantity}
                         </p>
+
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           Size: {product.size || "Normal"}
                         </p>
+
                         <p className="font-semibold text-gray-900 dark:text-white">
                           ₱{product.price * product.quantity}
                         </p>
@@ -188,7 +213,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               </Swiper>
             </div>
 
-            {/** DESKTOP → GRID VIEW */}
+            {/* DESKTOP */}
             <ul className="hidden lg:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {checkoutItems.map((product, idx) => (
                 <li
@@ -211,12 +236,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     <p className="font-medium text-gray-800 dark:text-gray-100">
                       {product.item_name}
                     </p>
+
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       Qty: {product.quantity}
                     </p>
+
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       Size: {product.size || "Normal"}
                     </p>
+
                     <p className="font-semibold text-gray-900 dark:text-white">
                       ₱{product.price * product.quantity}
                     </p>
@@ -254,17 +282,18 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 alt="GCash"
                 className="w-28 h-28 object-contain mb-3"
               />
+
               <p className="font-medium text-gray-800 dark:text-gray-200 text-lg">
                 GCash
               </p>
             </div>
 
-            {showGCash && orderId && (
+            {showGCash && (
               <div className="mt-4">
                 <GCashButton
                   amount={finalTotal}
-                  finalTotal={finalTotal} // ← ADD THIS
-                  orderId={orderId}
+                  finalTotal={finalTotal}
+                  onSubmitPayment={createOrderAndItems}
                   onPaymentSuccess={handlePaymentSuccess}
                   onPaymentError={(err) => console.error(err)}
                   menuImg={checkoutItems[0]?.menu_img || ""}

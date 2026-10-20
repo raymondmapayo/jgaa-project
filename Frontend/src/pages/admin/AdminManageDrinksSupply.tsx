@@ -11,7 +11,7 @@ import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 
-import EditSupplyModal from "../WorkerModals/EditSupplyModal";
+import EditSupplyModal from "../WorkerModals/EditIngredientsSupplyModal";
 import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 import AddSupplyDrinksModal from "../AdminModals/AddDrinksModal";
 

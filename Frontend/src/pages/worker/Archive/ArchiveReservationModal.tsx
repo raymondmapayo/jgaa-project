@@ -37,6 +37,8 @@ const ArchiveReservationModal = ({
     let isMounted = true;
 
     const fetchArchivedReservations = async () => {
+      setIsLoading(true);
+
       try {
         const response = await axios.get(`${apiUrl}/get_archive_reservation`, {
           headers: { "Cache-Control": "no-cache" },
@@ -48,19 +50,16 @@ const ArchiveReservationModal = ({
       } catch (error) {
         console.error("Error fetching archived reservations:", error);
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    // initial fetch
     fetchArchivedReservations();
-
-    // fetch every 10 seconds
-    const interval = setInterval(fetchArchivedReservations, 10000);
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
     };
   }, [apiUrl]);
 
@@ -76,7 +75,7 @@ const ArchiveReservationModal = ({
           await axios.put(`${apiUrl}/restore_reservation/${reservation_id}`);
 
           setArchivedReservations((prev) =>
-            prev.filter((item) => item.reservation_id !== reservation_id)
+            prev.filter((item) => item.reservation_id !== reservation_id),
           );
 
           // Refresh main table

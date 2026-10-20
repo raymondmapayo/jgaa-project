@@ -9,14 +9,16 @@ const { Option } = Select;
 interface EditValidationModalProps {
   order: any;
   onUpdateOrder?: (updatedOrder: any) => void;
-  onClose?: () => void; // ✅ Added onClose prop
+  onSuccess?: () => void;
+  onClose?: () => void;
 }
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const EditValidationModal: React.FC<EditValidationModalProps> = ({
   order,
   onUpdateOrder,
-  onClose, // ✅ Destructure onClose
+  onSuccess,
+  onClose,
 }) => {
   const [message, setMessage] = useState<string>("");
   const [paymentStatus, setPaymentStatus] = useState<string>("Pending");
@@ -46,9 +48,13 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
     }
 
     setLoading(true);
+
     try {
       const workerId = sessionStorage.getItem("user_id");
-      if (!workerId) throw new Error("Worker ID not found in session");
+
+      if (!workerId) {
+        throw new Error("Worker ID not found in session");
+      }
 
       // Send notification to client
       await axios.post(`${apiUrl}/send_client_notification`, {
@@ -59,22 +65,26 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
       });
 
       if (paymentStatus === "Paid") {
-        // Update order status & related tables
+        // 1. Update order status
         const { data } = await axios.put(`${apiUrl}/update_order_status`, {
           order_id: order?.order_id,
           payment_status: "paid",
           created_by: workerId,
         });
 
+        // 2. Update transaction status
         await axios.put(`${apiUrl}/update_transaction_status`, {
           order_id: order?.order_id,
           status: "completed",
         });
+
+        // 3. Update payment status
         await axios.put(`${apiUrl}/update_payment_status`, {
           order_id: order?.order_id,
           payment_status: "paid",
         });
 
+        // 4. Update order payment status
         await axios.post(
           `${apiUrl}/update_order_payment_status/${order.order_id}`,
           {
@@ -82,23 +92,35 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
           },
         );
 
+        // 5. Update the order in the current table
         if (onUpdateOrder && data.updatedOrder) {
           onUpdateOrder(data.updatedOrder);
         }
 
+        // 6. 🔥 Refresh the orders from backend
+        if (onSuccess) {
+          await onSuccess();
+        }
+
         antdMessage.success("Payment completed & inventory updated!");
-        // ✅ Disable inputs only for this order after successful save
+
+        // 7. Disable inputs
         setIsSaved(true);
 
-        // ✅ Close modal automatically after successful Paid save
-        if (onClose) onClose();
+        // 8. Close modal
+        if (onClose) {
+          onClose();
+        }
       } else {
         antdMessage.success("Validation saved successfully!");
-        // Optional: auto-close even for Pending
-        if (onClose) onClose();
+
+        if (onClose) {
+          onClose();
+        }
       }
     } catch (error: any) {
       console.error("Error saving order:", error);
+
       antdMessage.error(
         error.response?.data?.error || "Failed to save changes.",
       );

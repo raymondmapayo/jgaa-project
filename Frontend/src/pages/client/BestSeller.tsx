@@ -1,24 +1,24 @@
-import { Divider, Modal, notification } from "antd";
+import { notification } from "antd";
 import axios from "axios";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { FaShoppingBag } from "react-icons/fa";
+import { FaFire, FaShoppingBag } from "react-icons/fa";
 import { CustomRate } from "../../components/client/Rate";
-import { addToCart } from "../../zustand/store/store.provider"; // Importing addToCart from zustand store
-import ProductInfo from "./ProductInfo";
+import { addToCart } from "../../zustand/store/store.provider";
 import ClientsCommentsRated from "../ClientsModal/ClientsCommentsRated";
 import OrderDetailsModal from "../../clientsmodal/OrderDetailsModal";
-// Define interface for bestselling product
+
 interface BestsellerProduct {
-  bestseller_id?: number; // Optional in case it's not returned
+  bestseller_id?: number;
   item_name: string;
   menu_img: string;
   price: number;
   total_avg_rating: string;
   rating_count: number;
-  availability?: string; // add this
+  availability?: string;
   categories_name?: string | null;
 }
+
 interface MenuItem {
   id: number;
   item_name: string;
@@ -27,32 +27,31 @@ interface MenuItem {
   price: number;
   categories_name: string;
   quantity: number;
-  size: string; // Optional size property
+  size: string;
 }
 
 const Bestseller: React.FC = () => {
-  const [bestselling, setBestselling] = useState<BestsellerProduct[]>([]); // Use interface
-  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null); // Selected item for the modal
-  const [modalVisible, setModalVisible] = useState(false); // Modal visibility state
+  const [bestselling, setBestselling] = useState<BestsellerProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [reviewsModalVisible, setReviewsModalVisible] = useState(false);
-  const [orderModalVisible, setOrderModalVisible] = useState(false); // ✅ NEW state for OrderDetailsModal
+  const [orderModalVisible, setOrderModalVisible] = useState(false);
   const [selectedMenuName, setSelectedMenuName] = useState<string>("");
 
+  const reduceMotion = useReducedMotion();
   const apiUrl = import.meta.env.VITE_API_URL;
-  // Show the modal when a menu item is clicked
-  // ✅ NEW - handle Buy Now to open OrderDetailsModal
-  const handleBuyNowClick = (product: BestsellerProduct) => {
+
+  const handleBuyNowClick = (product: BestsellerProduct, index: number) => {
     const userId = sessionStorage.getItem("user_id");
-    // 🔒 Check if user is logged in
     if (!userId) {
       notification.warning({
-        message: "Login Required",
-        description: "You need to login or register before buying items.",
+        message: "Login required",
+        description: "Log in or register to buy items.",
       });
-      return; // stop here if not logged in
+      return;
     }
-    const menuItem: MenuItem = {
-      id: 1,
+    setSelectedItem({
+      id: product.bestseller_id ?? index + 1,
       item_name: product.item_name,
       menu_img: product.menu_img,
       description: "This is a description",
@@ -60,14 +59,8 @@ const Bestseller: React.FC = () => {
       categories_name: product.categories_name || "",
       quantity: 1,
       size: "Normal size",
-    };
-    setSelectedItem(menuItem);
-    setOrderModalVisible(true); // ✅ opens OrderDetailsModal
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedItem(null);
+    });
+    setOrderModalVisible(true);
   };
 
   const closeOrderModal = () => {
@@ -80,197 +73,236 @@ const Bestseller: React.FC = () => {
 
     if (storedData) {
       setBestselling(JSON.parse(storedData));
-    } else {
-      axios
-        .get<BestsellerProduct[]>(`${apiUrl}/bestselling`)
-        .then((response) => {
-          console.log("API Response:", response.data);
-          setBestselling(response.data);
-          sessionStorage.setItem(
-            "bestsellingData",
-            JSON.stringify(response.data),
-          );
-        })
-        .catch((error) => {
-          console.error("Error fetching bestseller data:", error);
-          if (error.response) {
-            console.error("Response error:", error.response.data);
-            console.error("Response status:", error.response.status);
-            console.error("Response headers:", error.response.headers);
-          } else if (error.request) {
-            console.error("Request error:", error.request);
-          } else {
-            console.error("General error:", error.message);
-          }
-        });
+      setLoading(false);
+      return;
     }
-  }, []);
+
+    axios
+      .get<BestsellerProduct[]>(`${apiUrl}/bestselling`)
+      .then((response) => {
+        setBestselling(response.data);
+        sessionStorage.setItem(
+          "bestsellingData",
+          JSON.stringify(response.data),
+        );
+      })
+      .catch((error) => {
+        console.error("Error fetching bestseller data:", error);
+      })
+      .finally(() => setLoading(false));
+  }, [apiUrl]);
 
   const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2,
-        duration: 0.5,
-      },
-    },
+    hidden: {},
+    visible: { transition: { staggerChildren: reduceMotion ? 0 : 0.08 } },
   };
 
   const cardVariants = {
-    hidden: { opacity: 0, y: 50 },
+    hidden: { opacity: 0, y: reduceMotion ? 0 : 24 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.6, ease: "easeOut" },
+      transition: { duration: 0.5, ease: "easeOut" },
     },
   };
 
-  return (
-    <div className="container mx-auto px-4 py-12">
-      {/* Section Heading */}
-      <motion.div
-        className="text-center mx-auto mb-12 max-w-3xl"
-        initial={{ opacity: 0, y: -30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-      >
-        <h1 className="font-core text-4xl font-bold text-gray-800">
-          Bestseller Products
-        </h1>
-        <p className="font-core text-gray-600 mt-4">
-          Explore our most popular products based on customer ratings.
-        </p>
-      </motion.div>
+  const getImageSrc = (img: string) =>
+    img
+      ? img.startsWith("http")
+        ? img
+        : `${apiUrl}/uploads/images/${img}`
+      : "https://via.placeholder.com/400?text=No+Image";
 
-      {/* Grid Layout for Bestseller Products */}
-      {bestselling.length > 0 && (
+  return (
+    <section className="container mx-auto px-4 py-14 sm:px-6">
+      {/* Heading */}
+      <header className="mx-auto mb-10 max-w-2xl text-center">
+        <h1 className="font-core text-3xl  font-extrabold tracking-tight text-stone-900 sm:text-4xl">
+          Our bestsellers
+        </h1>
+        <p className="font-core mt-3 text-base text-stone-500">
+          The dishes our customers rate highest and order again and again.
+        </p>
+      </header>
+
+      {/* Loading skeletons */}
+      {loading && (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="animate-pulse rounded-[28px] bg-white p-3 shadow-[0_10px_40px_-12px_rgba(120,70,20,0.18)] ring-1 ring-orange-100"
+            >
+              <div className="aspect-square w-full rounded-3xl bg-orange-50" />
+              <div className="space-y-3 px-2 pb-2 pt-5">
+                <div className="h-5 w-3/4 rounded-full bg-stone-100" />
+                <div className="h-4 w-1/2 rounded-full bg-stone-100" />
+                <div className="h-10 w-full rounded-full bg-stone-100" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Product grid */}
+      {!loading && bestselling.length > 0 && (
         <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-8"
+          className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: false, amount: 0.2 }}
+          viewport={{ once: true, amount: 0.1 }}
         >
-          {bestselling.map((product) => (
-            <motion.div
-              key={product.item_name + product.menu_img}
-              className="bg-[#fff7ec] cursor-pointer border border-gray-200 rounded-xl shadow-lg overflow-hidden"
-              variants={cardVariants}
-            >
-              {/* BIG SQUARE IMAGE - FULL WIDTH */}
-              <div className="w-full aspect-square">
-                <img
-                  src={
-                    product.menu_img
-                      ? product.menu_img.startsWith("http")
-                        ? product.menu_img
-                        : `${apiUrl}/uploads/images/${product.menu_img}`
-                      : "https://via.placeholder.com/400?text=No+Image"
-                  }
-                  alt={product.item_name}
-                  className="w-full h-full object-cover rounded-t-xl"
-                />
-              </div>
+          {bestselling.map((product, index) => {
+            const rating = Number(product.total_avg_rating) || 0;
+            const isAvailable =
+              (product.availability ?? "available").trim().toLowerCase() ===
+              "available";
 
-              {/* CONTENT WITH PADDING */}
-              <div className="p-5">
-                {/* ITEM NAME + REVIEWS */}
-                <div className="flex items-start justify-between">
-                  <h5 className="font-core text-lg font-semibold text-gray-800">
-                    {product.item_name}
-                  </h5>
+            return (
+              <motion.article
+                key={product.item_name + product.menu_img}
+                variants={cardVariants}
+                className="flex flex-col rounded-[28px] bg-white p-3 shadow-[0_10px_40px_-12px_rgba(120,70,20,0.18)] ring-1 ring-orange-100"
+              >
+                {/* Image */}
+                <div className="relative aspect-square w-full overflow-hidden rounded-3xl bg-orange-50">
+                  <img
+                    src={getImageSrc(product.menu_img)}
+                    alt={product.item_name}
+                    loading="lazy"
+                    className={`h-full w-full object-cover ${
+                      isAvailable ? "" : "grayscale"
+                    }`}
+                  />
 
-                  <div
-                    className="flex items-center gap-2 cursor-pointer"
-                    onClick={() => {
-                      if (product.rating_count > 0) {
-                        setSelectedMenuName(product.item_name);
-                        setReviewsModalVisible(true);
-                      }
-                    }}
-                  >
-                    <CustomRate value={parseFloat(product.total_avg_rating)} />
-                    <span className="text-gray-600 text-sm whitespace-nowrap">
-                      {parseFloat(product.total_avg_rating).toFixed(1)} (
-                      {product.rating_count})
+                  {/* soft bottom fade so badges stay readable */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-24  " />
+
+                  {index < 3 && isAvailable && (
+                    <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-orange-600 shadow-md backdrop-blur">
+                      <FaFire className="text-[11px]" />
+                      Top {index + 1}
                     </span>
-                  </div>
+                  )}
+
+                  {product.categories_name && (
+                    <span className="absolute right-3 top-3 rounded-full bg-black/45 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
+                      {product.categories_name}
+                    </span>
+                  )}
+
+                  {!isAvailable && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-stone-900/45">
+                      <span className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-stone-800 shadow-lg">
+                        Not available today
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {/* DIVIDER */}
-                <Divider
-                  style={{
-                    margin: "14px 0", // extreme negative to ensure full width
-                    borderTopWidth: "2px",
-                    borderColor: "#e0d3c0",
-                  }}
-                />
+                {/* Content */}
+                <div className="flex flex-1 flex-col px-2 pb-2 pt-5">
+                  <h3 className="font-core line-clamp-2 text-lg font-bold leading-snug text-stone-900">
+                    {product.item_name}
+                  </h3>
 
-                {/* PRICE + BUTTONS */}
-                {(product.availability ?? "available").trim().toLowerCase() ===
-                "available" ? (
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-core text-xl font-bold text-gray-800">
-                      ₱{product.price}
-                    </h4>
+                  <button
+                    type="button"
+                    disabled={product.rating_count === 0}
+                    onClick={() => {
+                      setSelectedMenuName(product.item_name);
+                      setReviewsModalVisible(true);
+                    }}
+                    className="mt-2 flex items-center gap-2 self-start rounded-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-500 disabled:cursor-default"
+                    aria-label={`${product.item_name} rated ${rating.toFixed(
+                      1,
+                    )} out of 5 from ${product.rating_count} reviews`}
+                  >
+                    <CustomRate value={rating} />
+                    <span className="text-sm font-semibold text-stone-800">
+                      {rating.toFixed(1)}
+                    </span>
+                    <span className="text-sm text-stone-500 underline decoration-stone-300 underline-offset-4">
+                      {product.rating_count}{" "}
+                      {product.rating_count === 1 ? "review" : "reviews"}
+                    </span>
+                  </button>
 
-                    <div className="flex gap-3 ml-1">
-                      <motion.button
-                        className="font-core px-4 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition whitespace-nowrap"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => handleBuyNowClick(product)}
-                      >
-                        Buy Now
-                      </motion.button>
-
-                      <motion.button
-                        className="font-core flex items-center gap-2 px-4 py-2 text-sm font-semibold text-orange-500 border border-orange-500 rounded-full hover:bg-orange-500 hover:text-white transition whitespace-nowrap"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() =>
-                          addToCart({
-                            ...product,
-                            categories_name: product.categories_name || null,
-                          })
-                        }
-                      >
-                        <FaShoppingBag className="text-sm" />
-                        Add to Cart
-                      </motion.button>
+                  {/* Price + actions */}
+                  <div className="mt-auto pt-5">
+                    <div className="font-core mb-4 flex items-baseline justify-between border-t border-dashed border-orange-200 pt-4">
+                      <span className="text-sm text-stone-500">Price</span>
+                      <span className="font-core text-2xl font-extrabold text-stone-900">
+                        ₱{Number(product.price).toLocaleString()}
+                      </span>
                     </div>
+
+                    {isAvailable ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <motion.button
+                          onClick={() => handleBuyNowClick(product, index)}
+                          className="font-core flex min-w-[110px] flex-1 items-center justify-center gap-2 rounded-xl border border-orange-300 bg-white px-3 py-2.5 text-sm font-semibold text-orange-600 outline-none focus-visible:ring-4 focus-visible:ring-orange-300/40 active:scale-[0.98]   hover:bg-orange-500 hover:text-white transition whitespace-nowrap"
+                          whileHover={{ scale: 1.0 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          Buy now
+                        </motion.button>
+
+                        <motion.button
+                          whileHover={{ scale: 1.0 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() =>
+                            addToCart({
+                              ...product,
+                              categories_name: product.categories_name || null,
+                            })
+                          }
+                          className="font-core flex min-w-[110px] flex-1 items-center justify-center gap-2 rounded-xl border border-orange-300 bg-white px-3 py-2.5 text-sm font-semibold text-orange-600 outline-none focus-visible:ring-4 focus-visible:ring-orange-300/40 active:scale-[0.98]   hover:bg-orange-500 hover:text-white transition whitespace-nowrap"
+                        >
+                          <FaShoppingBag className="text-sm" />
+                          Add to cart
+                        </motion.button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        className="font-core w-full cursor-not-allowed rounded-full bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-400"
+                      >
+                        Unavailable
+                      </button>
+                    )}
                   </div>
-                ) : (
-                  <span className="font-core flex items-center justify-center px-3 py-2 text-sm font-semibold text-red-500 border border-red-500 rounded-full bg-red-100">
-                    We're not Available today.
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          ))}
-
-          {/* Reviews Modal */}
-          <ClientsCommentsRated
-            visible={reviewsModalVisible}
-            onCancel={() => setReviewsModalVisible(false)}
-            menuName={selectedMenuName}
-          />
-
-          {/* Product Info Modal */}
-          <Modal
-            open={modalVisible}
-            onCancel={closeModal}
-            footer={null}
-            bodyStyle={{ padding: "20px" }}
-            width={800}
-          >
-            {selectedItem && <ProductInfo item={selectedItem} />}
-          </Modal>
+                </div>
+              </motion.article>
+            );
+          })}
         </motion.div>
       )}
 
-      {/* ✅ OrderDetailsModal shown here */}
+      {/* Empty state */}
+      {!loading && bestselling.length === 0 && (
+        <div className="mx-auto flex max-w-md flex-col items-center rounded-[28px] bg-white px-8 py-14 text-center shadow-[0_10px_40px_-12px_rgba(120,70,20,0.18)] ring-1 ring-orange-100">
+          <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-orange-500">
+            <FaFire className="text-2xl" />
+          </span>
+          <p className="font-core text-lg font-bold text-stone-900">
+            No bestsellers yet
+          </p>
+          <p className="font-core mt-1 text-sm text-stone-500">
+            Check back soon. Popular items appear here as customers rate them.
+          </p>
+        </div>
+      )}
+
+      {/* Modals */}
+      <ClientsCommentsRated
+        visible={reviewsModalVisible}
+        onCancel={() => setReviewsModalVisible(false)}
+        menuName={selectedMenuName}
+      />
+
       {selectedItem && (
         <OrderDetailsModal
           visible={orderModalVisible}
@@ -279,15 +311,7 @@ const Bestseller: React.FC = () => {
           onCancel={closeOrderModal}
         />
       )}
-      {/* Fallback when no products */}
-      {bestselling.length === 0 && (
-        <div className="col-span-full flex items-center justify-center py-12">
-          <p className="font-core text-gray-500 text-base sm:text-lg md:text-xl font-medium text-center">
-            No bestseller products available at the moment.
-          </p>
-        </div>
-      )}
-    </div>
+    </section>
   );
 };
 

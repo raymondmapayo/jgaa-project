@@ -1,9 +1,9 @@
 import { notification, Spin } from "antd";
 import axios from "axios";
-import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
-import { BsCheck2Circle } from "react-icons/bs";
-import ReservationClose from "./ReservationClose"; // ✅ added import
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { BsCheck2Circle, BsPeople, BsDash, BsPlus } from "react-icons/bs";
+import ReservationClose from "./ReservationClose";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -13,11 +13,24 @@ import ReservationTermsConditionModal from "../WorkerModals/ReservationTermsCond
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-interface Reservation {
-  reservation_id: number;
-  status: string;
-  table_id: string;
-}
+const tables = [
+  { reservation_id: 1, tableName: "1", capacity: 4, img: "/Table-1.png" },
+  { reservation_id: 2, tableName: "2", capacity: 4, img: "/Table-2.png" },
+  { reservation_id: 3, tableName: "3", capacity: 4, img: "/Table-3.png" },
+  { reservation_id: 4, tableName: "4", capacity: 6, img: "/Table-4.png" },
+  { reservation_id: 5, tableName: "5", capacity: 6, img: "/Table-5.png" },
+  { reservation_id: 6, tableName: "6", capacity: 8, img: "/Table-6.png" },
+  { reservation_id: 7, tableName: "7", capacity: 2, img: "/Table-7.png" },
+  { reservation_id: 8, tableName: "8", capacity: 2, img: "/Table-8.png" },
+  { reservation_id: 9, tableName: "9", capacity: 2, img: "/Table-9.png" },
+];
+
+const fieldClass =
+  "font-core w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 " +
+  "placeholder:text-slate-400 outline-none transition " +
+  "focus:border-orange-400 focus:ring-4 focus:ring-orange-500/20";
+
+const labelClass = "font-core mb-1.5 block text-xs font-medium text-slate-600";
 
 const Reservation = () => {
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
@@ -33,11 +46,12 @@ const Reservation = () => {
 
   const [reservedTables, setReservedTables] = useState<string[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isReservationOpen, setIsReservationOpen] = useState<boolean>(true); // ✅ added
-  const [loading, setLoading] = useState<boolean>(true); // ✅ Loading screen state
+  const [isReservationOpen, setIsReservationOpen] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const apiUrl = import.meta.env.VITE_API_URL;
 
-  // 🔹 Sync with worker toggle
+  // Sync with worker toggle
   useEffect(() => {
     const fetchReservationStatus = async () => {
       const res = await axios.get(`${apiUrl}/get_reservation_status`);
@@ -51,6 +65,7 @@ const Reservation = () => {
 
     return () => window.removeEventListener("focus", onFocus);
   }, [apiUrl]);
+
   useEffect(() => {
     const storedEmail = sessionStorage.getItem("email");
     const storedFname = sessionStorage.getItem("fname");
@@ -83,34 +98,22 @@ const Reservation = () => {
     }
   }, [isAuthenticated]);
 
-  // ✅ Automatically check open/close time using dayjs (no backend reset)
+  // Open 8:00 AM → 12:59 AM, closed 1:00 AM → 7:59 AM (Asia/Manila)
   useEffect(() => {
     const checkReservationTime = () => {
       const now = dayjs().tz("Asia/Manila");
       const hour = now.hour();
-      // ✅ OPEN: 8:00 AM → 12:59 AM (next day)
-      // // ❌ CLOSED: 1:00 AM → 7:59 AM
-      if (hour >= 8 || hour < 1) {
-        setIsReservationOpen(true);
-      } else {
-        setIsReservationOpen(false);
-      }
-
+      setIsReservationOpen(hour >= 8 || hour < 1);
       setLoading(false);
     };
 
-    // run once on load
     checkReservationTime();
 
-    // run when user returns to tab
     const onFocus = () => checkReservationTime();
     window.addEventListener("focus", onFocus);
 
-    // run when tab becomes visible again (better than focus sometimes)
     const onVisibilityChange = () => {
-      if (!document.hidden) {
-        checkReservationTime();
-      }
+      if (!document.hidden) checkReservationTime();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
 
@@ -123,11 +126,9 @@ const Reservation = () => {
   const fetchReservedTables = async () => {
     try {
       const response = await axios.get(`${apiUrl}/get_reserved_tables`);
-
       const reservedTableIds = response.data.map((tableId: number | string) =>
         String(tableId),
       );
-
       setReservedTables(reservedTableIds);
     } catch (error) {
       console.error("Error fetching reserved tables:", error);
@@ -153,36 +154,30 @@ const Reservation = () => {
       updatedTables = selectedTables.filter((t) => t !== tableName);
       setSelectedTables(updatedTables);
 
-      if (updatedTables.length === 0) {
-        notification.info({
-          message: "All Tables Deselected",
-          description: "You deselected all tables.",
-          placement: "topRight",
-        });
-      } else {
-        notification.info({
-          message: "Table Deselected",
-          description: `You deselected table ${tableName}.`,
-          placement: "topRight",
-        });
-      }
+      notification.info({
+        message:
+          updatedTables.length === 0
+            ? "All Tables Deselected"
+            : "Table Deselected",
+        description:
+          updatedTables.length === 0
+            ? "You deselected all tables."
+            : `You deselected table ${tableName}.`,
+        placement: "topRight",
+      });
     } else {
       updatedTables = [...selectedTables, tableName];
       setSelectedTables(updatedTables);
 
-      if (updatedTables.length === 1) {
-        notification.success({
-          message: "Table Selected",
-          description: `You selected table ${tableName}.`,
-          placement: "topRight",
-        });
-      } else {
-        notification.success({
-          message: "Tables Selected",
-          description: `You selected tables ${updatedTables.join(", ")}.`,
-          placement: "topRight",
-        });
-      }
+      notification.success({
+        message:
+          updatedTables.length === 1 ? "Table Selected" : "Tables Selected",
+        description:
+          updatedTables.length === 1
+            ? `You selected table ${tableName}.`
+            : `You selected tables ${updatedTables.join(", ")}.`,
+        placement: "topRight",
+      });
     }
   };
 
@@ -219,6 +214,7 @@ const Reservation = () => {
       });
     }
 
+    setSubmitting(true);
     try {
       // 1. Add reservation
       const reservationResponse = await axios.post(
@@ -279,203 +275,411 @@ const Reservation = () => {
           err.response?.data?.error ||
           "Failed to add reservation. Please try again later.",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const tables = [
-    { reservation_id: 1, tableName: "1", capacity: 4, img: "/Table-1.png" },
-    { reservation_id: 2, tableName: "2", capacity: 4, img: "/Table-2.png" },
-    { reservation_id: 3, tableName: "3", capacity: 4, img: "/Table-3.png" },
-    { reservation_id: 4, tableName: "4", capacity: 6, img: "/Table-4.png" },
-    { reservation_id: 5, tableName: "5", capacity: 6, img: "/Table-5.png" },
-    { reservation_id: 6, tableName: "6", capacity: 8, img: "/Table-6.png" },
-    { reservation_id: 7, tableName: "7", capacity: 2, img: "/Table-7.png" },
-    { reservation_id: 8, tableName: "8", capacity: 2, img: "/Table-8.png" },
-    { reservation_id: 9, tableName: "9", capacity: 2, img: "/Table-9.png" },
-  ];
+  const totalSeats = useMemo(
+    () =>
+      tables
+        .filter((t) => selectedTables.includes(t.tableName))
+        .reduce((sum, t) => sum + t.capacity, 0),
+    [selectedTables],
+  );
 
-  // ✅ Loading screen
+  const availableCount = tables.filter(
+    (t) => !reservedTables.includes(t.tableName),
+  ).length;
+
+  const needsMoreSeats =
+    numOfPeople > 0 && totalSeats > 0 && totalSeats < numOfPeople;
+
+  // Loading screen
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-white dark:bg-[#1f1f1f]">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white">
         <Spin size="large" />
-        <p className="mt-4 text-gray-600 dark:text-gray-300 font-core">
+        <p className="font-core mt-4 text-slate-500">
           Checking reservation status...
         </p>
       </div>
     );
   }
 
-  // ✅ Show close message when outside operating hours
+  // Outside operating hours
   if (!isReservationOpen) {
     return <ReservationClose />;
   }
-  // If worker disabled reservations, show ReservationDisableEnable
+
+  // Worker disabled reservations
   if (!isWorkerEnabled) {
     return <ReservationDisableEnable />;
   }
 
   return (
-    <motion.div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <motion.div className="text-center mb-8">
-        <h1 className="font-core text-3xl font-bold">
-          SELECT DATE AND TIME FOR YOUR RESERVATION
-        </h1>
-      </motion.div>
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
+      {/* Ambient glow + grid backdrop */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(60% 40% at 15% 0%, rgba(249,115,22,0.16), transparent 70%)," +
+            "radial-gradient(50% 40% at 90% 20%, rgba(56,189,248,0.12), transparent 70%)," +
+            "linear-gradient(rgba(15,23,42,0.04) 1px, transparent 1px)," +
+            "linear-gradient(90deg, rgba(15,23,42,0.04) 1px, transparent 1px)",
+          backgroundSize: "auto, auto, 44px 44px, 44px 44px",
+        }}
+      />
 
-      <motion.div className="font-core text-center mb-4 text-gray-700">
-        Available tables for your reservation. Click on an available table to
-        book it.
-      </motion.div>
+      <ReservationTermsConditionModal
+        visible={isTermsModalVisible}
+        onClose={() => setIsTermsModalVisible(false)}
+      />
 
-      {/* Legend */}
-      <div className="flex justify-start mt-2 mb-4">
-        <div className="flex items-center gap-6 ml-2">
-          <div className="flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-green-500 border border-black"></span>
-            <span className="font-core text-sm text-green-500">Available</span>
+      <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        {/* Header */}
+        <motion.header
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
+        >
+          <div>
+            <h1 className="font-core text-3xl font-bold leading-tight tracking-tight sm:text-4xl md:text-5xl">
+              Reserve your table
+            </h1>
+            <p className="font-core mt-2 max-w-xl text-sm text-slate-500 sm:text-base">
+              Pick a date and time, choose one or more open tables, and confirm.
+              Reserved tables are locked.
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-gray-400 border border-black"></span>
-            <span className="font-core text-sm text-gray-700">Reserved</span>
+
+          <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm md:self-auto">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            </span>
+            <span className="font-core text-sm text-slate-700">
+              {availableCount} of {tables.length} tables open
+            </span>
           </div>
+        </motion.header>
+
+        <div className="flex flex-col gap-8 lg:flex-row">
+          {/* Floor / tables */}
+          <section className="flex-1">
+            {/* Legend */}
+            <div className="mb-4 flex flex-wrap items-center gap-5 text-xs text-slate-600">
+              <span className="font-core flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                Available
+              </span>
+              <span className="font-core flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+                Your selection
+              </span>
+              <span className="font-core flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-slate-300" />
+                Reserved
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {tables.map((table, i) => {
+                const isReserved = reservedTables.includes(table.tableName);
+                const isSelected = selectedTables.includes(table.tableName);
+
+                return (
+                  <motion.button
+                    type="button"
+                    key={table.reservation_id}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 * i, duration: 0.35 }}
+                    whileTap={isReserved ? undefined : { scale: 0.97 }}
+                    onClick={() => handleTableClick(table.tableName)}
+                    aria-pressed={isSelected}
+                    aria-disabled={isReserved}
+                    aria-label={`Table ${table.tableName}, ${table.capacity} seats, ${
+                      isReserved
+                        ? "reserved"
+                        : isSelected
+                          ? "selected"
+                          : "available"
+                    }`}
+                    className={`group relative aspect-[4/3] overflow-hidden rounded-2xl border text-left outline-none transition-shadow duration-300
+                      focus-visible:ring-4 focus-visible:ring-orange-400/50
+                      ${
+                        isReserved
+                          ? "cursor-not-allowed border-slate-200"
+                          : isSelected
+                            ? "border-orange-500 shadow-[0_0_0_1px_rgba(249,115,22,0.9),0_12px_36px_rgba(249,115,22,0.3)]"
+                            : "border-emerald-300 bg-white shadow-sm hover:border-emerald-400 hover:shadow-[0_12px_28px_rgba(16,185,129,0.2)]"
+                      }`}
+                  >
+                    <img
+                      src={table.img}
+                      alt=""
+                      className={`absolute inset-0 h-full w-full object-cover transition duration-500 ${
+                        isReserved
+                          ? "scale-100 opacity-50 grayscale"
+                          : "group-hover:scale-105"
+                      }`}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white/50 to-transparent" />
+
+                    {/* Status pill */}
+                    <div className="absolute right-2 top-2">
+                      <span
+                        className={`font-core rounded-full border px-2.5 py-1 text-[11px] font-medium backdrop-blur ${
+                          isReserved
+                            ? "border-slate-200 bg-white/90 text-slate-500"
+                            : isSelected
+                              ? "border-orange-300 bg-orange-100 text-orange-700"
+                              : "border-emerald-300 bg-emerald-50 text-emerald-700"
+                        }`}
+                      >
+                        {isReserved
+                          ? "Reserved"
+                          : isSelected
+                            ? "Selected"
+                            : "Open"}
+                      </span>
+                    </div>
+
+                    {/* Check mark */}
+                    <AnimatePresence>
+                      {!isReserved && isSelected && (
+                        <motion.div
+                          initial={{ scale: 0, rotate: -90, opacity: 0 }}
+                          animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                          exit={{ scale: 0, opacity: 0 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 300,
+                            damping: 15,
+                          }}
+                          className="absolute left-2 top-2"
+                        >
+                          <BsCheck2Circle className="text-3xl text-orange-500 drop-shadow-[0_0_6px_rgba(249,115,22,0.6)]" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Label */}
+                    <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-3">
+                      <span className="font-core text-lg font-semibold text-slate-900">
+                        Table {table.tableName}
+                      </span>
+                      <span className="font-core flex items-center gap-1.5 text-xs text-slate-600">
+                        <BsPeople /> {table.capacity} seats
+                      </span>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Form */}
+          <motion.form
+            onSubmit={handleSubmit}
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.45, delay: 0.1 }}
+            className="h-fit w-full space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-6 lg:sticky lg:top-6 lg:w-[400px]"
+          >
+            <h2 className="font-core text-lg font-semibold text-slate-900">
+              Your details
+            </h2>
+
+            <div>
+              <label htmlFor="fullName" className={labelClass}>
+                Full name
+              </label>
+              <input
+                id="fullName"
+                type="text"
+                placeholder="Juan Dela Cruz"
+                className={fieldClass}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <div>
+                <label htmlFor="email" className={labelClass}>
+                  Email address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="you@email.com"
+                  className={fieldClass}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="phone" className={labelClass}>
+                  Phone number
+                </label>
+                <input
+                  id="phone"
+                  type="text"
+                  placeholder="09xx xxx xxxx"
+                  className={fieldClass}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="date" className={labelClass}>
+                  Date
+                </label>
+                <input
+                  id="date"
+                  type="date"
+                  className={fieldClass}
+                  value={reservationDate}
+                  onChange={(e) => setReservationDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="time" className={labelClass}>
+                  Time
+                </label>
+                <input
+                  id="time"
+                  type="time"
+                  className={fieldClass}
+                  value={reservationTime}
+                  onChange={(e) => setReservationTime(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Guests stepper */}
+            <div>
+              <label htmlFor="guests" className={labelClass}>
+                Number of guests
+              </label>
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-1.5">
+                <button
+                  type="button"
+                  aria-label="Decrease guests"
+                  onClick={() => setNumOfPeople((n) => Math.max(0, n - 1))}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-xl text-slate-700 transition hover:bg-slate-200 focus-visible:ring-4 focus-visible:ring-orange-500/30 outline-none"
+                >
+                  <BsDash />
+                </button>
+                <input
+                  id="guests"
+                  type="number"
+                  min={0}
+                  value={numOfPeople === 0 ? "" : numOfPeople}
+                  placeholder="0"
+                  onChange={(e) =>
+                    setNumOfPeople(Math.max(0, Number(e.target.value)))
+                  }
+                  className="font-core h-10 w-full flex-1 bg-transparent text-center text-lg font-semibold text-slate-900 outline-none placeholder:text-slate-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  required
+                />
+                <button
+                  type="button"
+                  aria-label="Increase guests"
+                  onClick={() => setNumOfPeople((n) => n + 1)}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-xl text-slate-700 transition hover:bg-slate-200 focus-visible:ring-4 focus-visible:ring-orange-500/30 outline-none"
+                >
+                  <BsPlus />
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="notes" className={labelClass}>
+                Notes (optional)
+              </label>
+              <textarea
+                id="notes"
+                placeholder="Birthday setup, allergies, high chair..."
+                className={`${fieldClass} resize-none`}
+                rows={3}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+
+            {/* Live summary */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between">
+                <span className="font-core text-xs text-slate-500">
+                  Selected tables
+                </span>
+                <span className="font-core text-xs text-slate-500">
+                  {totalSeats} seats
+                </span>
+              </div>
+              <div className="mt-2 flex min-h-[28px] flex-wrap gap-2">
+                <AnimatePresence initial={false}>
+                  {selectedTables.length === 0 ? (
+                    <motion.span
+                      key="empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="font-core text-sm text-slate-400"
+                    >
+                      Tap a table to add it.
+                    </motion.span>
+                  ) : (
+                    selectedTables.map((t) => (
+                      <motion.span
+                        key={t}
+                        layout
+                        initial={{ scale: 0.6, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.6, opacity: 0 }}
+                        className="font-core rounded-full border border-orange-300 bg-orange-50 px-3 py-1 text-sm text-orange-700"
+                      >
+                        Table {t}
+                      </motion.span>
+                    ))
+                  )}
+                </AnimatePresence>
+              </div>
+              {needsMoreSeats && (
+                <p className="font-core mt-3 text-xs text-amber-600">
+                  {numOfPeople} guests, but your tables seat {totalSeats}. Add
+                  another table so everyone fits.
+                </p>
+              )}
+            </div>
+
+            <motion.button
+              type="submit"
+              disabled={submitting}
+              whileHover={submitting ? undefined : { scale: 1.02 }}
+              whileTap={submitting ? undefined : { scale: 0.98 }}
+              className="font-core w-full rounded-xl bg-gradient-to-r from-orange-500 via-orange-500 to-amber-400 py-3.5 font-bold text-white shadow-[0_8px_24px_rgba(249,115,22,0.35)] outline-none transition focus-visible:ring-4 focus-visible:ring-orange-300/50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitting ? "Reserving..." : "Reserve table"}
+            </motion.button>
+          </motion.form>
         </div>
       </div>
-
-      {/* Flex container for tables and form */}
-      <div className="flex flex-wrap md:flex-nowrap gap-12 mt-2">
-        {/* Tables Section */}
-        <motion.div className="flex flex-wrap gap-4 flex-1 h-[480px] overflow-y-auto justify-center">
-          {tables.map((table) => {
-            const isReserved = reservedTables.includes(table.tableName);
-            const isSelected = selectedTables.includes(table.tableName);
-
-            return (
-              <motion.div
-                key={table.reservation_id}
-                className={`
-                  relative flex justify-center items-center rounded-lg overflow-hidden cursor-pointer transition-all duration-300
-                  border flex-auto
-                  min-w-[45%] sm:min-w-[30%] md:min-w-[25%] lg:min-w-[30%] xl:min-w-[30%]
-                  max-w-[45%] sm:max-w-[30%] md:max-w-[25%] lg:max-w-[30%] xl:max-w-[30%]
-                  ${
-                    isReserved
-                      ? "border-4 border-gray-400 bg-white cursor-not-allowed"
-                      : isSelected
-                        ? "border-4 border-green-500 bg-white"
-                        : "border-4 border-green-500 bg-white"
-                  }
-                `}
-                onClick={() => handleTableClick(table.tableName)}
-              >
-                {!isReserved && isSelected && (
-                  <motion.div
-                    initial={{ scale: 0, opacity: 0, rotate: -90 }}
-                    animate={{ scale: 1.1, opacity: 1, rotate: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                    className="absolute top-2 left-2 z-10"
-                  >
-                    <BsCheck2Circle
-                      className="text-green-600 drop-shadow-[0_0_3px_rgba(34,197,94,0.8)]
-                        text-[20px] sm:text-[22px] md:text-[24px] lg:text-[26px] xl:text-[28px]"
-                    />
-                  </motion.div>
-                )}
-                <img
-                  src={table.img}
-                  alt={`Table ${table.tableName}`}
-                  className={`
-                    absolute inset-0 object-cover w-full h-full z-0
-                    transition-transform duration-300
-                    ${
-                      isReserved || isSelected
-                        ? "opacity-80 scale-95"
-                        : "opacity-100 scale-100"
-                    }
-                  `}
-                />
-              </motion.div>
-            );
-          })}
-        </motion.div>
-        <ReservationTermsConditionModal
-          visible={isTermsModalVisible}
-          onClose={() => setIsTermsModalVisible(false)}
-        />
-        {/* Reservation Form */}
-        <motion.form
-          onSubmit={handleSubmit}
-          className="space-y-4 w-full md:w-[40%]"
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          <input
-            type="text"
-            placeholder="Fullname*"
-            className="font-core w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            required
-          />
-          <input
-            type="email"
-            placeholder="Email Address*"
-            className="font-core w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="text"
-            placeholder="Phone number*"
-            className="font-core w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            required
-          />
-          <div className="flex gap-4">
-            <input
-              type="date"
-              className="flex-1 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-              value={reservationDate}
-              onChange={(e) => setReservationDate(e.target.value)}
-              required
-            />
-            <input
-              type="time"
-              placeholder="Set Time*"
-              className="flex-1 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-              value={reservationTime}
-              onChange={(e) => setReservationTime(e.target.value)}
-              required
-            />
-          </div>
-          <input
-            type="number"
-            placeholder="Number of person*"
-            className="font-core w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-            onChange={(e) => setNumOfPeople(Number(e.target.value))}
-            required
-          />
-          <textarea
-            placeholder="Notes* (Optional)"
-            className="font-core w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-            rows={3}
-            value={notes} // ✅ bind value
-            onChange={(e) => setNotes(e.target.value)}
-          ></textarea>
-          <motion.button
-            type="submit"
-            className="font-core w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 transition"
-            whileHover={{ scale: 1.05 }}
-          >
-            Reserve Table
-          </motion.button>
-        </motion.form>
-      </div>
-    </motion.div>
+    </div>
   );
 };
 

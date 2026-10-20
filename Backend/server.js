@@ -343,7 +343,7 @@ app.get("/ingredients_items", (request, response) => {
 });
 
 // @ts-ignore
-app.get("/menu_items_drinks", (request, response) => {
+app.get("/menu_items_drinks", async (request, response) => {
   const sql = `
     SELECT 
       menu_id,
@@ -357,49 +357,65 @@ app.get("/menu_items_drinks", (request, response) => {
     WHERE TRIM(categories_name) = 'Drinks'
   `;
 
-  db.query(sql, (error, data) => {
-    if (error) {
-      console.error("Error fetching drinks:", error);
-      return response.status(500).json({ error: "Internal Server Error" });
-    }
+  try {
+    const [data] = await db.promise().query(sql);
 
     console.log("Fetched drinks:", data);
+
     return response.json(data);
-  });
+  } catch (error) {
+    console.error("Error fetching drinks:", error);
+
+    return response.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
 });
 
 //========================== MENUS ITEM END GET =======================================
 
 // ====================== Fetch low/out-of-stock notifications ======================
-app.get("/notifications", (req, res) => {
-  const sql = `
-    SELECT notification_id, message, status, created_at
-    FROM notifications_tbl
-    WHERE message LIKE '%low on stock%' OR message LIKE '%out of stock%'
-    ORDER BY created_at DESC
-  `;
+app.get("/notifications", async (req, res) => {
+  try {
+    const sql = `
+      SELECT notification_id, message, status, created_at
+      FROM notifications_tbl
+      WHERE message LIKE '%low on stock%' 
+         OR message LIKE '%out of stock%'
+      ORDER BY created_at DESC
+    `;
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching notifications:", err);
-      return res.status(500).json({ error: "Failed to fetch notifications" });
-    }
+    const [results] = await db.promise().query(sql);
+
     res.json(results);
-  });
+  } catch (err) {
+    console.error("Error fetching notifications:", err);
+    res.status(500).json({ error: "Failed to fetch notifications" });
+  }
 });
 
 // ====================== Mark notification as read ======================
 app.post("/notifications/read/:id", (req, res) => {
   const id = req.params.id;
 
-  const sql = `UPDATE notifications_tbl SET status='read' WHERE notification_id=?`;
+  const sql = `
+    UPDATE notifications_tbl 
+    SET status = 'read' 
+    WHERE notification_id = ?
+  `;
 
   db.query(sql, [id], (err) => {
     if (err) {
       console.error("Error updating notification status:", err);
-      return res.status(500).json({ error: "Failed to mark as read" });
+
+      return res.status(500).json({
+        error: "Failed to mark as read",
+      });
     }
-    res.json({ message: "Notification marked as read" });
+
+    res.json({
+      message: "Notification marked as read",
+    });
   });
 });
 
@@ -1386,7 +1402,7 @@ app.get("/get_archive_supply_categories", (req, res) => {
 });
 // ✅ Get all archived reservations
 
-app.get("/get_archive_reservation", (req, res) => {
+app.get("/get_archive_reservation", async (req, res) => {
   const sql = `
     SELECT 
       r.reservation_id,
@@ -1411,13 +1427,17 @@ app.get("/get_archive_reservation", (req, res) => {
     ORDER BY r.reservation_date DESC, r.reservation_time DESC
   `;
 
-  db.query(sql, (error, results) => {
-    if (error) {
-      console.error("Error fetching archived reservations:", error);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
+  try {
+    const [results] = await db.promise().query(sql);
+
     res.json(results);
-  });
+  } catch (error) {
+    console.error("Error fetching archived reservations:", error);
+
+    res.status(500).json({
+      error: "Internal Server Error",
+    });
+  }
 });
 
 // ✅ Restore archived reservation
@@ -1632,7 +1652,7 @@ app.post("/add_supply_ingredients", (req, res) => {
   );
 });
 
-app.post("/add_supply_drinks", (req, res) => {
+app.post("/add_supply_drinks", async (req, res) => {
   const {
     drinks_inventory_id,
     product_name,
@@ -1652,24 +1672,25 @@ app.post("/add_supply_drinks", (req, res) => {
     !status ||
     !created_by
   ) {
-    return res.status(400).json({ success: false, message: "Missing fields" });
+    return res.status(400).json({
+      success: false,
+      message: "Missing fields",
+    });
   }
 
-  const checkDrinkSQL = `
-  SELECT item_name 
-  FROM menu_tbl 
-  WHERE categories_name = 'Drinks'
-    AND item_name = ?
-  LIMIT 1
-`;
+  try {
+    // =============================
+    // 1. CHECK IF PRODUCT IS DRINK
+    // =============================
+    const checkDrinkSQL = `
+      SELECT item_name
+      FROM menu_tbl
+      WHERE categories_name = 'Drinks'
+        AND item_name = ?
+      LIMIT 1
+    `;
 
-  db.query(checkDrinkSQL, [product_name], (err, drinkRows) => {
-    if (err) {
-      return res.status(500).json({
-        success: false,
-        message: "DB error checking drinks",
-      });
-    }
+    const [drinkRows] = await db.promise().query(checkDrinkSQL, [product_name]);
 
     if (drinkRows.length === 0) {
       return res.status(400).json({
@@ -1679,298 +1700,450 @@ app.post("/add_supply_drinks", (req, res) => {
     }
 
     // =============================
-    // 2) BATCH NUMBER GENERATOR
+    // 2. CHECK EXISTING INVENTORY
     // =============================
-    const generateBatchNo = (productName, callback) => {
-      db.query(
-        "SELECT COUNT(*) AS batch_count FROM supply_drinks_tbl WHERE product_name = ?",
-        [productName],
-        (err2, rows) => {
-          if (err2) return callback(err2);
-          const batchCount = rows[0]?.batch_count || 0;
-          callback(null, `Stock ${batchCount + 1}`);
-        },
+    let inventoryId = drinks_inventory_id;
+
+    if (!inventoryId) {
+      const [inventoryRows] = await db.promise().query(
+        `
+        SELECT *
+        FROM drinks_inventory_tbl
+        WHERE product_name = ?
+          AND unit = ?
+        LIMIT 1
+        `,
+        [product_name, unit],
       );
-    };
+
+      if (inventoryRows.length > 0) {
+        inventoryId = inventoryRows[0].drinks_inventory_id;
+      }
+    }
 
     // =============================
-    // 3) INSERT LOGIC
+    // 3. GENERATE BATCH NUMBER
     // =============================
-    const insertSupplyAndInventory = (invId) => {
-      generateBatchNo(product_name, (err3, batchNo) => {
-        if (err3)
-          return res
-            .status(500)
-            .json({ success: false, message: "Batch generation error" });
+    const [batchRows] = await db.promise().query(
+      `
+      SELECT COUNT(*) AS batch_count
+      FROM supply_drinks_tbl
+      WHERE product_name = ?
+      `,
+      [product_name],
+    );
 
-        const insertIfNeeded = (callback) => {
-          const sql = `
-        INSERT INTO drinks_inventory_tbl
-        (product_name, stock_in, stock_out, batch_no, unit, status, created_at, created_by)
-        VALUES (?, ?, 0, ?, ?, ?, NOW(), ?)
+    const batchCount = batchRows[0]?.batch_count || 0;
+    const batchNo = `Stock ${batchCount + 1}`;
+
+    // =============================
+    // 4. INSERT INVENTORY
+    // =============================
+    const insertInventorySQL = `
+      INSERT INTO drinks_inventory_tbl
+      (
+        product_name,
+        stock_in,
+        stock_out,
+        batch_no,
+        unit,
+        status,
+        created_at,
+        created_by
+      )
+      VALUES (?, ?, 0, ?, ?, ?, NOW(), ?)
     `;
-          db.query(
-            sql,
-            [product_name, stock_in, batchNo, unit, status, created_by],
-            (err, result) => {
-              if (err) return callback(err);
-              callback(null, result.insertId);
-            },
-          );
-        };
 
-        insertIfNeeded((err5, newInvId) => {
-          if (err5)
-            return res.status(500).json({
-              success: false,
-              message: "Insert inventory error",
-            });
+    const [inventoryResult] = await db
+      .promise()
+      .query(insertInventorySQL, [
+        product_name,
+        stock_in,
+        batchNo,
+        unit,
+        status,
+        created_by,
+      ]);
 
-          const sqlSupply = `
-            INSERT INTO supply_drinks_tbl
-            (drinks_inventory_id, product_name, stock_in, batch_no, unit, price, status, created_at, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-          `;
+    const newInventoryId = inventoryResult.insertId;
 
-          db.query(
-            sqlSupply,
-            [
-              newInvId,
-              product_name,
-              stock_in,
-              batchNo,
-              unit,
-              price,
-              status,
-              created_by,
-            ],
-            (err6) => {
-              if (err6)
-                return res.status(500).json({
-                  success: false,
-                  message: "Insert supply error",
-                });
+    // =============================
+    // 5. INSERT SUPPLY
+    // =============================
+    const insertSupplySQL = `
+      INSERT INTO supply_drinks_tbl
+      (
+        drinks_inventory_id,
+        product_name,
+        stock_in,
+        batch_no,
+        unit,
+        price,
+        status,
+        created_at,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+    `;
 
-              const updateMenuSQL = `
-      UPDATE menu_tbl 
+    await db
+      .promise()
+      .query(insertSupplySQL, [
+        newInventoryId,
+        product_name,
+        stock_in,
+        batchNo,
+        unit,
+        price,
+        status,
+        created_by,
+      ]);
+
+    // =============================
+    // 6. UPDATE MENU AVAILABILITY
+    // =============================
+    const updateMenuSQL = `
+      UPDATE menu_tbl
       SET availability = 'Available'
       WHERE item_name = ?
     `;
-              db.query(updateMenuSQL, [product_name], (err) => {
-                if (err) console.error("Menu availability update error:", err);
-              });
 
-              return res.json({
-                success: true,
-                message: `Drink supply added with ${batchNo}`,
-                drinks_inventory_id: newInvId,
-              });
-            },
-          );
-        });
-      });
-    };
+    await db.promise().query(updateMenuSQL, [product_name]);
 
     // =============================
-    // 4) CHECK IF INVENTORY EXISTS
+    // 7. SUCCESS
     // =============================
-    if (drinks_inventory_id) {
-      insertSupplyAndInventory(drinks_inventory_id);
-    } else {
-      db.query(
-        "SELECT * FROM drinks_inventory_tbl WHERE product_name = ? AND unit = ? LIMIT 1",
-        [product_name, unit],
-        (err7, rows) => {
-          if (err7)
-            return res.status(500).json({
-              success: false,
-              message: "Find inventory error",
-            });
+    return res.json({
+      success: true,
+      message: `Drink supply added with ${batchNo}`,
+      drinks_inventory_id: newInventoryId,
+    });
+  } catch (error) {
+    console.error("❌ Add Drink Supply Error:", error);
 
-          if (rows.length > 0) {
-            insertSupplyAndInventory(rows[0].drinks_inventory_id);
-          } else {
-            insertSupplyAndInventory(null);
-          }
-        },
-      );
-    }
-  });
+    return res.status(500).json({
+      success: false,
+      message: "Database error while adding drink supply",
+    });
+  }
 });
 
 // ✅ API to get all drinks supply
-app.get("/get_supply_drinks", (req, res) => {
+app.get("/get_supply_drinks", async (req, res) => {
   const sql =
     "SELECT * FROM supply_drinks_tbl ORDER BY drinks_inventory_id, batch_no ASC";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("❌ MySQL Get Supply Drinks Error:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Database error (get Supply Drinks)",
-      });
-    }
-    res.json({ success: true, data: results });
-  });
-});
 
+  try {
+    const [results] = await db.promise().query(sql);
+
+    res.json({
+      success: true,
+      data: results,
+    });
+  } catch (err) {
+    console.error("❌ MySQL Get Supply Drinks Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: "Database error (get Supply Drinks)",
+    });
+  }
+});
 // ✅ API to get all supply
-app.get("/get_supply", (req, res) => {
+app.get("/get_supply", async (req, res) => {
   const sql = "SELECT * FROM supply_tbl ORDER BY inventory_id, batch_no ASC";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("❌ MySQL Get Supply Error:", err);
-      return res
-        .status(500)
-        .json({ success: false, message: "Database error (get Supply)" });
-    }
-    res.json({ success: true, data: results });
-  });
-});
 
+  try {
+    const [results] = await db.promise().query(sql);
+
+    res.json({
+      success: true,
+      data: results,
+    });
+  } catch (err) {
+    console.error("❌ MySQL Get Supply Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: "Database error (get Supply)",
+    });
+  }
+});
 // ✅ API to get all inventory
-app.get("/get_inventory", (req, res) => {
+app.get("/get_inventory", async (req, res) => {
   const sql = "SELECT * FROM inventory_tbl ORDER BY inventory_id, batch_no ASC";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("❌ MySQL Get Inventory Error:", err);
-      return res
-        .status(500)
-        .json({ success: false, message: "Database error (get inventory)" });
-    }
-    res.json({ success: true, data: results });
-  });
+
+  try {
+    const [results] = await db.promise().query(sql);
+
+    res.json({
+      success: true,
+      data: results,
+    });
+  } catch (err) {
+    console.error("❌ MySQL Get Inventory Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: "Database error (get inventory)",
+    });
+  }
 });
 
 // ✅ API to get all inventory
-app.get("/get_inventory_drinks", (req, res) => {
+app.get("/get_inventory_drinks", async (req, res) => {
   const sql =
     "SELECT * FROM drinks_inventory_tbl ORDER BY drinks_inventory_id, batch_no ASC";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("❌ MySQL Get Inventory Error:", err);
-      return res
-        .status(500)
-        .json({ success: false, message: "Database error (get inventory)" });
-    }
-    res.json({ success: true, data: results });
-  });
+
+  try {
+    const [results] = await db.promise().query(sql);
+
+    res.json({
+      success: true,
+      data: results,
+    });
+  } catch (err) {
+    console.error("❌ MySQL Get Inventory Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: "Database error (get inventory)",
+    });
+  }
 });
 
 // Update supply and automatically recalc inventory stock and menu availability
-app.put("/update_supply/:supply_id", (req, res) => {
+app.put("/update_supply/:supply_id", async (req, res) => {
   const { supply_id } = req.params;
   const { product_name, category, stock_in, unit, price } = req.body;
 
-  // 1️⃣ Update the supply first
-  const updateSupplySql = `
-    UPDATE supply_tbl
-    SET product_name = ?, category = ?, stock_in = ?, unit = ?, price = ?
-    WHERE supply_id = ?
-  `;
+  try {
+    // Get related inventory
+    const [supplyRows] = await db.promise().query(
+      `
+      SELECT inventory_id
+      FROM supply_tbl
+      WHERE supply_id = ?
+      `,
+      [supply_id],
+    );
 
-  db.query(
-    updateSupplySql,
-    [product_name, category, stock_in, unit, price, supply_id],
-    (err) => {
-      if (err) {
-        console.error("❌ Update Supply Error:", err);
-        return res
-          .status(500)
-          .json({ success: false, message: "DB update supply error" });
-      }
-
-      // 2️⃣ Get the inventory_id of this supply
-      const getInventorySql = `SELECT inventory_id FROM supply_tbl WHERE supply_id = ?`;
-      db.query(getInventorySql, [supply_id], (err2, rows) => {
-        if (err2 || rows.length === 0) {
-          console.error("❌ Get Inventory ID Error:", err2);
-          return res.status(500).json({
-            success: false,
-            message: "Failed to get related inventory",
-          });
-        }
-
-        const inventoryId = rows[0].inventory_id;
-
-        // 3️⃣ Recalculate total stock_in for this inventory
-        const calcTotalStockSql = `
-          SELECT SUM(stock_in) AS total_stock,
-                 MAX(created_at) AS latest_created
-          FROM supply_tbl
-          WHERE inventory_id = ?
-        `;
-        db.query(calcTotalStockSql, [inventoryId], (err3, rows2) => {
-          if (err3) {
-            console.error("❌ Calc Inventory Stock Error:", err3);
-            return res
-              .status(500)
-              .json({ success: false, message: "Failed to recalc inventory" });
-          }
-
-          const totalStock = rows2[0].total_stock || 0;
-          const latestCreated = rows2[0].latest_created;
-
-          // 4️⃣ Update inventory_tbl with new stock and status
-          const inventoryStatus =
-            totalStock > 0 ? "Available" : "Not Available";
-          const updateInventorySql = `
-            UPDATE inventory_tbl
-            SET stock_in = ?, created_at = ?, status = ?
-            WHERE inventory_id = ?
-          `;
-          db.query(
-            updateInventorySql,
-            [totalStock, latestCreated, inventoryStatus, inventoryId],
-            (err4) => {
-              if (err4) {
-                console.error("❌ Update Inventory Error:", err4);
-                return res.status(500).json({
-                  success: false,
-                  message: "Failed to update inventory",
-                });
-              }
-
-              // 5️⃣ Update all menu items that use this supply as ingredient
-              const updateMenuSql = `
-             UPDATE menu_tbl m
-                SET m.availability = 
-                  CASE
-                    WHEN NOT EXISTS (
-                      SELECT 1
-                      FROM ingredients_tbl ing
-                      JOIN inventory_tbl i ON i.product_name = ing.ingredients_name
-                      WHERE ing.menu_id = m.menu_id
-                        AND i.stock_in <= 0
-                    ) THEN 'Available'
-                    ELSE 'Not Available'
-                  END;
-            `;
-
-              db.query(updateMenuSql, [product_name], (err5) => {
-                if (err5) {
-                  console.error("❌ Update Menu Availability Error:", err5);
-                  return res.status(500).json({
-                    success: false,
-                    message: "Failed to update menu availability",
-                  });
-                }
-
-                // ✅ Success
-                res.json({
-                  success: true,
-                  message:
-                    "Supply updated & inventory & menu availability updated successfully",
-                });
-              });
-            },
-          );
-        });
+    if (supplyRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Supply not found",
       });
-    },
-  );
+    }
+
+    const inventoryId = supplyRows[0].inventory_id;
+
+    // Update supply
+    await db.promise().query(
+      `
+      UPDATE supply_tbl
+      SET product_name = ?,
+          category = ?,
+          stock_in = ?,
+          unit = ?,
+          price = ?
+      WHERE supply_id = ?
+      `,
+      [product_name, category, stock_in, unit, price, supply_id],
+    );
+
+    // Calculate total stock
+    const [stockRows] = await db.promise().query(
+      `
+      SELECT
+        COALESCE(SUM(stock_in), 0) AS total_stock,
+        MAX(created_at) AS latest_created
+      FROM supply_tbl
+      WHERE inventory_id = ?
+      `,
+      [inventoryId],
+    );
+
+    const totalStock = Number(stockRows[0].total_stock || 0);
+    const latestCreated = stockRows[0].latest_created;
+
+    const status = totalStock > 0 ? "Available" : "Not Available";
+
+    // Update inventory
+    await db.promise().query(
+      `
+      UPDATE inventory_tbl
+      SET product_name = ?,
+          category = ?,
+          stock_in = ?,
+          unit = ?,
+          price = ?,
+          created_at = ?,
+          status = ?
+      WHERE inventory_id = ?
+      `,
+      [
+        product_name,
+        category,
+        totalStock,
+        unit,
+        price,
+        latestCreated,
+        status,
+        inventoryId,
+      ],
+    );
+
+    // Update menu availability
+    await db.promise().query(`
+      UPDATE menu_tbl m
+      SET m.availability =
+        CASE
+          WHEN NOT EXISTS (
+            SELECT 1
+            FROM ingredients_tbl ing
+            JOIN inventory_tbl i
+              ON i.product_name = ing.ingredients_name
+            WHERE ing.menu_id = m.menu_id
+              AND i.stock_in <= 0
+          )
+          THEN 'Available'
+          ELSE 'Not Available'
+        END
+    `);
+
+    res.json({
+      success: true,
+      message: "Supply and inventory updated successfully",
+      inventory_id: inventoryId,
+      total_stock: totalStock,
+    });
+  } catch (error) {
+    console.error("❌ Update Supply Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Database error while updating supply",
+    });
+  }
 });
 
+app.put("/update_drinks_supply/:supply_drinks_id", async (req, res) => {
+  const { supply_drinks_id } = req.params;
+  const { product_name, stock_in, unit, price } = req.body;
+
+  try {
+    // Get related drinks inventory
+    const [supplyRows] = await db.promise().query(
+      `
+      SELECT drinks_inventory_id
+      FROM supply_drinks_tbl
+      WHERE supply_drinks_id = ?
+      `,
+      [supply_drinks_id],
+    );
+
+    if (supplyRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Drinks supply not found",
+      });
+    }
+
+    const drinksInventoryId = supplyRows[0].drinks_inventory_id;
+
+    // Update drinks supply
+    await db.promise().query(
+      `
+      UPDATE supply_drinks_tbl
+      SET product_name = ?,
+          stock_in = ?,
+          unit = ?,
+          price = ?,
+          status = ?
+      WHERE supply_drinks_id = ?
+      `,
+      [
+        product_name,
+        stock_in,
+        unit,
+        price,
+        stock_in > 0 ? "Available" : "Not Available",
+        supply_drinks_id,
+      ],
+    );
+
+    // Get total stock from all supplies connected
+    // to this drinks inventory
+    const [stockRows] = await db.promise().query(
+      `
+      SELECT
+        COALESCE(SUM(stock_in), 0) AS total_stock,
+        MAX(created_at) AS latest_created
+      FROM supply_drinks_tbl
+      WHERE drinks_inventory_id = ?
+      `,
+      [drinksInventoryId],
+    );
+
+    const totalStock = Number(stockRows[0].total_stock || 0);
+    const latestCreated = stockRows[0].latest_created;
+
+    const status = totalStock > 0 ? "Available" : "Not Available";
+
+    // Update drinks inventory
+    await db.promise().query(
+      `
+      UPDATE drinks_inventory_tbl
+      SET product_name = ?,
+          stock_in = ?,
+          unit = ?,
+          status = ?,
+          created_at = ?
+      WHERE drinks_inventory_id = ?
+      `,
+      [
+        product_name,
+        totalStock,
+        unit,
+        status,
+        latestCreated,
+        drinksInventoryId,
+      ],
+    );
+
+    // Update menu availability
+    await db.promise().query(`
+      UPDATE menu_tbl m
+      SET m.availability =
+        CASE
+          WHEN NOT EXISTS (
+            SELECT 1
+            FROM ingredients_tbl ing
+            JOIN inventory_tbl i
+              ON i.product_name = ing.ingredients_name
+            WHERE ing.menu_id = m.menu_id
+              AND i.stock_in <= 0
+          )
+          THEN 'Available'
+          ELSE 'Not Available'
+        END
+    `);
+
+    res.json({
+      success: true,
+      message: "Drinks supply and inventory updated successfully",
+      drinks_inventory_id: drinksInventoryId,
+      total_stock: totalStock,
+    });
+  } catch (error) {
+    console.error("❌ Update Drinks Supply Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Database error while updating drinks supply",
+    });
+  }
+});
 // Get all categories
 
 // Insert category
@@ -3573,22 +3746,30 @@ app.get("/getMessagesWorker/:workerId/:adminId", (req, res) => {
 
   const sql = `
     SELECT message_tbl.*, 
-    CASE WHEN sender_id = ? THEN 'admin' ELSE 'worker' END AS sender
+    CASE 
+      WHEN sender_id = ? THEN 'admin' 
+      ELSE 'worker' 
+    END AS sender
     FROM message_tbl 
-    WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
-    ORDER BY timestamp DESC
+    WHERE 
+      (sender_id = ? AND receiver_id = ?) 
+      OR 
+      (sender_id = ? AND receiver_id = ?)
+    ORDER BY timestamp ASC, message_id ASC
   `;
 
   db.query(
     sql,
     [adminId, adminId, workerId, workerId, adminId],
     (err, results) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json(results); // Return only the filtered results
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      res.json(results);
     },
   );
 });
-
 //==========================  CHAT WORKER TO ADMIN ============================
 // @ts-ignore
 app.post("/sendMessageToAdmin", (req, res) => {
@@ -3702,7 +3883,7 @@ app.get("/get_clients_info/:user_id", async (req, res) => {
   const { user_id } = req.params;
 
   const sql = `
-    SELECT 
+    SELECT
       u.user_id,
       u.fname,
       u.lname,
@@ -3714,33 +3895,38 @@ app.get("/get_clients_info/:user_id", async (req, res) => {
       m.timestamp AS last_message_time,
       m.sender_id AS last_sender_id
     FROM user_tbl u
+
     LEFT JOIN (
-        SELECT 
-          t.sender_id,
-          t.receiver_id,
-          t.message,
-          t.timestamp
+      SELECT
+        sender_id,
+        receiver_id,
+        message,
+        timestamp
+      FROM (
+        SELECT
+          t.*,
+          ROW_NUMBER() OVER (
+            PARTITION BY
+              LEAST(t.sender_id, t.receiver_id),
+              GREATEST(t.sender_id, t.receiver_id)
+            ORDER BY
+              t.timestamp DESC,
+              t.message_id DESC
+          ) AS rn
         FROM message_tbl t
-        INNER JOIN (
-            SELECT 
-              LEAST(sender_id, receiver_id) AS user1,
-              GREATEST(sender_id, receiver_id) AS user2,
-              MAX(timestamp) AS latest
-            FROM message_tbl
-            WHERE sender_id = ? OR receiver_id = ?
-            GROUP BY 
-              LEAST(sender_id, receiver_id),
-              GREATEST(sender_id, receiver_id)
-        ) lt ON 
-          LEAST(t.sender_id, t.receiver_id) = lt.user1
-          AND GREATEST(t.sender_id, t.receiver_id) = lt.user2
-          AND t.timestamp = lt.latest
-    ) m ON u.user_id = (
-      CASE 
-        WHEN m.sender_id = ? THEN m.receiver_id
-        ELSE m.sender_id
-      END
-    )
+        WHERE
+          t.sender_id = ?
+          OR t.receiver_id = ?
+      ) ranked
+      WHERE rn = 1
+    ) m
+      ON u.user_id = (
+        CASE
+          WHEN m.sender_id = ? THEN m.receiver_id
+          ELSE m.sender_id
+        END
+      )
+
     WHERE u.role = 'client'
   `;
 
@@ -3748,6 +3934,8 @@ app.get("/get_clients_info/:user_id", async (req, res) => {
     const [results] = await db
       .promise()
       .query(sql, [user_id, user_id, user_id]);
+
+    console.log("CLIENTS INFO:", results);
 
     return res.json(results);
   } catch (error) {
@@ -5604,7 +5792,7 @@ app.get("/fetch_my_purchase/:user_id", async (req, res) => {
 
 //==========================  ORDER TRANSACT END  ============================
 // @ts-ignore
-app.post("/bestseller", (req, res) => {
+app.post("/bestseller", async (req, res) => {
   const {
     user_id,
     item_name,
@@ -5612,7 +5800,7 @@ app.post("/bestseller", (req, res) => {
     price,
     rating,
     order_quantity,
-    comments, // new field
+    comments,
   } = req.body;
 
   console.log("Received data:", {
@@ -5633,135 +5821,133 @@ app.post("/bestseller", (req, res) => {
     !user_id ||
     !order_quantity
   ) {
-    return res.status(400).json({ error: "All fields are required" });
+    return res.status(400).json({
+      error: "All fields are required",
+    });
   }
 
-  // Step 1: Get order_item_id + categories_name from orderitem_tbl
-  const selectOrderItemQuery = `
-    SELECT order_item_id, categories_name
-    FROM orderitem_tbl 
-    WHERE item_name = ? AND menu_img = ? AND user_id = ?
-  `;
+  try {
+    const selectOrderItemQuery = `
+      SELECT order_item_id, categories_name
+      FROM orderitem_tbl
+      WHERE item_name = ? AND menu_img = ? AND user_id = ?
+    `;
 
-  db.query(
-    selectOrderItemQuery,
-    [item_name, menu_img, user_id],
-    (err, result) => {
-      if (err) {
-        console.error("Error fetching from orderitem_tbl:", err);
-        return res.status(500).json({ error: "Failed to fetch order item" });
-      }
+    const [orderItemResult] = await db.query(selectOrderItemQuery, [
+      item_name,
+      menu_img,
+      user_id,
+    ]);
 
-      if (result.length === 0) {
-        return res
-          .status(404)
-          .json({ error: "Product not found in orderitem_tbl" });
-      }
+    if (orderItemResult.length === 0) {
+      return res.status(404).json({
+        error: "Product not found in orderitem_tbl",
+      });
+    }
 
-      const { order_item_id, categories_name } = result[0];
+    const { order_item_id, categories_name } = orderItemResult[0];
 
-      // Step 2: Check if user already rated it
-      const checkIfRatedQuery = `
-        SELECT * FROM bestseller_tbl 
+    const checkIfRatedQuery = `
+      SELECT *
+      FROM bestseller_tbl
+      WHERE order_item_id = ? AND user_id = ?
+    `;
+
+    const [ratingResult] = await db.query(checkIfRatedQuery, [
+      order_item_id,
+      user_id,
+    ]);
+
+    if (ratingResult.length > 0) {
+      const existingRating = Number(ratingResult[0].rating);
+      const ratingCount = Number(ratingResult[0].rating_count);
+      const oldComments = ratingResult[0].comments || "";
+
+      const newTotalRating = existingRating + Number(rating);
+      const newRatingCount = ratingCount + 1;
+      const avgRating = newTotalRating / newRatingCount;
+
+      const combinedComments = oldComments
+        ? oldComments + "\n" + (comments || "")
+        : comments || "";
+
+      const updateQuery = `
+        UPDATE bestseller_tbl
+        SET
+          rating = ?,
+          rating_count = ?,
+          avg_rating = ?,
+          order_quantity = ?,
+          categories_name = ?,
+          comments = ?
         WHERE order_item_id = ? AND user_id = ?
       `;
 
-      db.query(checkIfRatedQuery, [order_item_id, user_id], (err, result) => {
-        if (err) {
-          console.error("Error checking rating:", err);
-          return res
-            .status(500)
-            .json({ error: "Failed to check rating status" });
-        }
+      const [updateResult] = await db.query(updateQuery, [
+        newTotalRating,
+        newRatingCount,
+        avgRating.toFixed(2),
+        order_quantity,
+        categories_name,
+        combinedComments,
+        order_item_id,
+        user_id,
+      ]);
 
-        if (result.length > 0) {
-          // Already rated → Update
-          const existingRating = result[0].rating;
-          const ratingCount = result[0].rating_count;
-          const oldComments = result[0].comments || "";
-          const newTotalRating = existingRating + rating;
-          const newRatingCount = ratingCount + 1;
-          const avgRating = newTotalRating / newRatingCount;
+      console.log("Rating updated:", updateResult);
 
-          const updateQuery = `
-            UPDATE bestseller_tbl
-            SET rating = ?, rating_count = ?, avg_rating = ?, order_quantity = ?, categories_name = ?, comments = ?
-            WHERE order_item_id = ? AND user_id = ?
-          `;
-
-          const combinedComments = oldComments
-            ? oldComments + "\n" + comments
-            : comments;
-
-          db.query(
-            updateQuery,
-            [
-              newTotalRating,
-              newRatingCount,
-              avgRating.toFixed(2),
-              order_quantity,
-              categories_name,
-              combinedComments,
-              order_item_id,
-              user_id,
-            ],
-            (err, result) => {
-              if (err) {
-                console.error("Error updating rating:", err);
-                return res
-                  .status(500)
-                  .json({ error: "Failed to update rating" });
-              }
-
-              console.log("Rating updated:", result);
-              return res.status(200).json({
-                message: "Rating and comments updated successfully",
-                avg_rating: avgRating.toFixed(2),
-              });
-            },
-          );
-        } else {
-          // Not rated yet → Insert
-          const insertQuery = `
-            INSERT INTO bestseller_tbl 
-              (order_item_id, user_id, item_name, menu_img, price, rating, rating_count, avg_rating, rated, order_quantity, categories_name, comments)
-            VALUES (?, ?, ?, ?, ?, ?, 1, ?, true, ?, ?, ?)
-          `;
-
-          const avgRating = rating;
-
-          db.query(
-            insertQuery,
-            [
-              order_item_id,
-              user_id,
-              item_name,
-              menu_img,
-              price,
-              rating,
-              avgRating,
-              order_quantity,
-              categories_name,
-              comments, // insert comments
-            ],
-            (err, result) => {
-              if (err) {
-                console.error("Error inserting into bestseller_tbl:", err);
-                return res
-                  .status(500)
-                  .json({ error: "Failed to insert rating" });
-              }
-
-              console.log("New product rating inserted:", result);
-              return res.status(201).json({
-                message: "Rating and comment submitted successfully",
-              });
-            },
-          );
-        }
+      return res.status(200).json({
+        message: "Rating and comments updated successfully",
+        avg_rating: avgRating.toFixed(2),
       });
-    },
-  );
+    }
+
+    const insertQuery = `
+      INSERT INTO bestseller_tbl
+      (
+        order_item_id,
+        user_id,
+        item_name,
+        menu_img,
+        price,
+        rating,
+        rating_count,
+        avg_rating,
+        rated,
+        order_quantity,
+        categories_name,
+        comments
+      )
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?, true, ?, ?, ?)
+    `;
+
+    const avgRating = Number(rating);
+
+    const [insertResult] = await db.query(insertQuery, [
+      order_item_id,
+      user_id,
+      item_name,
+      menu_img,
+      price,
+      rating,
+      avgRating,
+      order_quantity,
+      categories_name,
+      comments || "",
+    ]);
+
+    console.log("New product rating inserted:", insertResult);
+
+    return res.status(201).json({
+      message: "Rating and comment submitted successfully",
+    });
+  } catch (error) {
+    console.error("Error processing bestseller:", error);
+
+    return res.status(500).json({
+      error: "Failed to process rating",
+    });
+  }
 });
 
 // ✅ Get bestseller reviews and total average rating dynamically by item_name
@@ -5812,7 +5998,7 @@ app.get("/get_item_reviews/:item_name", async (req, res) => {
 });
 
 //==========================  TOP SELLING   ============================
-app.get("/top_selling", (req, res) => {
+app.get("/top_selling", async (req, res) => {
   const query = `
     SELECT
       topselling_id,
@@ -5821,25 +6007,27 @@ app.get("/top_selling", (req, res) => {
       price,
       total_order_amount,
       total_order_quantity,
-      total_avg_rating AS avg_rating,  -- Use total_avg_rating and alias it to avg_rating
-      menu_img  -- Add this field to the query
+      total_avg_rating AS avg_rating,
+      menu_img
     FROM topselling_tbl
     ORDER BY total_order_quantity DESC
     LIMIT 10;
   `;
 
-  console.log("Executing query:", query); // Log the query being executed
+  console.log("Executing query:", query);
 
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error("Error fetching top selling data:", err); // Log the error if any
-      return res.status(500).send("Error fetching data");
-    }
-    console.log("Query results:", results); // Log the results returned from the query
-    res.json(results); // Send the results as JSON
-  });
+  try {
+    const [results] = await db.query(query);
+
+    console.log("Query results:", results);
+
+    return res.json(results);
+  } catch (error) {
+    console.error("Error fetching top selling data:", error);
+
+    return res.status(500).send("Error fetching data");
+  }
 });
-
 // ✅ API route for top selling products
 app.get("/most_top_selling", (req, res) => {
   const query = `
@@ -6136,36 +6324,31 @@ app.post("/rate_product", (req, res) => {
 });
 
 // Assuming you are using MySQL or any other database to store data
-app.get("/fetchrated/:user_id", (req, res) => {
-  const userId = req.params.user_id; // Retrieve the user_id from the URL parameters
+app.get("/fetchrated/:user_id", async (req, res) => {
+  const userId = req.params.user_id;
 
-  // Log the user_id for debugging purposes
   console.log("Fetching rated products for user_id:", userId);
 
-  // SQL query to fetch item_name and user_id for rated products and a specific user
   const query = `
     SELECT item_name, user_id
     FROM bestseller_tbl
     WHERE rated = 1 AND user_id = ?;
   `;
 
-  // Execute the query
-  db.query(query, [userId], (err, result) => {
-    if (err) {
-      console.error("Error fetching rated products:", err);
-      return res.status(500).send("Server Error");
-    }
+  try {
+    const [result] = await db.query(query, [userId]);
 
-    // Log the result to check if it's correct
     console.log("Rated products for user_id:", userId, result);
 
-    // Send the result back to the client (rated products for this user)
-    res.json(result);
-  });
+    return res.json(result);
+  } catch (error) {
+    console.error("Error fetching rated products:", error);
+
+    return res.status(500).send("Server Error");
+  }
 });
 
-// @ts-ignore
-app.post("/bestselling", (req, res) => {
+app.post("/bestselling", async (req, res) => {
   const { item_name, price, menu_img } = req.body;
 
   console.log("Received data:", {
@@ -6176,146 +6359,154 @@ app.post("/bestselling", (req, res) => {
 
   // Validate request data
   if (!item_name || !price || !menu_img) {
-    return res.status(400).json({ error: "All fields are required" });
+    return res.status(400).json({
+      error: "All fields are required",
+    });
   }
 
-  // Step 1: Calculate total_avg_rating and rating_count from bestseller_tbl
-  const calculateAvgRatingQuery = `
-    SELECT SUM(avg_rating) AS total_rating, COUNT(*) AS total_ratings
-    FROM bestseller_tbl
-    WHERE item_name = ?
-  `;
+  try {
+    // Step 1: Calculate total_avg_rating and rating_count
+    const calculateAvgRatingQuery = `
+      SELECT
+        SUM(avg_rating) AS total_rating,
+        COUNT(*) AS total_ratings
+      FROM bestseller_tbl
+      WHERE item_name = ?
+    `;
 
-  db.query(calculateAvgRatingQuery, [item_name], (err, ratingResult) => {
-    if (err) {
-      console.error("Error calculating avg_rating:", err);
-      return res.status(500).json({ error: "Failed to calculate avg_rating" });
-    }
+    const [ratingResult] = await db
+      .promise()
+      .query(calculateAvgRatingQuery, [item_name]);
 
     if (ratingResult.length === 0) {
-      return res.status(404).json({ error: "No ratings found for item" });
+      return res.status(404).json({
+        error: "No ratings found for item",
+      });
     }
 
-    const totalRating = ratingResult[0].total_rating;
-    const totalRatings = ratingResult[0].total_ratings;
+    const totalRating = Number(ratingResult[0].total_rating) || 0;
+    const totalRatings = Number(ratingResult[0].total_ratings) || 0;
+
     const avgRating = totalRatings > 0 ? totalRating / totalRatings : 0;
 
-    // Step 2: Fetch categories_name from bestseller_tbl
+    // Step 2: Fetch categories_name
     const fetchCategoryQuery = `
-      SELECT categories_name FROM bestseller_tbl
+      SELECT categories_name
+      FROM bestseller_tbl
       WHERE item_name = ?
       LIMIT 1
     `;
 
-    db.query(fetchCategoryQuery, [item_name], (err, catResult) => {
-      if (err) {
-        console.error("Error fetching categories_name:", err);
-        return res
-          .status(500)
-          .json({ error: "Failed to fetch categories_name" });
-      }
+    const [catResult] = await db
+      .promise()
+      .query(fetchCategoryQuery, [item_name]);
 
-      const categories_name =
-        catResult.length > 0 ? catResult[0].categories_name : "Uncategorized";
+    const categories_name =
+      catResult.length > 0 ? catResult[0].categories_name : "Uncategorized";
 
-      // Step 3: Check if item exists in bestselling_tbl
-      const checkIfItemExistsQuery = `
-        SELECT * FROM bestselling_tbl
+    // Step 3: Check if item already exists
+    const checkIfItemExistsQuery = `
+      SELECT *
+      FROM bestselling_tbl
+      WHERE item_name = ?
+    `;
+
+    const [existsResult] = await db
+      .promise()
+      .query(checkIfItemExistsQuery, [item_name]);
+
+    if (existsResult.length > 0) {
+      // Update existing record
+      const updateQuery = `
+        UPDATE bestselling_tbl
+        SET
+          total_avg_rating = ?,
+          rating_count = rating_count + 1,
+          categories_name = ?
         WHERE item_name = ?
       `;
 
-      db.query(checkIfItemExistsQuery, [item_name], (err, existsResult) => {
-        if (err) {
-          console.error("Error checking existing item:", err);
-          return res.status(500).json({ error: "Failed to check item" });
-        }
+      const [updateResult] = await db
+        .promise()
+        .query(updateQuery, [avgRating.toFixed(2), categories_name, item_name]);
 
-        if (existsResult.length > 0) {
-          // Update total_avg_rating and increment rating_count
-          const updateQuery = `
-            UPDATE bestselling_tbl
-            SET total_avg_rating = ?, rating_count = rating_count + 1, categories_name = ?
-            WHERE item_name = ?
-          `;
+      console.log("Updated bestselling_tbl:", updateResult);
 
-          db.query(
-            updateQuery,
-            [avgRating.toFixed(2), categories_name, item_name],
-            (err, updateResult) => {
-              if (err) {
-                console.error("Error updating bestselling_tbl:", err);
-                return res
-                  .status(500)
-                  .json({ error: "Failed to update bestselling_tbl" });
-              }
-
-              console.log("Updated bestselling_tbl:", updateResult);
-              return res.status(200).json({
-                message: "Updated successfully",
-                total_avg_rating: avgRating.toFixed(2),
-                categories_name,
-              });
-            },
-          );
-        } else {
-          // Insert new record
-          const insertQuery = `
-            INSERT INTO bestselling_tbl (item_name, price, menu_img, total_avg_rating, rating_count, categories_name)
-            VALUES (?, ?, ?, ?, ?, ?)
-          `;
-
-          db.query(
-            insertQuery,
-            [
-              item_name,
-              price,
-              menu_img,
-              avgRating.toFixed(2),
-              1,
-              categories_name,
-            ],
-            (err, insertResult) => {
-              if (err) {
-                console.error("Error inserting into bestselling_tbl:", err);
-                return res
-                  .status(500)
-                  .json({ error: "Failed to insert into bestselling_tbl" });
-              }
-
-              console.log("Inserted into bestselling_tbl:", insertResult);
-              return res.status(201).json({
-                message: "Inserted successfully",
-                total_avg_rating: avgRating.toFixed(2),
-                rating_count: 1,
-                categories_name,
-              });
-            },
-          );
-        }
+      return res.status(200).json({
+        message: "Updated successfully",
+        total_avg_rating: avgRating.toFixed(2),
+        categories_name,
       });
-    });
-  });
-});
-
-app.get("/bestselling", (req, res) => {
-  const selectQuery = `
-    SELECT b.item_name, b.menu_img, b.price, b.total_avg_rating, b.rating_count, b.categories_name,
-           m.availability
-    FROM bestselling_tbl b
-    JOIN menu_tbl m ON b.item_name = m.item_name
-  `;
-
-  db.query(selectQuery, (err, result) => {
-    if (err) {
-      console.error("Error fetching bestselling data:", err);
-      return res
-        .status(500)
-        .json({ error: "Failed to fetch bestselling data" });
     }
 
-    // Send the fetched data as a response
-    res.status(200).json(result);
-  });
+    // Step 4: Insert new record
+    const insertQuery = `
+      INSERT INTO bestselling_tbl
+      (
+        item_name,
+        price,
+        menu_img,
+        total_avg_rating,
+        rating_count,
+        categories_name
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+
+    const [insertResult] = await db
+      .promise()
+      .query(insertQuery, [
+        item_name,
+        price,
+        menu_img,
+        avgRating.toFixed(2),
+        1,
+        categories_name,
+      ]);
+
+    console.log("Inserted into bestselling_tbl:", insertResult);
+
+    return res.status(201).json({
+      message: "Inserted successfully",
+      total_avg_rating: avgRating.toFixed(2),
+      rating_count: 1,
+      categories_name,
+    });
+  } catch (error) {
+    console.error("Error processing bestselling:", error);
+
+    return res.status(500).json({
+      error: "Failed to process bestselling",
+    });
+  }
+});
+
+app.get("/bestselling", async (req, res) => {
+  const selectQuery = `
+    SELECT
+      b.item_name,
+      b.menu_img,
+      b.price,
+      b.total_avg_rating,
+      b.rating_count,
+      b.categories_name,
+      m.availability
+    FROM bestselling_tbl b
+    JOIN menu_tbl m
+      ON b.item_name = m.item_name
+  `;
+
+  try {
+    const [result] = await db.promise().query(selectQuery);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching bestselling data:", error);
+
+    return res.status(500).json({
+      error: "Failed to fetch bestselling data",
+    });
+  }
 });
 
 //==========================  BESTSELLER END  ============================
@@ -6507,39 +6698,103 @@ app.get("/get_notifications_announcement/:id", async (req, res) => {
 });
 
 // Fetch only messages for a specific worker
-app.get("/get_notifications_for_worker/:workerId", (req, res) => {
-  const { workerId } = req.params;
+app.get("/get_notifications_for_worker/:workerId", async (req, res) => {
+  try {
+    const { workerId } = req.params;
 
-  console.log("Worker ID:", workerId); // Log the worker ID
+    console.log("Worker ID:", workerId);
 
-  // Query for messages only
-  const messageQuery = `
-     SELECT 
-      message_id AS id, 
-      message AS description, 
-      sender_id, 
-      receiver_id, 
-      timestamp AS time, 
-      'Message' AS type, 
-      m.status,  
-      u.profile_pic  
-    FROM message_tbl m
-    JOIN user_tbl u ON m.sender_id = u.user_id
-    WHERE receiver_id = ? 
-    ORDER BY timestamp DESC
-  `;
+    const messageQuery = `
+      SELECT
+        id,
+        description,
+        sender_id,
+        receiver_id,
+        time,
+        type,
+        is_read,
+        read_by,
+        profile_pic
+      FROM (
+        SELECT
+          m.message_id AS id,
+          m.message AS description,
+          m.sender_id,
+          m.receiver_id,
+          m.timestamp AS time,
+          'Message' AS type,
+          m.is_read,
+          m.read_by,
+          u.profile_pic,
 
-  db.query(messageQuery, [workerId], (err, messageResults) => {
-    if (err) {
-      console.error("Error fetching messages:", err);
-      return res.status(500).json({ error: "Failed to fetch messages" });
-    }
+          ROW_NUMBER() OVER (
+            PARTITION BY m.sender_id
+            ORDER BY m.timestamp DESC, m.message_id DESC
+          ) AS row_num
 
-    console.log("Messages fetched:", messageResults);
+        FROM message_tbl m
 
-    // Send only messages as response
+        JOIN user_tbl u
+          ON m.sender_id = u.user_id
+
+        WHERE m.receiver_id = ?
+      ) latest_messages
+
+      WHERE row_num = 1
+
+      ORDER BY time DESC, id DESC
+    `;
+
+    const [messageResults] = await db.promise().query(messageQuery, [workerId]);
+
+    console.log("Latest messages fetched:", messageResults);
+
     res.json(messageResults);
-  });
+  } catch (err) {
+    console.error("Error fetching messages:", err);
+
+    res.status(500).json({
+      error: "Failed to fetch messages",
+      details: err.message,
+    });
+  }
+});
+app.post("/messages/read/:workerId/:senderId", async (req, res) => {
+  try {
+    const { workerId, senderId } = req.params;
+
+    console.log("Marking message as read");
+    console.log("Worker ID:", workerId);
+    console.log("Sender ID:", senderId);
+
+    const sql = `
+      UPDATE message_tbl
+      SET 
+        is_read = 'read',
+        read_by = ?
+      WHERE receiver_id = ?
+        AND sender_id = ?
+        AND is_read != 'read'
+    `;
+
+    const [result] = await db
+      .promise()
+      .query(sql, [workerId, workerId, senderId]);
+
+    console.log("Updated rows:", result.affectedRows);
+
+    res.json({
+      message: "Messages marked as read",
+      affectedRows: result.affectedRows,
+    });
+  } catch (err) {
+    console.error("Error marking message as read:", err);
+
+    res.status(500).json({
+      error: "Failed to mark message as read",
+      details: err.message,
+    });
+  }
 });
 
 // Get messages for admin
@@ -6900,45 +7155,61 @@ app.get("/get_workers_read_and_unread", (req, res) => {
   });
 });
 // Get notifications for a specific client
-app.get("/client_notifications/:user_id", (req, res) => {
-  const { user_id } = req.params;
+app.get("/client_notifications/:user_id", async (req, res) => {
+  try {
+    const { user_id } = req.params;
 
-  const sql = `
-    SELECT client_notification_id, message, sender_id, recipient_id, created_at, status
-    FROM client_notification_tbl
-    WHERE recipient_id = ?
-    ORDER BY created_at DESC
-  `;
+    const sql = `
+      SELECT client_notification_id, message, sender_id, recipient_id, created_at, status
+      FROM client_notification_tbl
+      WHERE recipient_id = ?
+      ORDER BY created_at DESC
+    `;
 
-  db.query(sql, [user_id], (err, results) => {
-    if (err) {
-      console.error("Error fetching notifications:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
+    const results = await new Promise((resolve, reject) => {
+      db.query(sql, [user_id], (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(results);
+        }
+      });
+    });
 
-    // ✅ Always return an array of notifications
+    // Always return an array of notifications
     res.json(results);
-  });
+  } catch (err) {
+    console.error("Error fetching notifications:", err);
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
 // Mark a notification as read
-app.post("/client_notifications/read/:notificationId", (req, res) => {
-  const { notificationId } = req.params;
+app.post("/client_notifications/read/:notificationId", async (req, res) => {
+  try {
+    const { notificationId } = req.params;
 
-  const updateQuery = `
-    UPDATE client_notification_tbl
-    SET status = 'read'
-    WHERE client_notification_id = ?
-  `;
+    const updateQuery = `
+      UPDATE client_notification_tbl
+      SET status = 'read'
+      WHERE client_notification_id = ?
+    `;
 
-  db.query(updateQuery, [notificationId], (err, result) => {
-    if (err) {
-      console.error("Error marking notification as read:", err);
-      return res.status(500).json({ error: "Failed to mark as read" });
-    }
+    const result = await new Promise((resolve, reject) => {
+      db.query(updateQuery, [notificationId], (err, result) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result);
+        }
+      });
+    });
 
     res.json({ success: true });
-  });
+  } catch (err) {
+    console.error("Error marking notification as read:", err);
+    res.status(500).json({ error: "Failed to mark as read" });
+  }
 });
 
 // Create payment link endpoint for GCash
@@ -7222,94 +7493,138 @@ app.post("/paypal_payment", async (req, res) => {
 });
 
 // Route for GCash transaction with Cloudinary file upload
-app.post("/gcash_transaction", upload.single("proof_image"), (req, res) => {
-  const {
-    amount,
-    description,
-    remarks,
-    checkout_url,
-    payment_method,
-    status,
-    created_at,
-    user_id,
-    order_quantity,
-    menu_img,
-    reference_code,
-    gcash_number,
-    payment_date,
-    payment_time,
-    order_id,
-  } = req.body;
+app.post(
+  "/gcash_transaction",
+  upload.single("proof_image"),
+  async (req, res) => {
+    try {
+      const {
+        amount,
+        description,
+        remarks,
+        checkout_url,
+        payment_method,
+        status,
+        created_at,
+        user_id,
+        order_quantity,
+        menu_img,
+        reference_code,
+        gcash_number,
+        payment_date,
+        payment_time,
+        order_id,
+      } = req.body;
 
-  // ✅ Get Cloudinary URL for proof image
-  const proof_image = req.file?.path || null; // Cloudinary returns full URL
+      // Get Cloudinary URL
+      const proof_image = req.file?.path || null;
 
-  const transaction_id = `GCASH-${Date.now()}-${Math.floor(
-    Math.random() * 1000,
-  )}`;
+      const transaction_id = `GCASH-${Date.now()}-${Math.floor(
+        Math.random() * 1000,
+      )}`;
 
-  const sql = `
-    INSERT INTO transaction_tbl
-      (amount, description, remarks, transaction_id, checkout_url, payment_method, status, created_at,
-       user_id, order_quantity, menu_img, reference_code, gcash_number, payment_date, payment_time, proof_image, order_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
+      const sql = `
+        INSERT INTO transaction_tbl
+          (
+            amount,
+            description,
+            remarks,
+            transaction_id,
+            checkout_url,
+            payment_method,
+            status,
+            created_at,
+            user_id,
+            order_quantity,
+            menu_img,
+            reference_code,
+            gcash_number,
+            payment_date,
+            payment_time,
+            proof_image,
+            order_id
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
 
-  const values = [
-    amount,
-    description,
-    remarks,
-    transaction_id,
-    checkout_url,
-    payment_method,
-    status,
-    created_at,
-    user_id,
-    order_quantity,
-    menu_img,
-    reference_code,
-    gcash_number,
-    payment_date,
-    payment_time,
-    proof_image, // ✅ store Cloudinary URL
-    order_id,
-  ];
+      const values = [
+        amount,
+        description,
+        remarks,
+        transaction_id,
+        checkout_url,
+        payment_method,
+        status,
+        created_at,
+        user_id,
+        order_quantity,
+        menu_img,
+        reference_code,
+        gcash_number,
+        payment_date,
+        payment_time,
+        proof_image,
+        order_id,
+      ];
 
-  db.query(sql, values, (err, result) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: "Internal Server Error" });
+      const result = await new Promise((resolve, reject) => {
+        db.query(sql, values, (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(result);
+          }
+        });
+      });
+
+      console.log("GCash transaction inserted:", result);
+
+      return res.status(200).json({
+        message: "GCash transaction added successfully!",
+        proof_image: proof_image,
+        transaction_id: transaction_id,
+      });
+    } catch (error) {
+      console.error("GCash transaction error:", error);
+
+      return res.status(500).json({
+        error: "Internal Server Error",
+        details: error.sqlMessage || error.message,
+        code: error.code || null,
+      });
     }
-
-    // ✅ Send JSON response with proof_image URL for frontend
-    res.json({
-      message:
-        "GCash transaction added successfully with Cloudinary proof image!",
-      proof_image: proof_image,
-      transaction_id: transaction_id,
-    });
-  });
-});
+  },
+);
 
 app.post("/gcash_payment", async (req, res) => {
-  const {
-    user_id,
-    order_id, // ✅ Added this field
-    amount_paid,
-    payment_method = "GCash",
-    payment_status = "pending",
-  } = req.body;
-
-  // ✅ Validate input
-  if (!user_id || !order_id || !amount_paid) {
-    console.log("❌ Missing required fields:", req.body);
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-
   try {
-    // ✅ Updated query to include order_id
+    const {
+      user_id,
+      order_id,
+      amount_paid,
+      payment_method = "GCash",
+      payment_status = "pending",
+    } = req.body;
+
+    // Validate input
+    if (!user_id || !order_id || !amount_paid) {
+      console.log("❌ Missing required fields:", req.body);
+
+      return res.status(400).json({
+        error: "Missing required fields",
+      });
+    }
+
     const query = `
-      INSERT INTO payment_tbl (user_id, order_id, payment_date, amount_paid, payment_method, payment_status)
+      INSERT INTO payment_tbl
+        (
+          user_id,
+          order_id,
+          payment_date,
+          amount_paid,
+          payment_method,
+          payment_status
+        )
       VALUES (?, ?, NOW(), ?, ?, ?)
     `;
 
@@ -7324,28 +7639,32 @@ app.post("/gcash_payment", async (req, res) => {
     console.log("Query to be executed:", query);
     console.log("Values to be inserted:", values);
 
-    db.query(query, values, (error, results) => {
-      if (error) {
-        console.error("❌ Error inserting GCash payment:", error);
-        return res
-          .status(500)
-          .json({ error: "Error inserting payment into database" });
-      }
-
-      console.log("✅ GCash payment inserted successfully:", results);
-      return res.status(200).json({
-        message: "GCash payment details inserted successfully",
-        payment_id: results.insertId,
+    const results = await new Promise((resolve, reject) => {
+      db.query(query, values, (error, results) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(results);
+        }
       });
+    });
+
+    console.log("✅ GCash payment inserted successfully:", results);
+
+    return res.status(200).json({
+      message: "GCash payment details inserted successfully",
+      payment_id: results.insertId,
     });
   } catch (error) {
     console.error("❌ Error inserting GCash payment:", error);
-    return res
-      .status(500)
-      .json({ error: "Error inserting GCash payment details" });
+
+    return res.status(500).json({
+      error: "Error inserting GCash payment details",
+      details: error.sqlMessage || error.message,
+      code: error.code || null,
+    });
   }
 });
-
 //========================== TRANSACTIONS END ============================
 
 app.post("/insertTestimonial", (req, res) => {
@@ -7569,7 +7888,7 @@ app.put("/update_payment_status", (req, res) => {
 });
 
 // ✅ Get transaction validation by order_id
-app.get("/get_transac_validation/:order_id", (req, res) => {
+app.get("/get_transac_validation/:order_id", async (req, res) => {
   const { order_id } = req.params;
 
   // Safety check
@@ -7594,11 +7913,8 @@ app.get("/get_transac_validation/:order_id", (req, res) => {
     WHERE order_id = ?;
   `;
 
-  db.query(sql, [order_id], (error, results) => {
-    if (error) {
-      console.error("❌ SQL ERROR:", error.sqlMessage || error);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
+  try {
+    const [results] = await db.query(sql, [order_id]);
 
     if (!results || results.length === 0) {
       console.log("⚠️ No transaction found for order_id:", order_id);
@@ -7607,27 +7923,42 @@ app.get("/get_transac_validation/:order_id", (req, res) => {
 
     console.log("✅ Transaction fetched successfully:", results[0]);
     res.json(results);
-  });
+  } catch (err) {
+    console.error("❌ SQL ERROR:", err.sqlMessage || err);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 // server.js
 
-app.get("/get_payments", (req, res) => {
-  const sql = `
-    SELECT payment_id, user_id, amount_paid, payment_date, payment_method, payment_status
-    FROM payment_tbl
-    WHERE payment_status = 'paid'
-    ORDER BY payment_date ASC
-  `;
+app.get("/get_payments", async (req, res) => {
+  try {
+    const sql = `
+      SELECT
+        payment_id,
+        user_id,
+        amount_paid,
+        payment_date,
+        payment_method,
+        payment_status
+      FROM payment_tbl
+      WHERE payment_status = 'paid'
+      ORDER BY payment_date ASC
+    `;
 
-  db.query(sql, (error, data) => {
-    if (error) {
-      console.error("Error fetching payments:", error);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
-    console.log("Fetched payments (Completed only):", data);
-    return res.json(data);
-  });
+    const [data] = await db.promise().query(sql);
+
+    console.log("Fetched payments:", data);
+
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error("Error fetching payments:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
 });
 
 // Toggle favorite by menu_id using user_id
@@ -7695,39 +8026,66 @@ app.post("/toggle_user_favorites/:menu_id", (req, res) => {
 });
 
 // Get favorites for a specific user
-app.get("/get_user_favorites/:user_id", (req, res) => {
-  const { user_id } = req.params;
-  const query = "SELECT menu_id FROM user_favourites_tbl WHERE user_id = ?";
-  db.query(query, [user_id], (err, result) => {
-    if (err) return res.status(500).json(err);
-    // Return an array of menu_ids
+app.get("/get_user_favorites/:user_id", async (req, res) => {
+  try {
+    const { user_id } = req.params;
+
+    const query = `
+      SELECT menu_id
+      FROM user_favourites_tbl
+      WHERE user_id = ?
+    `;
+
+    const [result] = await db.promise().query(query, [user_id]);
+
     const favorites = result.map((row) => row.menu_id);
-    res.json(favorites);
-  });
+
+    res.status(200).json(favorites);
+  } catch (error) {
+    console.error("❌ Error fetching user favorites:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
 });
 // Get full favourites for a specific user
-app.get("/get_user_favourites_full/:user_id", (req, res) => {
-  const { user_id } = req.params;
-  const query = `
-   SELECT uf.*, m.availability, m.menu_id AS id
-    FROM user_favourites_tbl uf
-    JOIN menu_tbl m ON uf.menu_id = m.menu_id
-    WHERE uf.user_id = ?
-  `;
-  db.query(query, [user_id], (err, result) => {
-    if (err) return res.status(500).json(err);
+app.get("/get_user_favourites_full/:user_id", async (req, res) => {
+  try {
+    const { user_id } = req.params;
 
-    // Add `id` for ProductInfo compatibility
+    const query = `
+      SELECT 
+        uf.*,
+        m.availability,
+        m.menu_id AS id
+      FROM user_favourites_tbl uf
+      JOIN menu_tbl m 
+        ON uf.menu_id = m.menu_id
+      WHERE uf.user_id = ?
+    `;
+
+    const [result] = await db.promise().query(query, [user_id]);
+
     const favourites = result.map((row) => ({
       ...row,
       id: row.menu_id,
     }));
 
-    res.json(favourites);
-  });
+    res.status(200).json(favourites);
+  } catch (error) {
+    console.error("❌ Error fetching user favourites:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      favourites: [],
+    });
+  }
 });
 
-app.post("/update_cart_quantity/:user_id", (req, res) => {
+app.post("/update_cart_quantity/:user_id", async (req, res) => {
   const { user_id } = req.params;
   const { item_name, action } = req.body;
 
@@ -7740,10 +8098,13 @@ app.post("/update_cart_quantity/:user_id", (req, res) => {
     return res.status(400).json({ error: "Invalid action" });
   }
 
-  db.query(sql, [user_id, item_name], (err, result) => {
-    if (err) return res.status(500).json({ error: err });
+  try {
+    const [result] = await db.query(sql, [user_id, item_name]);
     res.json({ success: true });
-  });
+  } catch (err) {
+    console.error("Error updating cart quantity:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // Healthcheck endpoint

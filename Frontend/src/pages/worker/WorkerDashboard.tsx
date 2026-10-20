@@ -158,11 +158,13 @@ const WorkerDashboard = () => {
   };
 
   const handleReset = () => {
-    const resetStart = firstDayOfMonth;
-    const resetEnd = today;
+    const resetStart = dayjs().startOf("month");
+    const resetEnd = dayjs();
+
     setStartDate(resetStart);
     setEndDate(resetEnd);
     setDates([resetStart, resetEnd]);
+
     setIsModalOpen(false);
   };
 

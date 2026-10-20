@@ -9,6 +9,7 @@ interface MenuItem {
   description: string;
   price: number;
   categories_name: string;
+  availability?: string;
   size?: string;
   final_total?: number;
 }
@@ -26,12 +27,18 @@ const ProductInfo: React.FC<ProductInfoProps> = ({ item: propItem }) => {
 
   // Only fetch if no item was passed via prop
   useEffect(() => {
-    if (!propItem && type && name) {
+    if (propItem) {
+      setItem(propItem);
+      return;
+    }
+
+    if (type && name) {
       fetch(`${apiUrl}/menu?type=${type}&name=${name}`)
         .then((res) => res.json())
-        .then((data: MenuItem) => setItem(data));
+        .then((data: MenuItem) => setItem(data))
+        .catch((err) => console.error("Error fetching product:", err));
     }
-  }, [propItem, type, name]);
+  }, [propItem, type, name, apiUrl]);
 
   if (!item) return <p>Loading...</p>;
 
@@ -85,19 +92,25 @@ const ProductInfo: React.FC<ProductInfoProps> = ({ item: propItem }) => {
           </div>
 
           {/* Add to Cart Button */}
-          <button
-            onClick={() =>
-              addToCart({
-                ...item,
-                size: size || "Normal size",
-                final_total: item.price * (size === "Party Tray" ? 2 : 1),
-                categories_name: item.categories_name || "Bestsellers",
-              })
-            }
-            className="font-core mt-6 flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 text-white font-bold rounded-lg hover:bg-orange-600 transition w-full sm:w-auto"
-          >
-            Add to cart
-          </button>
+          {item.availability?.trim().toLowerCase() === "available" ? (
+            <button
+              onClick={() =>
+                addToCart({
+                  ...item,
+                  size: size || "Normal size",
+                  final_total: item.price * (size === "Party Tray" ? 2 : 1),
+                  categories_name: item.categories_name || "Bestsellers",
+                })
+              }
+              className="font-core mt-6 rounded-lg bg-orange-500 px-6 py-3 font-bold text-white transition hover:bg-orange-600"
+            >
+              Add to cart
+            </button>
+          ) : (
+            <span className="font-core mt-6 flex cursor-not-allowed justify-center rounded-full bg-stone-100 px-6 py-3 text-sm font-medium text-stone-400">
+              Unavailable
+            </span>
+          )}
         </div>
       </div>
     </section>

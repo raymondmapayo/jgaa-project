@@ -14,45 +14,67 @@ import axios from "axios";
 import dayjs from "dayjs";
 import React, { useState } from "react";
 import { FaArrowRight } from "react-icons/fa6";
+
 interface GCashButtonProps {
   amount: number;
-  orderId: number;
   menuImg: string;
   finalTotal: number;
   orderQuantity: number;
-  onPaymentSuccess: () => void;
+  onSubmitPayment: () => Promise<number>;
+  onPaymentSuccess: (createdOrderId: number) => Promise<void>;
   onPaymentError: (error: any) => void;
 }
 
 const GCashButton: React.FC<GCashButtonProps> = ({
   amount,
   menuImg,
-  orderId,
   orderQuantity,
   finalTotal,
+  onSubmitPayment,
   onPaymentSuccess,
   onPaymentError,
 }) => {
   const [step, setStep] = useState<"qr" | "form">("qr");
-  const [submitting, setSubmitting] = useState(false);
   const [uploadedProofUrl, setUploadedProofUrl] = useState<string | null>(null);
   const userId = sessionStorage.getItem("user_id");
   const [form] = Form.useForm();
   const apiUrl = import.meta.env.VITE_API_URL;
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (values: any) => {
-    if (submitting) return;
-    setSubmitting(true);
+    if (isLoading) return;
+
+    if (!userId) {
+      message.error("User ID not found. Please log in again.");
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
+      // 1. Create the order and its items only after Submit Payment.
+      const createdOrderId = Number(await onSubmitPayment());
+
+      if (!Number.isInteger(createdOrderId) || createdOrderId <= 0) {
+        throw new Error("Failed to create a valid order ID.");
+      }
+
+      console.log("Created order ID:", createdOrderId);
+
+      // 2. Prepare the GCash transaction.
       const formData = new FormData();
+
       formData.append("amount", String(amount));
       formData.append("description", "Payment for Order");
       formData.append("remarks", "Payment for order");
       formData.append("checkout_url", "GCash Manual Payment");
+
+      // Payment is pending until verified by the worker.
       formData.append("payment_method", "GCash");
       formData.append("status", "pending");
+
       formData.append("created_at", dayjs().format("YYYY-MM-DD HH:mm:ss"));
+
       formData.append("user_id", String(userId));
       formData.append("order_quantity", String(orderQuantity));
       formData.append("menu_img", menuImg);
@@ -60,38 +82,62 @@ const GCashButton: React.FC<GCashButtonProps> = ({
       formData.append("gcash_number", values.gcash || "");
       formData.append("payment_date", dayjs(values.date).format("YYYY-MM-DD"));
       formData.append("payment_time", dayjs(values.time).format("HH:mm:ss"));
-      formData.append("order_id", String(orderId));
+
+      // Use the actual order ID returned by the backend.
+      formData.append("order_id", String(createdOrderId));
 
       const proofFile = values.photo?.[0]?.originFileObj;
-      if (proofFile) formData.append("proof_image", proofFile);
 
-      const response = await axios.post(
+      if (!proofFile) {
+        throw new Error("Please upload proof of payment.");
+      }
+
+      formData.append("proof_image", proofFile);
+
+      // 3. Save the GCash transaction as pending.
+      const transactionResponse = await axios.post(
         `${apiUrl}/gcash_transaction`,
         formData,
         {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         },
       );
 
-      // Store uploaded proof URL from backend
-      setUploadedProofUrl(response.data.proof_image);
+      setUploadedProofUrl(transactionResponse.data.proof_image);
 
+      // 4. Save the payment using the SAME order ID.
       await axios.post(`${apiUrl}/gcash_payment`, {
         user_id: userId,
-        order_id: orderId,
+        order_id: createdOrderId,
         amount_paid: amount,
         payment_method: "GCash",
         payment_status: "pending",
       });
 
-      message.success("GCash payment submitted! Waiting for verification.");
-      onPaymentSuccess();
-    } catch (error) {
-      console.error(error);
-      message.error("GCash payment failed, please try again.");
+      message.success(
+        "GCash payment submitted! Please wait for worker verification.",
+      );
+
+      // 5. Complete the checkout using the same order ID.
+      await onPaymentSuccess(createdOrderId);
+    } catch (error: any) {
+      console.error(
+        "GCash payment error:",
+        error?.response?.data || error?.message || error,
+      );
+
+      message.error(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          error?.message ||
+          "GCash payment submission failed. Please try again.",
+      );
+
       onPaymentError(error);
     } finally {
-      setSubmitting(false);
+      setIsLoading(false);
     }
   };
 
@@ -100,20 +146,19 @@ const GCashButton: React.FC<GCashButtonProps> = ({
       {step === "qr" && (
         <>
           <p className="text-sm text-red-600 mb-2 text-center font-medium">
-            Note: Screenshot the Receipt payment
+            Note: Screenshot the receipt after payment.
           </p>
 
           <img src="/qr.jpg" alt="GCash QR Code" className="w-60 h-60 mb-4" />
 
           <div className="w-full flex justify-center">
             <div className="flex items-center bg-gray-200 dark:bg-[#1e293b] rounded-full w-[280px] px-3 py-1.5 border border-gray-300 dark:border-gray-600">
-              {/* LEFT SECTION - GRAND TOTAL */}
               <span className="flex-1 text-sm font-semibold text-gray-700 dark:text-gray-100">
                 Grand Total: ₱{finalTotal}
               </span>
 
-              {/* RIGHT SECTION - CIRCLE BUTTON */}
               <button
+                type="button"
                 onClick={() => setStep("form")}
                 className="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center text-white"
               >
@@ -143,12 +188,16 @@ const GCashButton: React.FC<GCashButtonProps> = ({
                 />
               </Form.Item>
             </Col>
+
             <Col span={12}>
               <Form.Item
                 name="reference"
                 label="Reference Code"
                 rules={[
-                  { required: true, message: "Please enter reference code" },
+                  {
+                    required: true,
+                    message: "Please enter reference code",
+                  },
                 ]}
               >
                 <Input placeholder="GCash Ref No." className="w-full" />
@@ -158,12 +207,31 @@ const GCashButton: React.FC<GCashButtonProps> = ({
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="date" label="Date" rules={[{ required: true }]}>
+              <Form.Item
+                name="date"
+                label="Date"
+                rules={[
+                  {
+                    required: true,
+                    message: "Please select payment date",
+                  },
+                ]}
+              >
                 <DatePicker className="w-full" />
               </Form.Item>
             </Col>
+
             <Col span={12}>
-              <Form.Item name="time" label="Time" rules={[{ required: true }]}>
+              <Form.Item
+                name="time"
+                label="Time"
+                rules={[
+                  {
+                    required: true,
+                    message: "Please select payment time",
+                  },
+                ]}
+              >
                 <TimePicker className="w-full" format="HH:mm" />
               </Form.Item>
             </Col>
@@ -175,10 +243,13 @@ const GCashButton: React.FC<GCashButtonProps> = ({
                 name="gcash"
                 label="GCash Number"
                 rules={[
-                  { required: true, message: "Please enter GCash number" },
+                  {
+                    required: true,
+                    message: "Please enter GCash number",
+                  },
                 ]}
               >
-                <Input placeholder="09xxxxxxxxx" className="w-full" />
+                <Input placeholder="09xxxxxxxxx" />
               </Form.Item>
             </Col>
 
@@ -189,12 +260,15 @@ const GCashButton: React.FC<GCashButtonProps> = ({
                 valuePropName="fileList"
                 getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
                 rules={[
-                  { required: true, message: "Please upload proof of payment" },
+                  {
+                    required: true,
+                    message: "Please upload proof of payment",
+                  },
                 ]}
               >
                 <Upload
                   listType="picture"
-                  beforeUpload={() => false} // prevent auto upload
+                  beforeUpload={() => false}
                   maxCount={1}
                   accept="image/*"
                   className="w-full"
@@ -218,18 +292,23 @@ const GCashButton: React.FC<GCashButtonProps> = ({
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item label=" ">
-                <Button block onClick={() => setStep("qr")}>
+                <Button
+                  block
+                  onClick={() => setStep("qr")}
+                  disabled={isLoading}
+                >
                   Back
                 </Button>
               </Form.Item>
             </Col>
+
             <Col span={12}>
               <Form.Item label=" ">
                 <Button
                   type="primary"
                   htmlType="submit"
                   block
-                  loading={submitting}
+                  loading={isLoading}
                 >
                   Submit Payment
                 </Button>

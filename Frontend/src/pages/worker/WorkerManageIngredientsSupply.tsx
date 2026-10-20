@@ -11,7 +11,7 @@ import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import SupplyModal from "../WorkerModals/AddSupplyIngredientsModal";
-import EditSupplyModal from "../WorkerModals/EditSupplyModal";
+import EditSupplyModal from "../WorkerModals/EditIngredientsSupplyModal";
 import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 import WorkerHistoryInventoryModal from "./WorkerHistoryInventory";
 
@@ -134,18 +134,23 @@ const WorkerIngredientsSupply = () => {
 
   const apiUrl = import.meta.env.VITE_API_URL;
   const fetchSupply = async () => {
+    setIsLoading(true);
+
     try {
       const response = await axios.get(`${apiUrl}/get_supply`);
+
       if (response.data.success) {
         setDataSource(response.data.data);
       }
+    } catch (error) {
+      console.error("❌ Fetch Supply Error:", error);
     } finally {
       setIsLoading(false);
     }
   };
   useEffect(() => {
     fetchSupply();
-  }, [apiUrl]);
+  }, []);
 
   const handleAddSupply = (values: any) => {
     console.log("New Supply Added:", values);
@@ -295,6 +300,7 @@ const WorkerIngredientsSupply = () => {
       <SupplyModal
         visible={isModalVisible}
         onFinish={handleAddSupply}
+        onSuccess={fetchSupply}
         onClose={() => setIsModalVisible(false)}
       />
 

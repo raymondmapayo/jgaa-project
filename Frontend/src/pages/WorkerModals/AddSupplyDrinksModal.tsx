@@ -20,17 +20,20 @@ interface AddSupplyDrinksModalProps {
   visible: boolean;
   onClose: () => void;
   onFinish: (values: any) => void;
+  onSuccess: () => void;
 }
 
 const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
   visible,
   onClose,
   onFinish,
+  onSuccess,
 }) => {
   const [form] = Form.useForm();
   const [drinks, setDrinks] = useState<any[]>([]); // ✅ NEW: drinks list
   const [supplyList, setSupplyList] = useState<any[]>([]);
   const apiUrl = import.meta.env.VITE_API_URL;
+  const [isLoading, setIsLoading] = useState(false);
   const user_id = sessionStorage.getItem("user_id");
   // ✅ Fetch drinks only
   useEffect(() => {
@@ -73,6 +76,7 @@ const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
 
   // ✅ Insert one immediately
   const handleInsertSingle = async () => {
+    setIsLoading(true);
     try {
       const values = await form.validateFields();
 
@@ -89,6 +93,7 @@ const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
       if (response.data.success) {
         message.success("Supply added successfully!");
         onFinish(values);
+        await onSuccess();
         form.resetFields();
         handleCancel();
       } else {
@@ -97,6 +102,8 @@ const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
     } catch (error) {
       console.error("Error adding supply:", error);
       message.error("Failed to add supply. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -112,6 +119,7 @@ const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
       return;
     }
 
+    setIsLoading(true);
     try {
       for (const supply of supplyList) {
         const response = await axios.post(`${apiUrl}/add_supply_drinks`, {
@@ -129,11 +137,14 @@ const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
 
       message.success("All supplies inserted successfully!");
       setSupplyList([]);
+      await onSuccess();
       form.resetFields();
       onClose();
     } catch (error) {
       console.error("Error inserting supplies:", error);
       message.error("Failed to insert supplies. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -221,12 +232,20 @@ const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
         {/* Buttons side by side */}
         <Row justify="end" gutter={16}>
           <Col>
-            <Button onClick={handleAddToList} type="dashed">
+            <Button
+              onClick={handleAddToList}
+              type="dashed"
+              disabled={isLoading}
+            >
               Add to List
             </Button>
           </Col>
           <Col>
-            <Button type="primary" onClick={handleInsertSingle}>
+            <Button
+              type="primary"
+              onClick={handleInsertSingle}
+              loading={isLoading}
+            >
               Insert Now
             </Button>
           </Col>
@@ -249,10 +268,16 @@ const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
 
           <Row justify="end" gutter={16} style={{ marginTop: 20 }}>
             <Col>
-              <Button onClick={handleCancel}>Cancel</Button>
+              <Button onClick={handleCancel} disabled={isLoading}>
+                Cancel
+              </Button>
             </Col>
             <Col>
-              <Button type="primary" onClick={handleInsertAll}>
+              <Button
+                type="primary"
+                onClick={handleInsertAll}
+                loading={isLoading}
+              >
                 Insert All
               </Button>
             </Col>

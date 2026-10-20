@@ -8,6 +8,7 @@ interface ValidationEditTabsModalProps {
   order: any;
   transaction: any;
   onUpdateOrder?: (updatedOrder: any) => void;
+  onSuccess?: () => void;
 }
 
 const { TabPane } = Tabs;
@@ -16,8 +17,8 @@ const ValidationEditTabsModal: React.FC<ValidationEditTabsModalProps> = ({
   isVisible,
   onClose,
   order,
-
   onUpdateOrder,
+  onSuccess,
 }) => {
   return (
     <Modal
@@ -25,27 +26,28 @@ const ValidationEditTabsModal: React.FC<ValidationEditTabsModalProps> = ({
       open={isVisible}
       onCancel={onClose}
       footer={null}
-      width={690} // ✅ smaller width for box look
+      width={690}
       style={{
-        maxHeight: "600px", // ✅ limit height to create box shape
-        overflowY: "auto", // ✅ scroll if content exceeds height
-        borderRadius: 12, // ✅ smooth rounded box corners
+        maxHeight: "600px",
+        overflowY: "auto",
+        borderRadius: 12,
       }}
       bodyStyle={{
-        padding: "16px", // ✅ balanced inner spacing
+        padding: "16px",
       }}
-      centered // ✅ center modal on screen
+      centered
     >
       <Tabs defaultActiveKey="1" centered>
         <TabPane tab="Validate" key="1">
-          {/* ✅ FIX: pass order instead of transaction */}
           <ValidationModal order={order} />
         </TabPane>
+
         <TabPane tab="Edit" key="2">
           <EditValidationModal
             order={order}
             onUpdateOrder={onUpdateOrder}
-            onClose={onClose} // ✅ Pass the parent onClose to allow auto-close
+            onSuccess={onSuccess}
+            onClose={onClose}
           />
         </TabPane>
       </Tabs>

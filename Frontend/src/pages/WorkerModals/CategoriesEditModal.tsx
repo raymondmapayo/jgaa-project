@@ -1,13 +1,12 @@
-import { UploadOutlined } from "@ant-design/icons";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { EditOutlined, UploadOutlined } from "@ant-design/icons";
 import {
   Button,
-  Col,
   Form,
   Image,
   Input,
   Modal,
   notification,
-  Row,
   Spin,
   Upload,
 } from "antd";
@@ -38,6 +37,7 @@ const CategoriesEdit: React.FC<CategoriesEditProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [fileList, setFileList] = useState<any[]>([]);
   const apiUrl = import.meta.env.VITE_API_URL;
 
@@ -53,6 +53,7 @@ const CategoriesEdit: React.FC<CategoriesEditProps> = ({
 
   const handleFinish = async (values: any) => {
     if (!selectedItem) return;
+    setSaving(true);
 
     const formData = new FormData();
     formData.append(
@@ -73,10 +74,14 @@ const CategoriesEdit: React.FC<CategoriesEditProps> = ({
     }
 
     try {
-      const response = await axios.post(
+      const response = await axios.put(
         `${apiUrl}/update_categories/${selectedItem.categories_id}`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        },
       );
 
       if (response.data.success) {
@@ -89,8 +94,10 @@ const CategoriesEdit: React.FC<CategoriesEditProps> = ({
         const updatedCategory: CategoryItem = {
           ...selectedItem,
           ...values,
+          categories_id: selectedItem.categories_id,
           categories_img:
-            fileList[0]?.originFileObj?.name || selectedItem.categories_img,
+            response.data.updatedCategory.categories_img ||
+            selectedItem.categories_img,
         };
 
         handleSaveEdit(updatedCategory);
@@ -110,6 +117,8 @@ const CategoriesEdit: React.FC<CategoriesEditProps> = ({
         message: "Error",
         description: "An error occurred while updating the category.",
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -126,130 +135,155 @@ const CategoriesEdit: React.FC<CategoriesEditProps> = ({
 
   return (
     <Modal
-      title="Edit Category Info"
       open={isEditModalVisible}
       onCancel={() => setIsEditModalVisible(false)}
       footer={null}
+      width={600}
+      centered
+      styles={{
+        content: { padding: 0, borderRadius: 28, overflow: "hidden" },
+        body: { padding: 0 },
+      }}
     >
       {selectedItem && (
-        <Form
-          layout="vertical"
-          form={form}
-          initialValues={selectedItem}
-          onFinish={handleFinish}
-        >
-          {/* Existing Image */}
-          {selectedItem.categories_img && (
-            <Row justify="center">
-              <Col
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  marginBottom: "20px",
-                  position: "relative",
-                  width: "150px",
-                  height: "150px",
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  border: "2px solid #ccc",
-                  margin: "0 auto",
-                }}
-              >
-                <Image
-                  width="100%"
-                  height="100%"
-                  src={
-                    selectedItem.categories_img.startsWith("http")
-                      ? selectedItem.categories_img
-                      : `${apiUrl}/uploads/images/${selectedItem.categories_img}`
-                  }
-                  alt="Existing Category Image"
-                  style={{ objectFit: "cover" }}
-                />
-              </Col>
-              <Col
-                span={24}
-                style={{ textAlign: "center", marginBottom: "10px" }}
-              >
-                <strong>Existing Image</strong>
-              </Col>
-            </Row>
-          )}
+        <>
+          {/* ================= Header ================= */}
+          <div className="relative overflow-hidden bg-[radial-gradient(circle_at_top_right,#dbeafe,transparent_55%),radial-gradient(circle_at_bottom_left,#e0f2fe,transparent_50%)] bg-white px-6 pb-5 pt-6 sm:px-8">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full border border-blue-200/70" />
+            <div className="pointer-events-none absolute -right-2 -top-2 h-20 w-20 rounded-full border border-blue-200/70" />
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="Category Name"
-                name="categories_name"
-                rules={[
-                  { required: true, message: "Category name is required" },
-                ]}
-              >
-                <Input />
-              </Form.Item>
-            </Col>
+            <div className="relative flex items-center gap-4">
+              <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-xl text-white shadow-lg shadow-blue-500/30">
+                <EditOutlined />
+              </span>
+              <div className="min-w-0">
+                <h2 className="m-0 text-xl font-extrabold leading-tight text-gray-900">
+                  Edit category info
+                </h2>
+                <p className="m-0 mt-0.5 truncate text-sm text-gray-500">
+                  Update the details for {selectedItem.categories_name}
+                </p>
+              </div>
+            </div>
+          </div>
 
-            <Col span={12}>
-              <Form.Item
-                label="Category Image"
-                name="categories_img"
-                extra="Upload a new image (optional)"
-              >
-                <Upload
-                  beforeUpload={(file) => {
-                    const isValidType = [
-                      "image/png",
-                      "image/jpeg",
-                      "image/jpg",
-                    ].includes(file.type);
-                    if (!isValidType) {
-                      notification.error({
-                        message: "Invalid File Type",
-                        description:
-                          "Only .png, .jpg, and .jpeg pictures are allowed.",
-                      });
-                      return Upload.LIST_IGNORE;
+          {/* ================= Form ================= */}
+          <Form
+            layout="vertical"
+            form={form}
+            initialValues={selectedItem}
+            onFinish={handleFinish}
+            requiredMark={false}
+            className="bg-white px-6 pb-6 pt-5 sm:px-8"
+          >
+            {/* Image card */}
+            <div className="mb-5 flex flex-col items-center gap-4 rounded-2xl border border-gray-100 bg-gray-50 p-4 sm:flex-row">
+              <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-2xl bg-white shadow-md ring-2 ring-white">
+                {selectedItem.categories_img ? (
+                  <Image
+                    width="100%"
+                    height="100%"
+                    src={
+                      selectedItem.categories_img.startsWith("http")
+                        ? selectedItem.categories_img
+                        : `${apiUrl}/uploads/images/${selectedItem.categories_img}`
                     }
-                    return false; // manual upload
-                  }}
-                  fileList={fileList}
-                  onChange={handleUploadChange}
-                  maxCount={1}
-                  listType="picture"
-                >
-                  <Button icon={<UploadOutlined />}>
-                    Upload New Category Image
-                  </Button>
-                </Upload>
-              </Form.Item>
-            </Col>
-          </Row>
+                    alt="Existing Category Image"
+                    style={{ objectFit: "cover" }}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs font-medium text-gray-400">
+                    No image
+                  </div>
+                )}
+              </div>
 
-          <Form.Item label="Description" name="description">
-            <Input.TextArea rows={3} />
-          </Form.Item>
+              <div className="w-full flex-1 text-center sm:text-left">
+                <p className="m-0 text-sm font-bold text-gray-900">
+                  Category image
+                </p>
+                <p className="m-0 mb-3 text-xs text-gray-500">
+                  Current photo. Upload a new .png, .jpg or .jpeg to replace it
+                  (optional).
+                </p>
 
-          {uploading && (
-            <Row justify="center">
-              <Col>
-                <Spin /> Uploading...
-              </Col>
-            </Row>
-          )}
+                <Form.Item name="categories_img" noStyle>
+                  <Upload
+                    beforeUpload={(file) => {
+                      const isValidType = [
+                        "image/png",
+                        "image/jpeg",
+                        "image/jpg",
+                      ].includes(file.type);
+                      if (!isValidType) {
+                        notification.error({
+                          message: "Invalid File Type",
+                          description:
+                            "Only .png, .jpg, and .jpeg pictures are allowed.",
+                        });
+                        return Upload.LIST_IGNORE;
+                      }
+                      return false; // manual upload
+                    }}
+                    fileList={fileList}
+                    onChange={handleUploadChange}
+                    maxCount={1}
+                    listType="picture"
+                  >
+                    <Button icon={<UploadOutlined />}>
+                      Upload New Category Image
+                    </Button>
+                  </Upload>
+                </Form.Item>
 
-          <Row justify="end" gutter={16}>
-            <Col>
-              <Button onClick={() => setIsEditModalVisible(false)}>
+                {uploading && (
+                  <div className="mt-2 flex items-center justify-center gap-2 text-xs text-gray-500 sm:justify-start">
+                    <Spin size="small" /> Uploading...
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Form.Item
+              label={<span className="font-semibold">Category name</span>}
+              name="categories_name"
+              rules={[{ required: true, message: "Category name is required" }]}
+            >
+              <Input size="large" className="rounded-xl" />
+            </Form.Item>
+
+            <Form.Item
+              label={<span className="font-semibold">Description</span>}
+              name="description"
+            >
+              <Input.TextArea
+                rows={3}
+                maxLength={300}
+                showCount
+                className="rounded-xl"
+              />
+            </Form.Item>
+
+            <div className="mt-2 flex flex-col-reverse gap-2 border-t border-dashed border-gray-200 pt-5 sm:flex-row sm:justify-end">
+              <Button
+                size="large"
+                onClick={() => setIsEditModalVisible(false)}
+                className="sm:min-w-[110px]"
+              >
                 Cancel
               </Button>
-            </Col>
-            <Col>
-              <Button type="primary" htmlType="submit">
-                Save Changes
+              <Button
+                size="large"
+                type="primary"
+                htmlType="submit"
+                loading={saving}
+                className="sm:min-w-[150px]"
+              >
+                Save changes
               </Button>
-            </Col>
-          </Row>
-        </Form>
+            </div>
+          </Form>
+        </>
       )}
     </Modal>
   );

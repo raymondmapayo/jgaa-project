@@ -6,7 +6,7 @@ import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import InventoryModal from "../WorkerModals/AddSupplyIngredientsModal";
-import EditInventoryModal from "../WorkerModals/EditSupplyModal";
+import EditInventoryModal from "../WorkerModals/EditIngredientsSupplyModal";
 import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 
 // ====================== Styled Components ======================

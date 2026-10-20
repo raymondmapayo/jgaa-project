@@ -33,45 +33,31 @@ const MyPurchase = () => {
     Array<{ item_name: string; user_id: string }>
   >([]); // Store both item_name and user_id
   const apiUrl = import.meta.env.VITE_API_URL;
+  const [isLoading, setIsLoading] = useState(true);
+  const userId = sessionStorage.getItem("user_id");
   useEffect(() => {
-    const userId = sessionStorage.getItem("user_id");
-    if (!userId) return;
-
-    let previousData: any[] = [];
-
     const fetchOrders = async () => {
+      setIsLoading(true);
+
       try {
         const response = await fetch(`${apiUrl}/fetch_my_purchase/${userId}`);
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch purchase data");
+        }
+
         const data = await response.json();
 
-        // Only update if data has changed
-        const isDifferent =
-          JSON.stringify(data) !== JSON.stringify(previousData);
-        if (isDifferent) {
-          setOrdersData(data);
-          previousData = data;
-        }
-
-        // ✅ Stop polling if all orders are paid
-        const allPaid = data.every(
-          (order: any) => order.payment_status?.toLowerCase() === "paid"
-        );
-        if (allPaid) {
-          clearInterval(intervalId);
-        }
+        setOrdersData(data);
       } catch (error) {
         console.error("Error fetching purchase data:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    // Initial fetch
     fetchOrders();
-
-    // Poll every 5 seconds
-    const intervalId = setInterval(fetchOrders, 5000);
-
-    return () => clearInterval(intervalId);
-  }, []);
+  }, [apiUrl, userId]);
 
   useEffect(() => {
     const userId = sessionStorage.getItem("user_id");
@@ -97,14 +83,17 @@ const MyPurchase = () => {
   // Group products by categories_name
   const groupByCategory = (ordersData: Order[]) => {
     return ordersData.map((order) => {
-      const groupedProducts = order.products.reduce((acc, product) => {
-        const category = product.categories_name;
-        if (!acc[category]) {
-          acc[category] = [];
-        }
-        acc[category].push(product);
-        return acc;
-      }, {} as { [key: string]: Product[] });
+      const groupedProducts = order.products.reduce(
+        (acc, product) => {
+          const category = product.categories_name;
+          if (!acc[category]) {
+            acc[category] = [];
+          }
+          acc[category].push(product);
+          return acc;
+        },
+        {} as { [key: string]: Product[] },
+      );
 
       return {
         ...order,
@@ -123,7 +112,7 @@ const MyPurchase = () => {
     const isRated = ratedItems.some(
       (ratedProduct) =>
         ratedProduct.item_name === product.item_name &&
-        ratedProduct.user_id === userId // Ensure that the user_id is also checked
+        ratedProduct.user_id === userId, // Ensure that the user_id is also checked
     );
 
     if (isRated) {
@@ -144,85 +133,67 @@ const MyPurchase = () => {
   };
 
   // Handle rating submission
-  const handleSubmitRating = (comments: string) => {
-    if (selectedProduct) {
-      const userId = sessionStorage.getItem("user_id"); // Get user_id from sessionStorage or other authentication method
-      const data = {
-        user_id: userId, // Add user_id here
-        order_item_id: selectedProduct.order_item_id,
-        item_name: selectedProduct.item_name,
-        item_names: selectedProduct.item_name, // Use 'item_names' here
-        menu_img: selectedProduct.menu_img,
-        price: selectedProduct.price,
-        rating: ratingValue,
-        order_quantity: selectedProduct.order_quantity, // Ensure this field is correctly set
-        categories_name: selectedProduct.categories_name || "Uncategorized", // Use a default value if categories_name is not available
-        comments, // ✅ just a separate property
-      };
+  const handleSubmitRating = async (comments: string) => {
+    if (!selectedProduct) return;
 
-      // Step 1: Submit data to the 'bestseller' table
-      axios
-        .post(`${apiUrl}/bestseller`, data)
-        .then(() => {
-          // After successfully submitting to 'bestseller', proceed to submit to 'selling' table
-          axios
-            .post(`${apiUrl}/bestselling`, data) // Submit to 'selling' table
-            .then((response) => {
-              // After successfully updating 'selling', proceed to add to 'topselling'
-              axios
-                .post(`${apiUrl}/topselling`, data) // Submit to 'topselling' table
-                .then(() => {
-                  // Display SweetAlert for successful submission
-                  Swal.fire({
-                    title: "Thank you for rating this product!",
-                    text: `Your rating has been successfully submitted. Average Rating: ${response.data.avg_rating} stars. The product has also been added to the top-selling list.`,
-                    icon: "success",
-                    confirmButtonText: "Close",
-                  });
-                  setSelectedProduct(null); // Close the modal
+    const userId = sessionStorage.getItem("user_id");
 
-                  // Fetch rated products after submission by user_id
-                  if (userId) {
-                    axios
-                      .get(`${apiUrl}/fetchrated/${userId}`)
-                      .then((response) => {
-                        const ratedProducts = response.data;
-                        setRatedItems(ratedProducts); // Update the rated items state
-                      })
-                      .catch((error) => {
-                        console.error("Error fetching rated products:", error);
-                      });
-                  }
-                })
-                .catch((error) => {
-                  Swal.fire({
-                    title: "Error",
-                    text: "There was an issue adding the product to the topselling list.",
-                    icon: "error",
-                    confirmButtonText: "Close",
-                  });
-                  console.error("Error inserting into topselling_tbl:", error);
-                });
-            })
-            .catch((error) => {
-              Swal.fire({
-                title: "Error",
-                text: "There was an issue submitting the rating to the selling table. Please try again.",
-                icon: "error",
-                confirmButtonText: "Close",
-              });
-              console.error("Error inserting into selling_tbl:", error);
-            });
-        })
-        .catch((error) => {
-          Swal.fire({
-            title: "Error",
-            text: "There was an issue submitting your rating to the bestseller table. Please try again.",
-            icon: "error",
-            confirmButtonText: "Close",
-          });
-          console.error("Error inserting into bestseller_tbl:", error);
-        });
+    const data = {
+      user_id: userId,
+      order_item_id: selectedProduct.order_item_id,
+      item_name: selectedProduct.item_name,
+      item_names: selectedProduct.item_name,
+      menu_img: selectedProduct.menu_img,
+      price: selectedProduct.price,
+      rating: ratingValue,
+      order_quantity: selectedProduct.order_quantity,
+      categories_name: selectedProduct.categories_name || "Uncategorized",
+      comments,
+    };
+
+    try {
+      // Step 1: Submit to bestseller
+      await axios.post(`${apiUrl}/bestseller`, data);
+
+      // Step 2: Submit to bestselling
+      const response = await axios.post(`${apiUrl}/bestselling`, data);
+
+      // Step 3: Submit to topselling
+      await axios.post(`${apiUrl}/topselling`, data);
+
+      // Success message
+      await Swal.fire({
+        title: "Thank you for rating this product!",
+        text: `Your rating has been successfully submitted. Average Rating: ${
+          response.data.avg_rating
+        } stars. The product has also been added to the top-selling list.`,
+        icon: "success",
+        confirmButtonText: "Close",
+      });
+
+      setSelectedProduct(null);
+
+      // Step 4: Fetch rated products
+      if (userId) {
+        try {
+          const ratedResponse = await axios.get(
+            `${apiUrl}/fetchrated/${userId}`,
+          );
+
+          setRatedItems(ratedResponse.data);
+        } catch (error) {
+          console.error("Error fetching rated products:", error);
+        }
+      }
+    } catch (error) {
+      console.error("Error submitting rating:", error);
+
+      Swal.fire({
+        title: "Error",
+        text: "There was an issue submitting your rating. Please try again.",
+        icon: "error",
+        confirmButtonText: "Close",
+      });
     }
   };
 
@@ -257,7 +228,11 @@ const MyPurchase = () => {
 
       {/* Orders List */}
       <div className="flex flex-col gap-6 px-0 sm:px-0">
-        {ordersData.length === 0 ? (
+        {isLoading ? (
+          <div className="font-core bg-white p-6 rounded-none sm:rounded-lg shadow-lg text-center text-gray-500 w-full mt-8">
+            <p>Loading purchases...</p>
+          </div>
+        ) : ordersData.length === 0 ? (
           <div className="font-core bg-white p-6 rounded-none sm:rounded-lg shadow-lg text-center text-gray-500 w-full mt-8">
             <p>No purchases yet.</p>
           </div>
@@ -404,7 +379,7 @@ const MyPurchase = () => {
         onSubmit={handleSubmitRating}
         rated={ratedItems.some(
           (ratedProduct) =>
-            ratedProduct.item_name === selectedProduct?.item_name
+            ratedProduct.item_name === selectedProduct?.item_name,
         )} // Check if rated
       />
     </div>

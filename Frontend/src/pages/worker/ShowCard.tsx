@@ -1,93 +1,68 @@
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination, Autoplay, Navigation } from "swiper/modules";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import styled from "styled-components";
 
 import "swiper/css";
 import "swiper/css/pagination";
 import "swiper/css/navigation";
 
 import { showCards } from "../../utils/showCards";
-import { Card, Typography, Grid } from "antd";
 
-const { Title, Text } = Typography;
-const { useBreakpoint } = Grid;
+// Pagination dots: small circles, the active one stretches into a pill
+const Dots = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  .swiper-pagination-bullet {
+    width: 8px;
+    height: 8px;
+    margin: 0 !important;
+    border-radius: 9999px;
+    background: #9ca3af;
+    opacity: 1;
+    transition:
+      width 0.25s ease,
+      background-color 0.25s ease;
+  }
+
+  .swiper-pagination-bullet-active {
+    width: 22px;
+    background: #2563eb;
+  }
+`;
 
 const ShowCard = () => {
-  const screens = useBreakpoint();
-  const isMobile = !screens.md;
-
-  const truncateWords = (text: string, wordLimit: number) => {
-    const words = text.split(" ");
-    if (words.length <= wordLimit) return text;
-    return words.slice(0, wordLimit).join(" ") + ".....";
-  };
-
   return (
-    <Card
-      bordered={false}
-      style={{
-        width: "100%",
-        height: isMobile ? 260 : "100%",
-        borderRadius: 16,
-        overflow: "hidden",
-        position: "relative",
-        background: "#111",
-      }}
-      styles={{
-        body: {
-          padding: 0,
-          height: "100%",
-        },
-      }}
-    >
-      {/* 🔥 CONTROLS OVERLAY */}
-      <div
-        style={{
-          position: "absolute",
-          top: isMobile ? 6 : 10,
-          left: isMobile ? 6 : 10,
-          right: isMobile ? 6 : 10,
-          zIndex: 99,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          pointerEvents: "none",
-        }}
-      >
-        {/* pagination */}
-        <div
-          className="custom-pagination"
-          style={{
-            display: "flex",
-            gap: 6,
-            pointerEvents: "auto",
-            transform: isMobile ? "scale(0.85)" : "scale(1)",
-          }}
-        />
+    <section className="relative h-[260px] w-full overflow-hidden rounded-3xl bg-gray-100 shadow-[0_10px_40px_-12px_rgba(30,64,175,0.25)] ring-1 ring-blue-100 md:h-full">
+      {/* Controls */}
+      <div className="pointer-events-none absolute left-3 right-3 top-3 z-10 flex items-center justify-between">
+        <Dots className="custom-pagination pointer-events-auto rounded-full bg-white/90 px-3 py-2 shadow-md backdrop-blur" />
 
-        {/* arrows */}
-        <div
-          style={{
-            display: "flex",
-            gap: isMobile ? 6 : 10,
-            pointerEvents: "auto",
-          }}
-        >
-          <div className="custom-prev" style={navBtnStyle(isMobile)}>
-            <FaChevronLeft color="#111" />
-          </div>
-
-          <div className="custom-next" style={navBtnStyle(isMobile)}>
-            <FaChevronRight color="#111" />
-          </div>
+        <div className="pointer-events-auto flex gap-2">
+          <button
+            type="button"
+            aria-label="Previous slide"
+            className="custom-prev flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-xs text-gray-800 shadow-md backdrop-blur"
+          >
+            <FaChevronLeft />
+          </button>
+          <button
+            type="button"
+            aria-label="Next slide"
+            className="custom-next flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-xs text-gray-800 shadow-md backdrop-blur"
+          >
+            <FaChevronRight />
+          </button>
         </div>
       </div>
 
-      {/* SWIPER */}
+      {/* Slides */}
       <Swiper
         modules={[Pagination, Autoplay, Navigation]}
         slidesPerView={1}
-        loop={true} // ✅ this is enough
+        loop={true}
         pagination={{
           clickable: true,
           el: ".custom-pagination",
@@ -104,98 +79,29 @@ const ShowCard = () => {
       >
         {showCards.map((item) => (
           <SwiperSlide key={item.id}>
-            <Card
-              bordered={false}
-              style={{
-                height: "100%",
-                borderRadius: 16,
-                overflow: "hidden",
-                position: "relative",
-                color: "#fafafa",
-                background: "#000",
-              }}
-            >
-              {/* IMAGE */}
+            <div className="relative h-full w-full">
               <img
                 src={item.image}
                 alt={item.title}
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  filter: "brightness(0.6)",
-                }}
+                className="absolute inset-0 h-full w-full object-cover"
               />
 
-              {/* GRADIENT */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  width: "100%",
-                  height: "70%",
-                  background:
-                    "linear-gradient(to top, rgba(0,0,0,0.9), transparent)",
-                }}
-              />
-
-              {/* CONTENT */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: isMobile ? 12 : 18, // 🔥 moved UP
-                  left: 0,
-                  width: "100%",
-                  zIndex: 2,
-                  background:
-                    "linear-gradient(to top, rgba(0,0,0,0.65), transparent)",
-                  padding: isMobile ? "10px 12px" : "12px 16px",
-                }}
-              >
-                <Title
-                  level={isMobile ? 5 : 4}
-                  style={{
-                    margin: 0,
-                    color: "#90ee90",
-                    fontWeight: 700,
-                  }}
-                >
-                  {truncateWords(item.title, isMobile ? 6 : 8)}
-                </Title>
-
-                <Text
-                  style={{
-                    fontSize: isMobile ? 11 : 12,
-                    opacity: 0.85,
-                    lineHeight: 1.5,
-                    color: "rgba(255,255,255,0.85)",
-                    marginTop: 8,
-                  }}
-                >
-                  {truncateWords(item.description, isMobile ? 10 : 15)}
-                </Text>
+              {/* Caption card */}
+              <div className="absolute inset-x-3 bottom-3 rounded-2xl bg-white/90 p-4 shadow-lg backdrop-blur sm:inset-x-4 sm:bottom-4 sm:p-5">
+                <span className="mb-2 block h-1 w-8 rounded-full bg-blue-600" />
+                <h3 className="m-0 line-clamp-2 text-base font-extrabold leading-snug text-gray-900 sm:text-lg">
+                  {item.title}
+                </h3>
+                <p className="m-0 mt-1 line-clamp-2 text-xs leading-relaxed text-gray-600 sm:text-sm">
+                  {item.description}
+                </p>
               </div>
-            </Card>
+            </div>
           </SwiperSlide>
         ))}
       </Swiper>
-    </Card>
+    </section>
   );
 };
-
-/* ONLY responsive tweak here */
-const navBtnStyle = (isMobile: boolean): React.CSSProperties => ({
-  width: isMobile ? 28 : 32,
-  height: isMobile ? 28 : 32,
-  borderRadius: "50%",
-  background: "rgba(255,255,255,0.75)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-});
 
 export default ShowCard;

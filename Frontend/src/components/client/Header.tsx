@@ -210,13 +210,13 @@ export const ClientHeader = () => {
           <Link
             to="/"
             onClick={() => setIsMenuOpen(false)}
-            className="px-6 py-3 hover:bg-gray-100 text-gray-700"
+            className="font-core flex w-full items-center justify-between px-6 py-3 text-left text-stone-700 transition hover:bg-stone-100"
           >
             Home
           </Link>
           {/* 🔽 Mobile dropdown for Shop Now */}
           <Dropdown overlay={productsMenu} trigger={["click"]}>
-            <button className="px-6 py-3 text-left hover:bg-gray-100 text-gray-700 w-full">
+            <button className="font-core flex w-full items-center justify-between px-6 py-3 text-left text-stone-700 transition hover:bg-stone-100">
               Shop Now
             </button>
           </Dropdown>
@@ -224,14 +224,14 @@ export const ClientHeader = () => {
           <Link
             to="/Reservation"
             onClick={() => setIsMenuOpen(false)}
-            className="px-6 py-3 hover:bg-gray-100 text-gray-700"
+            className="font-core flex w-full items-center justify-between px-6 py-3 text-left text-stone-700 transition hover:bg-stone-100"
           >
             Reservation
           </Link>
           <Link
             to="/Contact-Us"
             onClick={() => setIsMenuOpen(false)}
-            className="px-6 py-3 hover:bg-gray-100 text-gray-700"
+            className="font-core flex w-full items-center justify-between px-6 py-3 text-left text-stone-700 transition hover:bg-stone-100"
           >
             Contact
           </Link>
@@ -242,7 +242,7 @@ export const ClientHeader = () => {
               <Link
                 to="/My-Cart"
                 onClick={() => setIsMenuOpen(false)}
-                className="px-6 py-3 text-left hover:bg-gray-100 text-gray-700"
+                className="font-core flex w-full items-center justify-between px-6 py-3 text-left text-stone-700 transition hover:bg-stone-100"
               >
                 My Cart
               </Link>
@@ -251,7 +251,7 @@ export const ClientHeader = () => {
                   setIsUserDrawerOpen(true);
                   setIsMenuOpen(false);
                 }}
-                className="px-6 py-3 text-gray-700 hover:bg-gray-100 block w-full text-left"
+                className="font-core flex w-full items-center justify-between px-6 py-3 text-left text-stone-700 transition hover:bg-stone-100"
               >
                 Profile
               </button>
@@ -259,7 +259,7 @@ export const ClientHeader = () => {
           ) : (
             <button
               onClick={() => navigate("/login")}
-              className="font-core px-6 py-3 text-left hover:bg-gray-100 text-gray-700"
+              className="font-core flex w-full items-center justify-between px-6 py-3 text-left text-stone-700 transition hover:bg-stone-100"
             >
               Login
             </button>

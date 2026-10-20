@@ -20,12 +20,14 @@ interface AddSupplyIngredientsModalProps {
   visible: boolean;
   onClose: () => void;
   onFinish: (values: any) => void;
+  onSuccess: () => void;
 }
 
 const AddSupplyIngredientsModal: React.FC<AddSupplyIngredientsModalProps> = ({
   visible,
   onClose,
   onFinish,
+  onSuccess,
 }) => {
   const [form] = Form.useForm();
   const [categories, setCategories] = useState<
@@ -34,6 +36,7 @@ const AddSupplyIngredientsModal: React.FC<AddSupplyIngredientsModalProps> = ({
   const [supplyList, setSupplyList] = useState<any[]>([]);
   const apiUrl = import.meta.env.VITE_API_URL;
   const user_id = sessionStorage.getItem("user_id");
+  const [isLoading, setIsLoading] = useState(false);
   // ✅ Fetch categories only
   useEffect(() => {
     const fetchCategories = async () => {
@@ -76,7 +79,7 @@ const AddSupplyIngredientsModal: React.FC<AddSupplyIngredientsModalProps> = ({
       const values = await form.validateFields();
 
       const selectedCategory = categories.find(
-        (cat) => cat.cat_supply_id === values.cat_supply_id
+        (cat) => cat.cat_supply_id === values.cat_supply_id,
       )?.supply_cat_name;
 
       const newSupply = {
@@ -93,11 +96,13 @@ const AddSupplyIngredientsModal: React.FC<AddSupplyIngredientsModalProps> = ({
 
   // ✅ Insert one immediately
   const handleInsertSingle = async () => {
+    setIsLoading(true);
+
     try {
       const values = await form.validateFields();
 
       const selectedCategory = categories.find(
-        (cat) => cat.cat_supply_id === values.cat_supply_id
+        (cat) => cat.cat_supply_id === values.cat_supply_id,
       )?.supply_cat_name;
 
       const response = await axios.post(`${apiUrl}/add_supply_ingredients`, {
@@ -114,7 +119,12 @@ const AddSupplyIngredientsModal: React.FC<AddSupplyIngredientsModalProps> = ({
 
       if (response.data.success) {
         message.success("Supply added successfully!");
+
         onFinish(values);
+
+        // 🔄 Refresh parent table automatically
+        await onSuccess();
+
         form.resetFields();
         handleCancel();
       } else {
@@ -123,6 +133,8 @@ const AddSupplyIngredientsModal: React.FC<AddSupplyIngredientsModalProps> = ({
     } catch (error) {
       console.error("Error adding supply:", error);
       message.error("Failed to add supply. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -137,6 +149,8 @@ const AddSupplyIngredientsModal: React.FC<AddSupplyIngredientsModalProps> = ({
       message.error("No supplies to insert.");
       return;
     }
+
+    setIsLoading(true);
 
     try {
       for (const supply of supplyList) {
@@ -155,13 +169,19 @@ const AddSupplyIngredientsModal: React.FC<AddSupplyIngredientsModalProps> = ({
         onFinish(response.data);
       }
 
+      // 🔄 Refresh only once after all supplies are inserted
+      await onSuccess();
+
       message.success("All supplies inserted successfully!");
+
       setSupplyList([]);
       form.resetFields();
       onClose();
     } catch (error) {
       console.error("Error inserting supplies:", error);
       message.error("Failed to insert supplies. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -263,12 +283,20 @@ const AddSupplyIngredientsModal: React.FC<AddSupplyIngredientsModalProps> = ({
         {/* Buttons side by side */}
         <Row justify="end" gutter={16}>
           <Col>
-            <Button onClick={handleAddToList} type="dashed">
+            <Button
+              onClick={handleAddToList}
+              type="dashed"
+              disabled={isLoading}
+            >
               Add to List
             </Button>
           </Col>
           <Col>
-            <Button type="primary" onClick={handleInsertSingle}>
+            <Button
+              type="primary"
+              onClick={handleInsertSingle}
+              loading={isLoading}
+            >
               Insert Now
             </Button>
           </Col>
@@ -291,10 +319,16 @@ const AddSupplyIngredientsModal: React.FC<AddSupplyIngredientsModalProps> = ({
 
           <Row justify="end" gutter={16} style={{ marginTop: 20 }}>
             <Col>
-              <Button onClick={handleCancel}>Cancel</Button>
+              <Button onClick={handleCancel} disabled={isLoading}>
+                Cancel
+              </Button>
             </Col>
             <Col>
-              <Button type="primary" onClick={handleInsertAll}>
+              <Button
+                type="primary"
+                onClick={handleInsertAll}
+                loading={isLoading}
+              >
                 Insert All
               </Button>
             </Col>

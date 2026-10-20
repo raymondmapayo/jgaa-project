@@ -139,34 +139,32 @@ const WorkerManageExpensesSubCategory = () => {
   ];
 
   // Polling function to fetch updated expense categories
-  const fetchCategories = async () => {
+  const fetchCategories = async (showLoading = true) => {
     try {
+      if (showLoading) setIsLoading(true);
+
       const response = await axios.get(`${apiUrl}/get_expenses_subcategories`, {
         headers: { "Cache-Control": "no-cache" },
       });
+
       setDataSource(response.data);
     } catch (error) {
       console.error("Error fetching expense subcategories:", error);
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    let isMounted = true;
+    fetchCategories();
 
-    const wrappedFetchCategories = async () => {
-      if (isMounted) {
-        await fetchCategories();
-      }
-    };
+    // Fetch balik inig balik sa browser tab, walay loading
+    const onFocus = () => fetchCategories(false);
 
-    wrappedFetchCategories();
-    const interval = setInterval(wrappedFetchCategories, 10000);
+    window.addEventListener("focus", onFocus);
 
     return () => {
-      isMounted = false;
-      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
     };
   }, [apiUrl]);
 

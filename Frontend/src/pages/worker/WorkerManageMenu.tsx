@@ -6,9 +6,9 @@ import {
   SearchOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
-import { Button, Dropdown, Input, Menu, Table, Tag, Tooltip } from "antd";
+import { Button, Dropdown, Input, Table, Tag, Tooltip } from "antd";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import AddMenuForm from "../../components/form/AddMenu";
 import MenuEditModal from "../WorkerModals/MenuEditModal";
@@ -107,6 +107,15 @@ const ActionButton = styled(Button)`
   }
 `;
 
+type SortKey = "default" | "newest" | "oldest" | "availability";
+
+const SORT_LABELS: Record<SortKey, string> = {
+  default: "Default order",
+  newest: "Date: Newest first",
+  oldest: "Date: Oldest first",
+  availability: "Availability: Available first",
+};
+
 interface MenuItem {
   key: string;
   item_name: string;
@@ -129,10 +138,46 @@ const WorkerManageMenu = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("default");
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  // Stats for the summary cards (always based on all items)
+  const totalItems = dataSource.length;
+  const availableItems = dataSource.filter(
+    (item) => item.availability === "Available",
+  ).length;
+  const unavailableItems = totalItems - availableItems;
+
+  // Search + sort
+  const visibleItems = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+
+    const filtered = term
+      ? dataSource.filter((item: any) =>
+          [item.item_name, item.categories_name, item.description]
+            .filter(Boolean)
+            .some((field: string) => field.toLowerCase().includes(term)),
+        )
+      : dataSource;
+
+    if (sortKey === "default") return filtered;
+
+    return [...filtered].sort((a: any, b: any) => {
+      if (sortKey === "availability") {
+        const rank = (v: string) => (v === "Available" ? 0 : 1);
+        return rank(a.availability) - rank(b.availability);
+      }
+      const diff =
+        dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf();
+      return sortKey === "newest" ? diff : -diff;
+    });
+  }, [dataSource, searchTerm, sortKey]);
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentMenus = dataSource.slice(indexOfFirstItem, indexOfLastItem);
-  const apiUrl = import.meta.env.VITE_API_URL;
+  const currentMenus = visibleItems.slice(indexOfFirstItem, indexOfLastItem);
+
   // Fetch menu items from the database
   useEffect(() => {
     const fetchMenuItems = async () => {
@@ -188,7 +233,7 @@ const WorkerManageMenu = () => {
                 : `${apiUrl}/uploads/images/${record.menu_img}`
             }
             alt={record.item_name}
-            className="w-10 h-10 rounded object-cover flex-shrink-0"
+            className="h-10 w-10 flex-shrink-0 rounded-2xl object-cover ring-2 ring-orange-400 ring-offset-2"
           />
           <span className="text-sm sm:text-base">{text}</span>
         </div>
@@ -203,12 +248,32 @@ const WorkerManageMenu = () => {
       dataIndex: "availability",
       key: "availability",
       render: (text: string) => {
-        const colors: Record<string, string> = {
-          Available: "green",
-          "Not Available": "red",
-          Pending: "orange",
+        const styles: Record<string, { dot: string; text: string }> = {
+          Available: { dot: "bg-green-500", text: "text-green-600" },
+          "Not Available": { dot: "bg-red-500", text: "text-red-500" },
+          Pending: { dot: "bg-orange-400", text: "text-orange-500" },
         };
-        return <Tag color={colors[text] || "default"}>{text}</Tag>;
+        const s = styles[text] ?? { dot: "bg-gray-400", text: "text-gray-500" };
+        const isOnline = text === "Available";
+
+        return (
+          <span
+            className={`inline-flex items-center gap-2 whitespace-nowrap text-sm font-medium ${s.text}`}
+          >
+            {/* status dot, like an "online" indicator */}
+            <span className="relative flex h-1.5 w-1.5">
+              {isOnline && (
+                <span
+                  className={`absolute inline-flex h-full w-full rounded-full opacity-60 motion-safe:animate-ping ${s.dot}`}
+                />
+              )}
+              <span
+                className={`relative inline-flex h-1.5 w-1.5 rounded-full ${s.dot}`}
+              />
+            </span>
+            {text}
+          </span>
+        );
       },
     },
     {
@@ -256,21 +321,74 @@ const WorkerManageMenu = () => {
     <StyledContainer>
       {/* Header Section */}
       <div className="w-full mb-6">
-        <div className="flex flex-col gap-4 w-full">
-          {/* Title */}
-          <div>
-            <h2 className="text-xl font-bold">Menu List</h2>
-            <p className="text-gray-500 text-sm">Manage your food menu</p>
+        <div className="flex flex-col gap-6 w-full">
+          {/* Title (left) + Summary cards (right) */}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-xl font-bold">Menu List</h2>
+              <p className="text-gray-500 text-sm">Manage your food menu</p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 w-full lg:w-auto lg:min-w-[440px]">
+              {/* Total */}
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                <p className="m-0 text-2xl font-bold text-blue-600">
+                  {totalItems}
+                </p>
+                <p className="m-0 mt-0.5 flex items-center gap-1.5 text-xs sm:text-sm font-medium text-blue-700">
+                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  Total items
+                </p>
+              </div>
+
+              {/* Available */}
+              <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+                <p className="m-0 text-2xl font-bold text-green-600">
+                  {availableItems}
+                </p>
+                <p className="m-0 mt-0.5 flex items-center gap-1.5 text-xs sm:text-sm font-medium text-green-700">
+                  <span className="h-2 w-2 rounded-full bg-green-500" />
+                  Available
+                </p>
+              </div>
+
+              {/* Unavailable */}
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <p className="m-0 text-2xl font-bold text-red-500">
+                  {unavailableItems}
+                </p>
+                <p className="m-0 mt-0.5 flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600">
+                  <span className="h-2 w-2 rounded-full bg-red-500" />
+                  Unavailable
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Search + Actions Row */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 w-full">
             {/* Search */}
-            <Input
-              placeholder="Search categories"
-              prefix={<SearchOutlined />}
-              className="w-full md:w-1/3 bg-gray-100 dark:bg-[#1f2937] dark:text-[#fafafa] custom-placeholder"
-            />
+            <div className="w-full md:w-1/3">
+              <Input
+                allowClear
+                size="large"
+                placeholder="Search by name or category"
+                prefix={<SearchOutlined className="text-gray-400" />}
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full rounded-xl bg-gray-100 dark:bg-[#1f2937] dark:text-[#fafafa] custom-placeholder"
+              />
+              {searchTerm.trim() && (
+                <p className="m-0 mt-2 text-xs text-gray-500">
+                  {visibleItems.length}{" "}
+                  {visibleItems.length === 1 ? "result" : "results"} for "
+                  {searchTerm.trim()}"
+                </p>
+              )}
+            </div>
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
@@ -291,19 +409,29 @@ const WorkerManageMenu = () => {
                 Import Menu
               </Button>
               <Dropdown
-                overlay={
-                  <Menu>
-                    <Menu.Item key="1">Sort by Date</Menu.Item>
-                    <Menu.Item key="2">Sort by Availability</Menu.Item>
-                  </Menu>
-                }
                 trigger={["click"]}
+                menu={{
+                  selectable: true,
+                  selectedKeys: [sortKey],
+                  onClick: ({ key }) => {
+                    setSortKey(key as SortKey);
+                    setCurrentPage(1);
+                  },
+                  items: (Object.keys(SORT_LABELS) as SortKey[]).map((k) => ({
+                    key: k,
+                    label: SORT_LABELS[k],
+                  })),
+                }}
               >
                 <Button
-                  icon={<FilterOutlined />} // <-- add this
-                  className="w-full sm:w-[140px]"
+                  icon={<FilterOutlined />}
+                  className={`w-full sm:w-[140px] ${
+                    sortKey !== "default"
+                      ? "!border-blue-500 !bg-blue-50 !text-blue-600"
+                      : ""
+                  }`}
                 >
-                  Sort
+                  {sortKey === "default" ? "Sort" : "Sorted"}
                 </Button>
               </Dropdown>
             </div>
@@ -321,10 +449,15 @@ const WorkerManageMenu = () => {
             pagination={{
               current: currentPage,
               pageSize: itemsPerPage,
-              total: dataSource.length,
+              total: visibleItems.length,
               onChange: (page) => setCurrentPage(page),
             }}
             scroll={{ x: true }}
+            locale={{
+              emptyText: searchTerm.trim()
+                ? "No menu items match your search."
+                : "No menu items yet.",
+            }}
           />
         )}
       </div>

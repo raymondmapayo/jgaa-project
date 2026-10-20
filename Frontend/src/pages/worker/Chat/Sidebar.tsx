@@ -1,13 +1,9 @@
-import { useEffect, useReducer, useState } from "react";
-import { FaSearch } from "react-icons/fa";
+import { useEffect, useMemo, useState } from "react";
+import { RiSearchLine } from "react-icons/ri";
+import { getAvatarUrl, isOnline, timeAgo } from "../../../utils/Chatutils";
 
-// ⬇️⬇️⬇️ ADDED THIS HELPER (prevents duplicates) ⬇️⬇️⬇️
-const dedupeUsers = (list: any[]) => {
-  // <-- ADDED
-  const map = new Map();
-  list.forEach((u) => map.set(u.user_id, u));
-  return Array.from(map.values());
-}; // <-- ADDED
+const dedupeUsers = (list: any[]) =>
+  Array.from(new Map(list.map((u) => [u.user_id, u])).values());
 
 type SidebarProps = {
   admins: any[];
@@ -17,8 +13,6 @@ type SidebarProps = {
   currentWorkerId: number | null;
 };
 
-const apiUrl = import.meta.env.VITE_API_URL;
-
 const Sidebar = ({
   admins,
   clients,
@@ -26,127 +20,143 @@ const Sidebar = ({
   onSelectUser,
   currentWorkerId,
 }: SidebarProps) => {
-  const [, forceUpdate] = useReducer((x) => x + 1, 0); // force re-render
+  const [query, setQuery] = useState("");
+  const [, setTick] = useState(0);
 
-  const [users, setUsers] = useState<any[]>([]); // <-- CHANGED (initial empty array)
-
-  // Update users when admins or clients change
+  // Keep relative times fresh
   useEffect(() => {
-    setUsers(dedupeUsers([...admins, ...clients])); // <-- CHANGED (dedupe applied)
-  }, [admins, clients]); // keep the deps the same
-
-  // Force re-render every 10 seconds to update active status dynamically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      forceUpdate();
-    }, 10000); // every 10 seconds
-    return () => clearInterval(interval);
+    const refresh = () => setTick((x) => x + 1);
+    const id = setInterval(refresh, 60000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", refresh);
+    };
   }, []);
 
-  const formatTime = (timestamp: string) => {
-    if (!timestamp) return "";
-    const diff = new Date().getTime() - new Date(timestamp).getTime();
-    const mins = Math.floor(diff / 60000);
-    const hrs = Math.floor(mins / 60);
-    const days = Math.floor(hrs / 24);
+  const filter = (list: any[]) => {
+    const q = query.trim().toLowerCase();
+    const unique = dedupeUsers(list);
+    if (!q) return unique;
+    return unique.filter((u) =>
+      `${u.fname} ${u.lname}`.toLowerCase().includes(q),
+    );
+  };
 
-    if (mins < 60) return `${mins}m`;
-    if (hrs < 24) return `${hrs}h`;
-    return `${days}d`;
+  const groups = useMemo(
+    () => [
+      { label: "Admins", users: filter(admins) },
+      { label: "Clients", users: filter(clients) },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [admins, clients, query],
+  );
+
+  const total = groups.reduce((n, g) => n + g.users.length, 0);
+
+  const renderUser = (user: any) => {
+    const selected = selectedUser?.user_id === user.user_id;
+    const online = isOnline(user);
+    const unread = Number(user.unread_count) || 0;
+    const mine = Number(user.last_sender_id) === currentWorkerId;
+
+    return (
+      <li key={user.user_id}>
+        <button
+          onClick={() => onSelectUser(user)}
+          aria-current={selected ? "true" : undefined}
+          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
+            selected ? "bg-sky-50 ring-1 ring-sky-200" : "hover:bg-slate-100"
+          }`}
+        >
+          <div className="relative h-11 w-11 shrink-0">
+            <img
+              src={getAvatarUrl(user.profile_pic)}
+              alt=""
+              className="h-full w-full rounded-full object-cover"
+            />
+            <span
+              title={online ? "Online" : "Offline"}
+              className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
+                online ? "bg-emerald-500" : "bg-slate-300"
+              }`}
+            />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <h3
+                className={`truncate text-sm ${
+                  unread
+                    ? "font-semibold text-slate-900"
+                    : "font-medium text-slate-800"
+                }`}
+              >
+                {user.fname} {user.lname}
+              </h3>
+              <span className="shrink-0 text-[11px] text-slate-400">
+                {timeAgo(user.last_message_time)}
+              </span>
+            </div>
+
+            <div className="mt-0.5 flex items-center justify-between gap-2">
+              <p
+                className={`truncate text-xs ${
+                  unread ? "font-medium text-slate-700" : "text-slate-500"
+                }`}
+              >
+                {user.last_message
+                  ? `${mine ? "You: " : ""}${user.last_message}`
+                  : "No messages yet"}
+              </p>
+              {unread > 0 && (
+                <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-sky-600 px-1.5 text-[11px] font-medium text-white">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
+            </div>
+          </div>
+        </button>
+      </li>
+    );
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-white border-r shadow-md md:rounded-lg">
-      <div className="bg-white z-10 p-4 border-b md:rounded-t-lg">
-        <h2 className="text-lg font-bold mb-4">Workers</h2>
-        <div className="relative">
+    <aside className="flex h-full w-full flex-col overflow-hidden bg-white ring-1 ring-slate-200 md:rounded-2xl">
+      <div className="space-y-3 border-b border-slate-200 p-4">
+        <h2 className="text-lg font-semibold text-slate-900">Messages</h2>
+        <label className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 transition focus-within:bg-white focus-within:ring-2 focus-within:ring-sky-500">
+          <RiSearchLine className="text-slate-400" size={16} />
           <input
-            type="text"
-            placeholder="Search..."
-            className="w-full px-3 py-2 rounded-lg border bg-gray-100 focus:outline-none"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name"
+            aria-label="Search conversations"
+            className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
           />
-          <FaSearch className="absolute right-3 top-3 text-gray-400" />
-        </div>
+        </label>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {users.map((user) => {
-          const preview = user.last_message
-            ? (Number(user.last_sender_id) === currentWorkerId ? "You: " : "") +
-              (user.last_message.length > 20
-                ? user.last_message.slice(0, 20) + "..."
-                : user.last_message)
-            : "";
-
-          // Active if user_login_time exists and not too old
-          const isActive =
-            user.user_login_time &&
-            new Date().getTime() - new Date(user.user_login_time).getTime() <
-              30 * 60 * 1000; // 30 min
-
-          return (
-            <div
-              key={user.user_id}
-              className={`flex items-center p-2 cursor-pointer rounded-lg hover:bg-gray-200 ${
-                selectedUser?.user_id === user.user_id
-                  ? "bg-gray-300"
-                  : "bg-white"
-              }`}
-              onClick={() => onSelectUser(user)} // ✅ HERE (correct)
-            >
-              <div className="relative w-10 h-10 mr-3 flex-shrink-0">
-                <img
-                  src={
-                    user.profile_pic?.startsWith("http")
-                      ? user.profile_pic
-                      : user.profile_pic
-                      ? `${apiUrl}/uploads/images/${user.profile_pic}`
-                      : "/avatar.jpg"
-                  }
-                  alt={`${user.fname} ${user.lname}`}
-                  className="w-full h-full rounded-full object-cover"
-                />
-
-                {/* Status Indicator */}
-                <div
-                  className={`absolute flex items-center justify-center text-[8px] font-bold bottom-0 right-0 border-2 border-white ${
-                    isActive
-                      ? "bg-green-500 w-3 h-3 rounded-full text-white"
-                      : "bg-[#f6ffed] w-auto px-1 rounded-full text-black"
-                  }`}
-                  title={
-                    isActive
-                      ? "Online"
-                      : user.last_active_time
-                      ? `Last active: ${formatTime(user.last_active_time)} ago`
-                      : "No activity"
-                  }
-                >
-                  {!isActive && user.last_active_time
-                    ? formatTime(user.last_active_time)
-                    : ""}
-                </div>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold truncate">
-                  {user.fname} {user.lname}
+      <div className="flex-1 overflow-y-auto p-2">
+        {total === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-slate-500">
+            {query ? `No one matches "${query}".` : "No conversations yet."}
+          </p>
+        ) : (
+          groups
+            .filter((g) => g.users.length > 0)
+            .map((g) => (
+              <section key={g.label} className="mb-2">
+                <h3 className="px-3 pb-1 pt-2 text-xs font-medium text-slate-500">
+                  {g.label}
                 </h3>
-                <p className="text-sm text-gray-500 truncate">{preview}</p>
-              </div>
-
-              <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">
-                {isActive
-                  ? "Online"
-                  : user.last_active_time
-                  ? formatTime(user.last_active_time)
-                  : ""}
-              </span>
-            </div>
-          );
-        })}
+                <ul className="space-y-0.5">{g.users.map(renderUser)}</ul>
+              </section>
+            ))
+        )}
       </div>
-    </div>
+    </aside>
   );
 };
 

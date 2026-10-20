@@ -6,6 +6,7 @@ import axios from "axios";
 
 interface Notification {
   id: number;
+  sender_id: number;
   title?: string;
   description: string;
   time: string;
@@ -27,49 +28,120 @@ const MessageNotification: React.FC<Props> = ({
   onCloseDropdown,
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+
   const [loading, setLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    if (!userId) return;
-
-    let isMounted = true;
-
-    const fetchNotifications = async () => {
-      try {
-        const res = await axios.get(`${apiUrl}/worker_notifications/${userId}`);
-
-        const data: Notification[] = res.data.map((item: any) => ({
-          id: item.id,
-          title: item.title || "Message",
-          description: item.description,
-          time: item.time,
-          profile_pic: item.profile_pic || "",
-          is_read: item.is_read?.toLowerCase() === "read" ? "read" : "unread",
-        }));
-
-        if (isMounted) {
-          setNotifications(data);
-
-          const unread = data.filter((n) => n.is_read !== "read").length;
-
-          onUnreadCountChange?.(unread);
-        }
-      } catch (err) {
-        console.error("Failed to fetch messages:", err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+  const fetchNotifications = async (showLoading = true) => {
+    try {
+      if (!userId) {
+        setNotifications([]);
+        onUnreadCountChange?.(0);
+        return;
       }
-    };
 
-    setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
+
+      const res = await axios.get(
+        `${apiUrl}/get_notifications_for_worker/${userId}`,
+        {
+          headers: {
+            "Cache-Control": "no-cache",
+          },
+        },
+      );
+
+      const data: Notification[] = res.data.map((item: any) => ({
+        id: item.id,
+        sender_id: item.sender_id,
+
+        // USER NAME
+        title: item.user_name || "Message",
+
+        description: item.description,
+        time: item.time,
+
+        profile_pic: item.profile_pic || "",
+
+        // IMPORTANT:
+        // use is_read, NOT status
+        is_read: item.is_read?.toLowerCase() === "read" ? "read" : "unread",
+      }));
+
+      setNotifications(data);
+
+      const unread = data.filter((n) => n.is_read !== "read").length;
+
+      onUnreadCountChange?.(unread);
+    } catch (err) {
+      console.error("Failed to fetch messages:", err);
+    } finally {
+      if (showLoading) {
+        setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!userId) {
+      setNotifications([]);
+      setLoading(false);
+      onUnreadCountChange?.(0);
+      return;
+    }
+
     fetchNotifications();
 
-    return () => {
-      isMounted = false;
+    const onFocus = () => {
+      fetchNotifications(false);
     };
-  }, [apiUrl, userId, onUnreadCountChange]);
+
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [apiUrl, userId]);
+
+  const markAsRead = async (senderId: number) => {
+    if (!userId) return;
+
+    try {
+      console.log("Marking as read:", {
+        workerId: userId,
+        senderId: senderId,
+      });
+
+      // UPDATE DATABASE
+      await axios.post(`${apiUrl}/messages/read/${userId}/${senderId}`);
+
+      // UPDATE UI
+      setNotifications((prev) => {
+        const updated = prev.map((n) =>
+          n.sender_id === senderId
+            ? {
+                ...n,
+                is_read: "read",
+              }
+            : n,
+        );
+
+        const unread = updated.filter((n) => n.is_read !== "read").length;
+
+        onUnreadCountChange?.(unread);
+
+        return updated;
+      });
+
+      // CLOSE DROPDOWN
+      onCloseDropdown?.();
+
+      console.log("Message successfully marked as read");
+    } catch (err) {
+      console.error("Failed to mark messages as read:", err);
+    }
+  };
 
   if (loading) {
     return (
@@ -91,18 +163,30 @@ const MessageNotification: React.FC<Props> = ({
       <List
         size="small"
         dataSource={notifications}
+        locale={{
+          emptyText: "No messages",
+        }}
         renderItem={(item) => (
           <Link
             to="/Worker/Manage/Chats"
-            state={{ selectedUserId: item.id }}
-            onClick={() => onCloseDropdown?.()}
+            state={{
+              selectedUserId: item.sender_id,
+            }}
+            onClick={() => {
+              // MARK READ
+              markAsRead(item.sender_id);
+
+              // CLOSE DROPDOWN
+              onCloseDropdown?.();
+            }}
             style={{
               textDecoration: "none",
               color: "inherit",
+              display: "block",
             }}
           >
             <List.Item
-              key={item.id + item.time}
+              key={item.id}
               style={{
                 paddingLeft: 0,
                 paddingRight: 8,

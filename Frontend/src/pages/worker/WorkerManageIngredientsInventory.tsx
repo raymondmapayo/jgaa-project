@@ -5,8 +5,8 @@ import axios from "axios";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
-import InventoryModal from "../WorkerModals/AddSupplyIngredientsModal";
-import EditInventoryModal from "../WorkerModals/EditSupplyModal";
+
+import EditInventoryModal from "../WorkerModals/EditIngredientsSupplyModal";
 import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 
 // ====================== Styled Components ======================
@@ -108,37 +108,31 @@ interface InventoryItem {
 
 const WorkerManageIngredientsInventory = () => {
   const [dataSource, setDataSource] = useState<InventoryItem[]>([]);
-  const [isModalVisible, setIsModalVisible] = useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
-  useEffect(() => {
-    const fetchInventory = async () => {
-      try {
-        const response = await axios.get(`${apiUrl}/get_inventory`);
-        console.log("🟢 Backend Response:", response.data);
-        if (response.data.success) {
-          setDataSource(response.data.data); // replace the data, don't append
-        } else {
-          console.error("⚠️ Backend returned error:", response.data.message);
-        }
-      } catch (error) {
-        console.error("❌ Error fetching inventory:", error);
-      } finally {
-        setIsLoading(false);
+  const fetchInventory = async () => {
+    setIsLoading(true);
+
+    try {
+      const response = await axios.get(`${apiUrl}/get_inventory`);
+
+      if (response.data.success) {
+        setDataSource(response.data.data);
       }
-    };
-
-    fetchInventory(); // fetch only once
-  }, [apiUrl]);
-
-  const handleAddInventory = (values: any) => {
-    console.log("New Product Added:", values);
-    setIsModalVisible(false);
-    // Optionally refresh inventory after adding
+    } catch (error) {
+      console.error("❌ Error fetching inventory:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchInventory();
+  }, [apiUrl]);
 
   // ✅ Cleaned columns (removed Created By, fname, lname, profile_pic)
   const columns = [
@@ -237,11 +231,7 @@ const WorkerManageIngredientsInventory = () => {
       </div>
 
       {/* Add Inventory Modal */}
-      <InventoryModal
-        visible={isModalVisible}
-        onFinish={handleAddInventory}
-        onClose={() => setIsModalVisible(false)}
-      />
+
       {/* View Inventory Modal */}
       <ViewInventoryModal
         visible={viewModalVisible}
@@ -259,9 +249,7 @@ const WorkerManageIngredientsInventory = () => {
           setEditModalVisible(false);
           setSelectedItem(null);
         }}
-        onFinish={() => {
-          window.location.reload();
-        }}
+        onFinish={() => fetchInventory()}
       />
     </StyledContainer>
   );
