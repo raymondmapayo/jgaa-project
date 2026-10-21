@@ -5,7 +5,7 @@ import axios from "axios";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
-import InventoryModal from "../WorkerModals/AddSupplyIngredientsModal";
+
 import EditInventoryModal from "../WorkerModals/EditIngredientsSupplyModal";
 import ViewInventoryModal from "../WorkerModals/ViewInventoryModal";
 
@@ -108,7 +108,7 @@ interface InventoryItem {
 
 const WorkerManageDrinksInventory = () => {
   const [dataSource, setDataSource] = useState<InventoryItem[]>([]);
-  const [isModalVisible, setIsModalVisible] = useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
@@ -133,12 +133,6 @@ const WorkerManageDrinksInventory = () => {
 
     fetchInventory(); // fetch only once
   }, [apiUrl]);
-
-  const handleAddInventory = (values: any) => {
-    console.log("New Product Added:", values);
-    setIsModalVisible(false);
-    // Optionally refresh inventory after adding
-  };
 
   // ✅ Cleaned columns (removed Created By, fname, lname, profile_pic)
   const columns = [
@@ -233,12 +227,6 @@ const WorkerManageDrinksInventory = () => {
         )}
       </div>
 
-      {/* Add Inventory Modal */}
-      <InventoryModal
-        visible={isModalVisible}
-        onFinish={handleAddInventory}
-        onClose={() => setIsModalVisible(false)}
-      />
       {/* View Inventory Modal */}
       <ViewInventoryModal
         visible={viewModalVisible}

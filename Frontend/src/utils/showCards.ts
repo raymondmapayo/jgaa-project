@@ -6,30 +6,30 @@ import f4 from "../../public/assets/f4.jpeg";
 export const showCards = [
   {
     id: 1,
-    title: "Fast Mobile Ordering",
+    title: "Manage Your Dashboard",
     description:
-      "Enjoy a fast and convenient ordering experience designed for mobile users for everyday food needs.",
+      "Monitor dashboard analytics, track sales and revenue, and view important restaurant performance data in one convenient place.",
     image: f4,
   },
   {
     id: 2,
-    title: "Browse Menu on Mobile",
+    title: "Manage Inventory and Menus",
     description:
-      "View all available food and drinks directly on your mobile phone in a simple and organized menu.",
+      "Organize inventory, manage food and beverage menus, update product details and prices, and keep track of available stock.",
     image: f1,
   },
   {
     id: 3,
-    title: "Select Your Order",
+    title: "Manage Orders and Customers",
     description:
-      "Choose your favorite meals and drinks easily by tapping on the items you want to order.",
+      "View and manage customer orders, monitor order statuses, review customer information, and ensure smooth restaurant operations.",
     image: f2,
   },
   {
     id: 4,
-    title: "Place Your Order",
+    title: "Manage Chats and Categories",
     description:
-      "Add items to your cart and place your food order quickly with a smooth and simple process.",
+      "Communicate with customers through chats, organize menu categories, and manage other essential restaurant system features efficiently.",
     image: f3,
   },
 ];

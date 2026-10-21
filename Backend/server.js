@@ -117,19 +117,17 @@ db.connect((err) => {
 const promiseDb = db.promise();
 //==========================MENUS INSERT ===============================================
 //========================== MENUS INSERT (Cloudinary) ===============================================
+
 app.post("/add_menu", upload.single("menu_img"), async (req, res) => {
   console.log("========== ADD MENU ==========");
   console.log("BODY:", req.body);
   console.log("FILE:", req.file);
 
   try {
-    const { item_name, price, description, categories_id, created_by } =
+    const { item_name, price, description, categories_id, created_by, unit } =
       req.body;
 
     const menu_img = req.file?.path || "";
-
-    console.log("ADD MENU BODY:", req.body);
-    console.log("UPLOADED FILE:", req.file);
 
     if (!item_name || !price || !categories_id || !created_by) {
       return res.status(400).json({
@@ -143,25 +141,49 @@ app.post("/add_menu", upload.single("menu_img"), async (req, res) => {
       });
     }
 
+    // Fetch category name
     const fetchCategorySql = `
       SELECT categories_name
       FROM categories_tbl
       WHERE categories_id = ?
     `;
 
-    // ✅ USE promiseDb HERE
     const [categoryResults] = await promiseDb.query(fetchCategorySql, [
       categories_id,
     ]);
 
     if (categoryResults.length === 0) {
       return res.status(404).json({
-        error: "Category not found",
+        error: "Category not found.",
       });
     }
 
     const categories_name = categoryResults[0].categories_name;
 
+    // Only drinks require a unit
+    const isDrinks = String(categories_name).trim().toLowerCase() === "drinks";
+
+    const menuUnit = isDrinks
+      ? String(unit || "")
+          .trim()
+          .toLowerCase()
+      : null;
+
+    const allowedUnits = ["liters", "ml", "kg", "bottle", "can", "piece"];
+
+    if (isDrinks && !menuUnit) {
+      return res.status(400).json({
+        error: "Please select a unit for this drink.",
+      });
+    }
+
+    if (isDrinks && !allowedUnits.includes(menuUnit)) {
+      return res.status(400).json({
+        error: "Invalid drink unit.",
+      });
+    }
+
+    // Insert menu item, including unit
     const sql = `
       INSERT INTO menu_tbl
       (
@@ -172,12 +194,12 @@ app.post("/add_menu", upload.single("menu_img"), async (req, res) => {
         availability,
         categories_id,
         categories_name,
-        created_by
+        created_by,
+        unit
       )
-      VALUES (?, ?, ?, ?, "Pending", ?, ?, ?)
+      VALUES (?, ?, ?, ?, 'Pending', ?, ?, ?, ?)
     `;
 
-    // ✅ USE promiseDb HERE TOO
     const [result] = await promiseDb.query(sql, [
       item_name,
       menu_img,
@@ -186,6 +208,7 @@ app.post("/add_menu", upload.single("menu_img"), async (req, res) => {
       categories_id,
       categories_name,
       created_by,
+      menuUnit,
     ]);
 
     console.log("MENU INSERTED:", result);
@@ -195,7 +218,11 @@ app.post("/add_menu", upload.single("menu_img"), async (req, res) => {
       menu_id: result.insertId,
       item_name,
       menu_img,
+      description: description || "",
+      price,
+      categories_id,
       categories_name,
+      unit: menuUnit,
     });
   } catch (error) {
     console.error("========== ADD MENU ERROR ==========");
@@ -206,6 +233,7 @@ app.post("/add_menu", upload.single("menu_img"), async (req, res) => {
     });
   }
 });
+
 //========================== Edit start MENUS ===========================================
 
 app.put("/update_menu/:menu_id", upload.single("menu_img"), (req, res) => {
@@ -343,6 +371,7 @@ app.get("/ingredients_items", (request, response) => {
 });
 
 // @ts-ignore
+
 app.get("/menu_items_drinks", async (request, response) => {
   const sql = `
     SELECT 
@@ -352,6 +381,7 @@ app.get("/menu_items_drinks", async (request, response) => {
       menu_img,
       description,
       price,
+      unit,
       TRIM(availability) AS availability
     FROM menu_tbl
     WHERE TRIM(categories_name) = 'Drinks'
@@ -1680,22 +1710,26 @@ app.post("/add_supply_drinks", async (req, res) => {
 
   try {
     // =============================
-    // 1. CHECK IF PRODUCT IS DRINK
+    // 1. CHECK IF PRODUCT AND UNIT EXIST IN MENU
     // =============================
     const checkDrinkSQL = `
-      SELECT item_name
+      SELECT menu_id, item_name, unit
       FROM menu_tbl
-      WHERE categories_name = 'Drinks'
-        AND item_name = ?
+      WHERE LOWER(TRIM(categories_name)) = 'drinks'
+        AND LOWER(TRIM(item_name)) = LOWER(TRIM(?))
+        AND LOWER(TRIM(unit)) = LOWER(TRIM(?))
       LIMIT 1
     `;
 
-    const [drinkRows] = await db.promise().query(checkDrinkSQL, [product_name]);
+    const [drinkRows] = await db
+      .promise()
+      .query(checkDrinkSQL, [product_name, unit]);
 
     if (drinkRows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid product_name. Only drinks are allowed.",
+        message:
+          "Invalid drink name or unit. Please select a valid drink and unit from the menu.",
       });
     }
 
@@ -1709,8 +1743,8 @@ app.post("/add_supply_drinks", async (req, res) => {
         `
         SELECT *
         FROM drinks_inventory_tbl
-        WHERE product_name = ?
-          AND unit = ?
+        WHERE LOWER(TRIM(product_name)) = LOWER(TRIM(?))
+          AND LOWER(TRIM(unit)) = LOWER(TRIM(?))
         LIMIT 1
         `,
         [product_name, unit],
@@ -1728,12 +1762,13 @@ app.post("/add_supply_drinks", async (req, res) => {
       `
       SELECT COUNT(*) AS batch_count
       FROM supply_drinks_tbl
-      WHERE product_name = ?
+      WHERE LOWER(TRIM(product_name)) = LOWER(TRIM(?))
+        AND LOWER(TRIM(unit)) = LOWER(TRIM(?))
       `,
-      [product_name],
+      [product_name, unit],
     );
 
-    const batchCount = batchRows[0]?.batch_count || 0;
+    const batchCount = Number(batchRows[0]?.batch_count || 0);
     const batchNo = `Stock ${batchCount + 1}`;
 
     // =============================
@@ -1805,10 +1840,12 @@ app.post("/add_supply_drinks", async (req, res) => {
     const updateMenuSQL = `
       UPDATE menu_tbl
       SET availability = 'Available'
-      WHERE item_name = ?
+      WHERE LOWER(TRIM(categories_name)) = 'drinks'
+        AND LOWER(TRIM(item_name)) = LOWER(TRIM(?))
+        AND LOWER(TRIM(unit)) = LOWER(TRIM(?))
     `;
 
-    await db.promise().query(updateMenuSQL, [product_name]);
+    await db.promise().query(updateMenuSQL, [product_name, unit]);
 
     // =============================
     // 7. SUCCESS
@@ -1817,6 +1854,10 @@ app.post("/add_supply_drinks", async (req, res) => {
       success: true,
       message: `Drink supply added with ${batchNo}`,
       drinks_inventory_id: newInventoryId,
+      product_name,
+      unit,
+      stock_in,
+      batch_no: batchNo,
     });
   } catch (error) {
     console.error("❌ Add Drink Supply Error:", error);
@@ -5012,6 +5053,265 @@ app.get("/fetch_transaction/:user_id", (req, res) => {
   });
 });
 
+app.post("/update_order_drinks_payment_status/:order_id", async (req, res) => {
+  const orderId = req.params.order_id;
+  const paymentStatus = String(req.body.paymentStatus || "")
+    .trim()
+    .toLowerCase();
+
+  if (paymentStatus !== "paid") {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid payment status.",
+    });
+  }
+
+  // Use the existing callback-based mysql2 connection.
+  const connection = db;
+
+  // Convert callback queries into Promises.
+  const query = (sql, params = []) =>
+    new Promise((resolve, reject) => {
+      connection.query(sql, params, (err, results) => {
+        if (err) return reject(err);
+        resolve(results);
+      });
+    });
+
+  // Convert transaction methods into Promises.
+  const beginTransaction = () =>
+    new Promise((resolve, reject) => {
+      connection.beginTransaction((err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+
+  const commit = () =>
+    new Promise((resolve, reject) => {
+      connection.commit((err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+
+  const rollback = () =>
+    new Promise((resolve) => {
+      connection.rollback(() => resolve());
+    });
+
+  let transactionStarted = false;
+
+  try {
+    await beginTransaction();
+    transactionStarted = true;
+
+    // 1. Lock and check the order to prevent duplicate deductions.
+    const orders = await query(
+      `SELECT order_id, payment_status
+       FROM order_tbl
+       WHERE order_id = ?
+       FOR UPDATE`,
+      [orderId],
+    );
+
+    if (orders.length === 0) {
+      throw new Error("Order not found.");
+    }
+
+    if (
+      String(orders[0].payment_status || "")
+        .trim()
+        .toLowerCase() === "paid"
+    ) {
+      throw new Error(
+        "This order is already paid. Inventory was not deducted again.",
+      );
+    }
+
+    // 2. Get drinks in this order and their units from menu_tbl.
+    const orderItems = await query(
+      `SELECT
+         oi.menu_id,
+         oi.item_name,
+         oi.order_quantity,
+         m.unit,
+         m.categories_name
+       FROM orderitem_tbl oi
+       INNER JOIN menu_tbl m
+         ON m.menu_id = oi.menu_id
+       WHERE oi.order_id = ?
+         AND LOWER(TRIM(COALESCE(oi.categories_name, ''))) = 'drinks'
+         AND LOWER(TRIM(COALESCE(m.categories_name, ''))) = 'drinks'`,
+      [orderId],
+    );
+
+    if (orderItems.length === 0) {
+      throw new Error(
+        "No matching drinks found for this order. Check orderitem_tbl.menu_id and categories_name.",
+      );
+    }
+
+    // 3. Combine quantities for duplicate drinks with the same unit.
+    const drinkDeductions = new Map();
+
+    for (const item of orderItems) {
+      const name = String(item.item_name || "").trim();
+      const unit = String(item.unit || "").trim();
+      const quantity = Number(item.order_quantity);
+
+      if (!name || !unit || !Number.isFinite(quantity) || quantity <= 0) {
+        throw new Error(
+          `Invalid drink name, unit, or quantity for ${name || "drink"}.`,
+        );
+      }
+
+      const key = `${name.toLowerCase()}|${unit.toLowerCase()}`;
+
+      if (!drinkDeductions.has(key)) {
+        drinkDeductions.set(key, {
+          name,
+          unit,
+          quantity: 0,
+        });
+      }
+
+      drinkDeductions.get(key).quantity += quantity;
+    }
+
+    // 4. FIFO inventory deduction: oldest matching batch first.
+    for (const drink of drinkDeductions.values()) {
+      let remaining = drink.quantity;
+
+      const batches = await query(
+        `SELECT
+           drinks_inventory_id,
+           stock_in,
+           stock_out,
+           unit
+         FROM drinks_inventory_tbl
+         WHERE LOWER(TRIM(product_name)) = LOWER(TRIM(?))
+           AND LOWER(TRIM(unit)) = LOWER(TRIM(?))
+           AND stock_in > 0
+         ORDER BY created_at ASC, drinks_inventory_id ASC
+         FOR UPDATE`,
+        [drink.name, drink.unit],
+      );
+
+      if (batches.length === 0) {
+        throw new Error(
+          `No available inventory for ${drink.name} (${drink.unit}).`,
+        );
+      }
+
+      const available = batches.reduce(
+        (sum, batch) => sum + Math.max(0, Number(batch.stock_in) || 0),
+        0,
+      );
+
+      if (available < remaining) {
+        throw new Error(
+          `Insufficient stock for ${drink.name} (${drink.unit}). Available: ${available}; requested: ${remaining}.`,
+        );
+      }
+
+      for (const batch of batches) {
+        if (remaining <= 0) break;
+
+        const batchStock = Math.max(0, Number(batch.stock_in) || 0);
+
+        const deduction = Math.min(batchStock, remaining);
+        const newStock = batchStock - deduction;
+
+        await query(
+          `UPDATE drinks_inventory_tbl
+           SET stock_in = ?,
+               stock_out = COALESCE(stock_out, 0) + ?,
+               status = CASE
+                 WHEN ? <= 0 THEN 'Not Available'
+                 WHEN ? <= 3 THEN 'Low'
+                 ELSE 'Available'
+               END
+           WHERE drinks_inventory_id = ?`,
+          [newStock, deduction, newStock, newStock, batch.drinks_inventory_id],
+        );
+
+        remaining -= deduction;
+      }
+
+      if (remaining > 0) {
+        throw new Error(
+          `Unable to complete stock deduction for ${drink.name}.`,
+        );
+      }
+    }
+
+    // 5. Update payment status after successful inventory deduction.
+    await query(
+      `UPDATE payment_tbl
+       SET payment_status = 'paid'
+       WHERE order_id = ?`,
+      [orderId],
+    );
+
+    await query(
+      `UPDATE order_tbl
+       SET payment_status = 'paid'
+       WHERE order_id = ?`,
+      [orderId],
+    );
+
+    // 6. Synchronize menu availability with total remaining inventory.
+    // 0 stock = Not Available
+    // 1-3 stock = Low
+    // More than 3 = Available
+    await query(
+      `UPDATE menu_tbl m
+       LEFT JOIN (
+         SELECT
+           LOWER(TRIM(product_name)) AS drink_name,
+           LOWER(TRIM(unit)) AS drink_unit,
+           SUM(GREATEST(COALESCE(stock_in, 0), 0)) AS total_stock
+         FROM drinks_inventory_tbl
+         GROUP BY
+           LOWER(TRIM(product_name)),
+           LOWER(TRIM(unit))
+       ) d
+         ON LOWER(TRIM(m.item_name)) = d.drink_name
+        AND LOWER(TRIM(COALESCE(m.unit, ''))) = d.drink_unit
+       SET m.availability = CASE
+         WHEN COALESCE(d.total_stock, 0) <= 0
+           THEN 'Not Available'
+         WHEN COALESCE(d.total_stock, 0) <= 3
+           THEN 'Low'
+         ELSE 'Available'
+       END
+       WHERE LOWER(TRIM(COALESCE(m.categories_name, ''))) = 'drinks'`,
+    );
+
+    // 7. Commit all database changes together.
+    await commit();
+    transactionStarted = false;
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Drinks payment, FIFO inventory deduction, and menu availability updated successfully.",
+    });
+  } catch (error) {
+    if (transactionStarted) {
+      await rollback();
+    }
+
+    console.error("Drinks payment and inventory error:", error);
+
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Failed to update drinks inventory.",
+    });
+  }
+});
+
 app.post("/update_order_payment_status/:order_id", async (req, res) => {
   const orderId = req.params.order_id;
 
@@ -5053,9 +5353,10 @@ app.post("/update_order_payment_status/:order_id", async (req, res) => {
     // 3️⃣ Get order items
     const orderItems = await new Promise((resolve, reject) => {
       const sql = `
-        SELECT item_name, order_quantity, categories_name
-        FROM orderitem_tbl
-        WHERE order_id = ?
+      SELECT item_name, order_quantity, categories_name
+  FROM orderitem_tbl
+  WHERE order_id = ?
+    AND LOWER(TRIM(COALESCE(categories_name, ''))) != 'drinks'
       `;
       db.query(sql, [orderId], (err, results) => {
         if (err) reject(err);
@@ -5147,40 +5448,46 @@ app.post("/update_order_payment_status/:order_id", async (req, res) => {
       }
     }
 
-    // 6️⃣ ✅ UPDATE MENU AVAILABILITY (PUT HERE)
+    // 6️⃣ UPDATE MENU AVAILABILITY
     await new Promise((resolve, reject) => {
       const updateMenuSql = `
-  UPDATE menu_tbl m
+    UPDATE menu_tbl m
     SET m.availability = (
-      SELECT 
-        CASE 
-          WHEN COUNT(ing.ingredients_name) = 0 THEN 'Available'
+      SELECT
+        CASE
+          WHEN COUNT(ing.ingredients_name) = 0
+            THEN m.availability
 
           WHEN SUM(
-            CASE 
-              WHEN IFNULL(inv.total_stock, 0) <= 0 THEN 1 
-              ELSE 0 
+            CASE
+              WHEN IFNULL(inv.total_stock, 0) <= 0 THEN 1
+              ELSE 0
             END
-          ) > 0 THEN 'Not Available'
+          ) > 0
+            THEN 'Not Available'
 
           ELSE 'Available'
         END
       FROM ingredients_tbl ing
+
       LEFT JOIN (
-        SELECT 
-          TRIM(LOWER(product_name)) AS product_name, 
+        SELECT
+          TRIM(LOWER(product_name)) AS product_name,
           SUM(stock_in) AS total_stock
         FROM inventory_tbl
         GROUP BY TRIM(LOWER(product_name))
-      ) inv 
-      ON TRIM(LOWER(inv.product_name)) = TRIM(LOWER(ing.ingredients_name))
+      ) inv
+        ON TRIM(LOWER(inv.product_name)) =
+           TRIM(LOWER(ing.ingredients_name))
+
       WHERE ing.menu_id = m.menu_id
-    );
+    )
+    WHERE LOWER(TRIM(m.categories_name)) != 'drinks'
   `;
 
       db.query(updateMenuSql, (err) => {
-        if (err) reject(err);
-        else resolve(true);
+        if (err) return reject(err);
+        resolve(true);
       });
     });
 
@@ -7888,13 +8195,16 @@ app.put("/update_payment_status", (req, res) => {
 });
 
 // ✅ Get transaction validation by order_id
+
 app.get("/get_transac_validation/:order_id", async (req, res) => {
   const { order_id } = req.params;
 
   // Safety check
   if (!order_id || order_id === "undefined") {
     console.error("❌ Invalid or missing order_id in request.");
-    return res.status(400).json({ error: "Invalid order ID." });
+    return res.status(400).json({
+      error: "Invalid order ID.",
+    });
   }
 
   console.log("🔍 Fetching transaction for order_id:", order_id);
@@ -7910,22 +8220,29 @@ app.get("/get_transac_validation/:order_id", async (req, res) => {
       payment_date,
       payment_time
     FROM transaction_tbl
-    WHERE order_id = ?;
+    WHERE order_id = ?
   `;
 
   try {
-    const [results] = await db.query(sql, [order_id]);
+    const [results] = await db.promise().query(sql, [order_id]);
 
     if (!results || results.length === 0) {
       console.log("⚠️ No transaction found for order_id:", order_id);
-      return res.status(404).json({ message: "No transaction found." });
+
+      return res.status(404).json({
+        message: "No transaction found.",
+      });
     }
 
     console.log("✅ Transaction fetched successfully:", results[0]);
-    res.json(results);
+
+    return res.json(results);
   } catch (err) {
     console.error("❌ SQL ERROR:", err.sqlMessage || err);
-    return res.status(500).json({ error: "Internal Server Error" });
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+    });
   }
 });
 

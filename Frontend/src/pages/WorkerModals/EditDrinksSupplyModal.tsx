@@ -26,11 +26,12 @@ const EditDrinksSupplyModal: React.FC<EditDrinksSupplyModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [remainingStock, setRemainingStock] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
-    if (selectedItem) {
+    if (visible && selectedItem) {
       form.setFieldsValue({
         product_name: selectedItem.product_name,
         stock_in: selectedItem.stock_in,
@@ -38,33 +39,47 @@ const EditDrinksSupplyModal: React.FC<EditDrinksSupplyModalProps> = ({
         price: selectedItem.price,
       });
 
-      setRemainingStock(selectedItem.stock_in);
+      setRemainingStock(Number(selectedItem.stock_in) || 0);
     }
-  }, [selectedItem, form]);
+  }, [visible, selectedItem, form]);
 
   // Update remaining stock when stock_in changes
   const handleValuesChange = (_: any, allValues: any) => {
-    setRemainingStock(allValues.stock_in || 0);
+    if (allValues.stock_in !== undefined) {
+      setRemainingStock(Number(allValues.stock_in) || 0);
+    }
   };
 
   const handleOk = async () => {
+    if (!selectedItem) {
+      message.error("No drinks supply selected.");
+      return;
+    }
+
+    setIsLoading(true);
+
     try {
       const values = await form.validateFields();
 
       const response = await axios.put(
         `${apiUrl}/update_drinks_supply/${selectedItem.supply_drinks_id}`,
         {
-          product_name: values.product_name,
           stock_in: values.stock_in,
-          unit: values.unit,
           price: values.price,
         },
       );
 
       if (response.data.success) {
-        message.success(response.data.message, 1);
+        message.success(
+          response.data.message || "Drinks supply updated successfully.",
+        );
 
-        onFinish(values);
+        onFinish({
+          ...selectedItem,
+          stock_in: values.stock_in,
+          price: values.price,
+        });
+
         onClose();
       } else {
         message.error(
@@ -72,8 +87,17 @@ const EditDrinksSupplyModal: React.FC<EditDrinksSupplyModalProps> = ({
         );
       }
     } catch (error: any) {
-      console.error("❌ Error updating drinks supply:", error);
-      message.error("Failed to update drinks supply. Please try again.");
+      console.error(
+        "Error updating drinks supply:",
+        error.response?.data || error,
+      );
+
+      message.error(
+        error.response?.data?.message ||
+          "Failed to update drinks supply. Please try again.",
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -81,14 +105,21 @@ const EditDrinksSupplyModal: React.FC<EditDrinksSupplyModalProps> = ({
     <Modal
       title="Edit Drinks Supply"
       open={visible}
-      onOk={handleOk}
       onCancel={onClose}
+      closable={!isLoading}
+      maskClosable={!isLoading}
+      keyboard={!isLoading}
       footer={[
-        <Button key="cancel" onClick={onClose}>
+        <Button key="cancel" onClick={onClose} disabled={isLoading}>
           Cancel
         </Button>,
 
-        <Button key="submit" type="primary" onClick={handleOk}>
+        <Button
+          key="submit"
+          type="primary"
+          onClick={handleOk}
+          loading={isLoading}
+        >
           Save Changes
         </Button>,
       ]}
@@ -96,17 +127,8 @@ const EditDrinksSupplyModal: React.FC<EditDrinksSupplyModalProps> = ({
       <Form form={form} layout="vertical" onValuesChange={handleValuesChange}>
         <Row gutter={16}>
           <Col span={12}>
-            <Form.Item
-              label="Product Name"
-              name="product_name"
-              rules={[
-                {
-                  required: true,
-                  message: "Please enter product name",
-                },
-              ]}
-            >
-              <Input />
+            <Form.Item label="Product Name" name="product_name">
+              <Input disabled />
             </Form.Item>
           </Col>
 
@@ -121,7 +143,7 @@ const EditDrinksSupplyModal: React.FC<EditDrinksSupplyModalProps> = ({
                 },
               ]}
             >
-              <InputNumber min={0} style={{ width: "100%" }} />
+              <InputNumber min={0} precision={0} style={{ width: "100%" }} />
             </Form.Item>
           </Col>
         </Row>
@@ -138,22 +160,13 @@ const EditDrinksSupplyModal: React.FC<EditDrinksSupplyModalProps> = ({
                 },
               ]}
             >
-              <InputNumber min={0} style={{ width: "100%" }} />
+              <InputNumber min={0} precision={2} style={{ width: "100%" }} />
             </Form.Item>
           </Col>
 
           <Col span={12}>
-            <Form.Item
-              label="Unit"
-              name="unit"
-              rules={[
-                {
-                  required: true,
-                  message: "Please enter unit",
-                },
-              ]}
-            >
-              <Input />
+            <Form.Item label="Unit" name="unit">
+              <Input disabled />
             </Form.Item>
           </Col>
         </Row>

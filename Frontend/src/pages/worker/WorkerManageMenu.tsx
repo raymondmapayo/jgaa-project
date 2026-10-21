@@ -14,6 +14,7 @@ import AddMenuForm from "../../components/form/AddMenu";
 import MenuEditModal from "../WorkerModals/MenuEditModal";
 import ViewDetailsModal from "../WorkerModals/ViewDetailsModal";
 import dayjs from "dayjs";
+import MenuTermsModal from "../../terms_policy/MenuTermsModal";
 const StyledContainer = styled.div`
   width: 100%;
   background-color: #fafafa;
@@ -132,8 +133,9 @@ const WorkerManageMenu = () => {
   const [dataSource, setDataSource] = useState<MenuItem[]>([]);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [isTermsModalVisible, setIsTermsModalVisible] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -312,7 +314,7 @@ const WorkerManageMenu = () => {
     try {
       const response = await axios.get(`${apiUrl}/menu_items`);
       setDataSource(response.data); // refresh table after adding
-      setIsAddModalVisible(false);
+      setIsEditModalVisible(false);
     } catch (error) {
       console.error("Error fetching updated menu items:", error);
     }
@@ -396,7 +398,7 @@ const WorkerManageMenu = () => {
                 type="primary"
                 icon={<PlusOutlined />}
                 className="w-full sm:w-[140px]"
-                onClick={() => setIsAddModalVisible(true)}
+                onClick={() => setIsTermsModalVisible(true)}
               >
                 Add Menu
               </Button>
@@ -461,6 +463,14 @@ const WorkerManageMenu = () => {
           />
         )}
       </div>
+      <MenuTermsModal
+        open={isTermsModalVisible}
+        onClose={() => setIsTermsModalVisible(false)}
+        onContinue={() => {
+          setIsTermsModalVisible(false);
+          setIsAddModalVisible(true);
+        }}
+      />
 
       {/* Modals */}
       <ViewDetailsModal
@@ -474,6 +484,7 @@ const WorkerManageMenu = () => {
         onClose={() => setIsEditModalVisible(false)}
         onSave={handleSaveEdit}
       />
+
       <AddMenuForm
         isAddModalVisible={isAddModalVisible}
         onClose={() => setIsAddModalVisible(false)}

@@ -4,7 +4,6 @@ import {
   Button,
   Col,
   Form,
-  Input,
   InputNumber,
   message,
   Modal,
@@ -35,6 +34,16 @@ const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
   const apiUrl = import.meta.env.VITE_API_URL;
   const [isLoading, setIsLoading] = useState(false);
   const user_id = sessionStorage.getItem("user_id");
+  const selectedProduct = Form.useWatch("product_name", form);
+
+  const unitOptions = [
+    ...new Set(
+      drinks
+        .filter((drink) => drink.item_name === selectedProduct && drink.unit)
+        .map((drink) => String(drink.unit).trim())
+        .filter(Boolean),
+    ),
+  ];
   // ✅ Fetch drinks only
   useEffect(() => {
     if (visible) {
@@ -186,13 +195,25 @@ const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
                 { required: true, message: "Please select product name" },
               ]}
             >
-              <Select placeholder="Select a product name">
-                {drinks.map((drink) => (
-                  <Select.Option key={drink.menu_id} value={drink.item_name}>
-                    {drink.item_name}
-                  </Select.Option>
-                ))}
-              </Select>
+              <Select
+                placeholder="Select a product name"
+                showSearch
+                optionFilterProp="label"
+                options={[
+                  ...new Map(
+                    drinks.map((drink) => [
+                      drink.item_name,
+                      {
+                        value: drink.item_name,
+                        label: drink.item_name,
+                      },
+                    ]),
+                  ).values(),
+                ]}
+                onChange={() => {
+                  form.setFieldValue("unit", undefined);
+                }}
+              />
             </Form.Item>
           </Col>
 
@@ -222,9 +243,18 @@ const AddSupplyDrinksModal: React.FC<AddSupplyDrinksModalProps> = ({
             <Form.Item
               label="Unit"
               name="unit"
-              rules={[{ required: true, message: "Please enter unit" }]}
+              rules={[{ required: true, message: "Please select a unit" }]}
             >
-              <Input style={{ width: "100%" }} />
+              <Select
+                placeholder={
+                  selectedProduct ? "Select a unit" : "Select product first"
+                }
+                disabled={!selectedProduct || unitOptions.length === 0}
+                options={unitOptions.map((unit) => ({
+                  value: unit,
+                  label: unit,
+                }))}
+              />
             </Form.Item>
           </Col>
         </Row>

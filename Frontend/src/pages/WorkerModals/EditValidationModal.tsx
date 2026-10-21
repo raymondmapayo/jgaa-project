@@ -65,39 +65,42 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
       });
 
       if (paymentStatus === "Paid") {
-        // 1. Update order status
-        const { data } = await axios.put(`${apiUrl}/update_order_status`, {
+        // 1. Process drinks inventory
+        await axios.post(
+          `${apiUrl}/update_order_drinks_payment_status/${order.order_id}`,
+          {
+            paymentStatus: "paid",
+          },
+        );
+
+        // 2. Process ingredient inventory and record worker ID
+        const { data } = await axios.post(
+          `${apiUrl}/update_order_payment_status/${order.order_id}`,
+          {
+            paymentStatus: "paid",
+            created_by: workerId,
+          },
+        );
+
+        // 3. Update order status and record the worker
+        await axios.put(`${apiUrl}/update_order_status`, {
           order_id: order?.order_id,
           payment_status: "paid",
           created_by: workerId,
         });
 
-        // 2. Update transaction status
+        // 4. Update transaction status
         await axios.put(`${apiUrl}/update_transaction_status`, {
           order_id: order?.order_id,
           status: "completed",
         });
-
-        // 3. Update payment status
-        await axios.put(`${apiUrl}/update_payment_status`, {
-          order_id: order?.order_id,
-          payment_status: "paid",
-        });
-
-        // 4. Update order payment status
-        await axios.post(
-          `${apiUrl}/update_order_payment_status/${order.order_id}`,
-          {
-            paymentStatus: "paid",
-          },
-        );
 
         // 5. Update the order in the current table
         if (onUpdateOrder && data.updatedOrder) {
           onUpdateOrder(data.updatedOrder);
         }
 
-        // 6. 🔥 Refresh the orders from backend
+        // 6. Refresh the orders from backend
         if (onSuccess) {
           await onSuccess();
         }
@@ -122,7 +125,10 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
       console.error("Error saving order:", error);
 
       antdMessage.error(
-        error.response?.data?.error || "Failed to save changes.",
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          error.message ||
+          "Failed to save changes.",
       );
     } finally {
       setLoading(false);
