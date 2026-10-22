@@ -22,6 +22,8 @@ import { FiCalendar, FiFilter } from "react-icons/fi";
 
 import WelcomeCard from "./WelcomeCard";
 import ShowCard from "./ShowCard";
+import { getWorkerDashboardCardData } from "./WorkerDashboardCardData";
+import StatCards from "./StatCards";
 
 interface Category {
   categories_id: number;
@@ -178,55 +180,12 @@ const WorkerDashboard = () => {
   const formattedTotalCategories =
     totalCategories !== null ? `${totalCategories.toLocaleString()}` : "...";
 
-  const cardData = [
-    {
-      title: "Total Products",
-      value: formattedTotalProducts,
-      icon: <FaBoxOpen size={20} />,
-      color: "text-blue-500",
-      change: changeData.change,
-      changeType: changeData.changeType,
-      link: "view more",
-      onClick: openProductsModal,
-    },
-    {
-      title: "Total Categories",
-      value: formattedTotalCategories,
-      icon: <FaTags size={20} />,
-      color: "text-red-500",
-      change: categoriesChangeData.change,
-      changeType: categoriesChangeData.changeType,
-      link: "view more",
-      onClick: openCategoriesModal,
-    },
-    {
-      title: "Total Sales",
-      value: "$18,645",
-      icon: <FaShoppingCart size={20} />,
-      color: "text-purple-500",
-      change: "+24%",
-      changeType: "down",
-      link: "view more",
-    },
-    {
-      title: "Total Revenue",
-      value: "$34,876",
-      icon: <FaDollarSign size={20} />,
-      color: "text-green-500",
-      change: "+0.26%",
-      changeType: "up",
-      link: "view more",
-    },
-    {
-      title: "Total Expenses",
-      value: "$73,579",
-      icon: <FaWallet size={20} />,
-      color: "text-yellow-500",
-      change: "+0.6%",
-      changeType: "up",
-      link: "view more",
-    },
-  ];
+  const cardData = getWorkerDashboardCardData({
+    totalProducts: formattedTotalProducts,
+    totalCategories: formattedTotalCategories,
+    onProductsClick: openProductsModal,
+    onCategoriesClick: openCategoriesModal,
+  });
 
   return (
     <div
@@ -328,54 +287,9 @@ const WorkerDashboard = () => {
         </div>
       </div>
 
-      {/* 🔸 Cards */}
-      <div className="bg-[#fafafa] dark:bg-[#1e293b] flex flex-wrap justify-center gap-6 p-6 rounded-lg ">
-        {cardData.map((card, index) => (
-          <div
-            key={index}
-            className="group rounded-2xl bg-[#fafafa] dark:bg-[rgb(0,51,102)] p-4 flex-1 min-w-[200px] max-w-[250px] shadow-md hover:bg-[rgb(0,51,102)] dark:hover:bg-[rgb(0,41,82)] transition-colors duration-300"
-          >
-            <div className="flex justify-between items-center">
-              <div className="font-bold">
-                <h1 className="capitalize text-sm font-medium text-gray-500 group-hover:text-[#fafafa] dark:text-[#fafafa]">
-                  {card.title}
-                </h1>
-                <p className="text-2xl font-semibold my-4 group-hover:text-[#fafafa] dark:text-[#fafafa]">
-                  {card.value}
-                </p>
-              </div>
-              <div
-                className={`text-3xl ${card.color} bg-gray-100 dark:bg-transparent p-4 rounded-md group-hover:bg-transparent group-hover:text-[#fafafa] dark:text-[#fafafa] transition-colors`}
-              >
-                {card.icon}
-              </div>
-            </div>
-            <div className="flex justify-between items-center mt-4">
-              <p
-                className={`text-[10px] px-2 py-1 rounded-full ${
-                  card.changeType === "up" ? "text-green-500" : "text-red-500"
-                } group-hover:text-[#fafafa] dark:text-[#fafafa]`}
-              >
-                {card.change}
-              </p>
-              {card.onClick ? (
-                <button
-                  className="px-2 py-1 rounded-full text-green-600 group-hover:text-[#fafafa] dark:text-[#fafafa]"
-                  onClick={card.onClick}
-                >
-                  {card.link}
-                </button>
-              ) : (
-                <a
-                  href="#"
-                  className="px-2 py-1 rounded-full text-green-600 group-hover:text-[#fafafa] dark:text-[#fafafa]"
-                >
-                  {card.link}
-                </a>
-              )}
-            </div>
-          </div>
-        ))}
+      {/* 🔸 Dashboard Statistic Cards */}
+      <div className="rounded-2xl bg-gray-50 p-4 sm:p-6 dark:bg-[#1e293b]">
+        <StatCards cards={cardData} />
       </div>
 
       {/* 🔸 Charts */}

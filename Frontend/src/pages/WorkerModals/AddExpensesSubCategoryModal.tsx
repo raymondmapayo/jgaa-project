@@ -1,18 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { DeleteOutlined } from "@ant-design/icons";
-import {
-  Button,
-  Form,
-  Input,
-  message,
-  Modal,
-  Popconfirm,
-  Table,
-  Row,
-  Col,
-} from "antd";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { Button, Form, Input, message, Modal, Popconfirm, Table } from "antd";
 import axios from "axios";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 interface AddExpensesSubCategoryModalProps {
   visible: boolean;
@@ -26,6 +16,7 @@ const AddExpensesSubCategoryModal: React.FC<
   const [form] = Form.useForm();
   const [queueList, setQueueList] = useState<any[]>([]); // queue
   const [existingCategories, setExistingCategories] = useState<any[]>([]); // already in DB
+  const [submitting, setSubmitting] = useState<"one" | "all" | null>(null);
   const apiUrl = import.meta.env.VITE_API_URL;
   const user_id = sessionStorage.getItem("user_id");
   // Fetch existing categories when modal opens
@@ -63,6 +54,8 @@ const AddExpensesSubCategoryModal: React.FC<
       return;
     }
 
+    setSubmitting("one");
+
     try {
       const response = await axios.post(`${apiUrl}/add_expenses_subcategory`, {
         subcategory: values.subcategory,
@@ -85,6 +78,8 @@ const AddExpensesSubCategoryModal: React.FC<
       console.error("Error adding subcategory:", error);
 
       message.error("Failed to add subcategory. Try again.");
+    } finally {
+      setSubmitting(null);
     }
   };
 
@@ -121,6 +116,8 @@ const AddExpensesSubCategoryModal: React.FC<
 
   // Insert all queued categories to DB
   const handleInsertAll = async () => {
+    setSubmitting("all");
+
     try {
       const addedSubCategories = [];
 
@@ -155,14 +152,26 @@ const AddExpensesSubCategoryModal: React.FC<
       console.error("Error inserting queued subcategories:", error);
 
       message.error("Failed to insert queued subcategories. Try again.");
+    } finally {
+      setSubmitting(null);
     }
   };
 
   const columns = [
-    { title: "Category Name", dataIndex: "subcategory", key: "subcategory" },
+    {
+      title: "Subcategory",
+      dataIndex: "subcategory",
+      key: "subcategory",
+      render: (name: string) => (
+        <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
+          {name}
+        </span>
+      ),
+    },
     {
       title: "Action",
       key: "action",
+      width: 80,
       render: (_: any, __: any, index: number) => (
         <Popconfirm
           title="Remove this subcategory?"
@@ -196,55 +205,126 @@ const AddExpensesSubCategoryModal: React.FC<
 
   return (
     <Modal
-      title="Add Expense Sub Category"
       open={visible}
       onCancel={handleCancel}
       footer={null}
-      width={500}
+      width={540}
+      centered
+      styles={{
+        content: { padding: 0, borderRadius: 28, overflow: "hidden" },
+        body: { padding: 0 },
+      }}
     >
-      <Form form={form} layout="vertical">
-        <Form.Item
-          label="Sub Category Name"
-          name="subcategory"
-          rules={[{ required: true, message: "Please enter subcategory name" }]}
-        >
-          <Input placeholder="Enter subcategory name" />
-        </Form.Item>
+      {/* ================= Header ================= */}
+      <div className="relative overflow-hidden bg-[radial-gradient(circle_at_top_right,#dbeafe,transparent_55%),radial-gradient(circle_at_bottom_left,#e0f2fe,transparent_50%)] bg-white px-6 pb-5 pt-6 sm:px-8">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full border border-blue-200/70" />
+        <div className="pointer-events-none absolute -right-2 -top-2 h-20 w-20 rounded-full border border-blue-200/70" />
 
-        <Row justify="end" gutter={16} className="mb-4">
-          <Col>
-            <Button onClick={handleCancel}>Cancel</Button>
-          </Col>
-          <Col>
-            <Button onClick={handleAddOneClick}>Add One</Button>
-          </Col>
-          <Col>
-            <Button type="primary" onClick={handleAddToListClick}>
-              Add to List
-            </Button>
-          </Col>
-        </Row>
-      </Form>
-
-      {/* Queue Table */}
-      {queueList.length > 0 && (
-        <>
-          <Table
-            dataSource={queueList.map((item, index) => ({
-              ...item,
-              key: index,
-            }))}
-            columns={columns}
-            pagination={false}
-            bordered
-          />
-          <div className="flex justify-end mt-3">
-            <Button type="primary" onClick={handleInsertAll}>
-              Insert All
-            </Button>
+        <div className="relative flex items-center gap-4">
+          <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-xl text-white shadow-lg shadow-blue-500/30">
+            <PlusOutlined />
+          </span>
+          <div className="min-w-0">
+            <h2 className="m-0 text-xl font-extrabold leading-tight text-gray-900">
+              Add expense subcategory
+            </h2>
+            <p className="m-0 mt-0.5 text-sm text-gray-500">
+              Add one now, or queue several and insert them together.
+            </p>
           </div>
-        </>
-      )}
+        </div>
+      </div>
+
+      {/* ================= Body (scrolls if tall) ================= */}
+      <div className="max-h-[72vh] overflow-y-auto bg-white px-6 pb-6 pt-5 sm:px-8">
+        <Form form={form} layout="vertical" requiredMark={false}>
+          <Form.Item
+            label={<span className="font-semibold">Subcategory name</span>}
+            name="subcategory"
+            rules={[
+              { required: true, message: "Please enter subcategory name" },
+            ]}
+          >
+            <Input
+              size="large"
+              placeholder="Enter subcategory name"
+              className="rounded-xl"
+              onPressEnter={handleAddToListClick}
+            />
+          </Form.Item>
+
+          <div className="border-t border-dashed border-gray-200 pt-5">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                size="large"
+                onClick={handleCancel}
+                disabled={submitting !== null}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="large"
+                onClick={handleAddOneClick}
+                loading={submitting === "one"}
+                disabled={submitting === "all"}
+              >
+                Add one
+              </Button>
+              <Button
+                size="large"
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleAddToListClick}
+                disabled={submitting !== null}
+              >
+                Add to list
+              </Button>
+            </div>
+
+            <p className="m-0 mt-3 text-xs text-gray-500 sm:text-right">
+              <strong>Add one</strong> saves it right away.{" "}
+              <strong>Add to list</strong> queues it so you can insert several
+              at once. Press Enter to add to the list.
+            </p>
+          </div>
+        </Form>
+
+        {/* Queue */}
+        {queueList.length > 0 && (
+          <div className="mt-6 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="m-0 text-base font-bold text-gray-900">
+                Queued subcategories
+              </h3>
+              <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white">
+                {queueList.length}
+              </span>
+            </div>
+
+            <Table
+              dataSource={queueList.map((item, index) => ({
+                ...item,
+                key: index,
+              }))}
+              columns={columns}
+              pagination={false}
+              size="small"
+            />
+
+            <div className="mt-4 flex justify-end">
+              <Button
+                size="large"
+                type="primary"
+                onClick={handleInsertAll}
+                loading={submitting === "all"}
+                disabled={submitting === "one"}
+              >
+                Insert all ({queueList.length})
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </Modal>
   );
 };

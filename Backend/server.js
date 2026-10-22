@@ -369,7 +369,36 @@ app.get("/ingredients_items", (request, response) => {
     return response.json(data);
   });
 });
+app.get("/get_supply_ingredients_dropdown", (req, res) => {
+  const sql = `
+    SELECT
+      product_name AS ingredients_name,
+      unit
+    FROM supply_tbl
+    WHERE product_name IS NOT NULL
+      AND TRIM(product_name) != ''
+      AND unit IS NOT NULL
+      AND TRIM(unit) != ''
+    GROUP BY product_name, unit
+    ORDER BY product_name ASC
+  `;
 
+  db.query(sql, (err, rows) => {
+    if (err) {
+      console.error("Error fetching supply ingredients:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch supply ingredients.",
+      });
+    }
+
+    res.json({
+      success: true,
+      ingredients: rows,
+    });
+  });
+});
 // @ts-ignore
 
 app.get("/menu_items_drinks", async (request, response) => {
@@ -493,71 +522,143 @@ app.post(
 );
 
 app.post("/add_ingredients", (req, res) => {
-  const { ingredients_name, unit, category, measurement, created_by } =
-    req.body;
+  const {
+    ingredients_name,
+    unit: requestedUnit,
+    category,
+    measurement,
+    created_by,
+  } = req.body;
 
-  if (!ingredients_name || !unit || !category || !measurement || !created_by) {
-    return res.status(400).json({ message: "All fields are required" });
+  if (
+    !ingredients_name ||
+    !requestedUnit ||
+    !category ||
+    measurement == null ||
+    String(measurement).trim() === "" ||
+    !created_by
+  ) {
+    return res.status(400).json({
+      message: "All fields are required",
+    });
   }
 
-  db.query(
-    "SELECT menu_id FROM menu_tbl WHERE item_name = ?",
-    [category],
-    (err, menu) => {
-      if (err) return res.status(500).json({ message: "Database error" });
-      if (!menu.length)
-        return res
-          .status(400)
-          .json({ message: "Selected category/item does not exist" });
+  // 1. Fetch and validate ingredient name and unit from supply_tbl
+  const supplySql = `
+    SELECT product_name, unit
+    FROM supply_tbl
+    WHERE LOWER(TRIM(product_name)) = LOWER(TRIM(?))
+      AND LOWER(TRIM(unit)) = LOWER(TRIM(?))
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
 
-      const menu_id = menu[0].menu_id;
-      const date_created = new Date();
+  db.query(supplySql, [ingredients_name, requestedUnit], (err, supplies) => {
+    if (err) {
+      console.error("Supply lookup error:", err);
+      return res.status(500).json({
+        message: "Failed to fetch ingredient from supply_tbl",
+      });
+    }
 
-      db.query(
-        `INSERT INTO ingredients_tbl
-        (ingredients_name, unit, measurement, date_created, item_name, menu_id, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          ingredients_name,
-          unit,
-          measurement,
-          date_created,
-          category,
-          menu_id,
-          created_by,
-        ],
-        (err2, result) => {
-          if (err2) return res.status(500).json({ message: "Database error" });
+    if (!supplies.length) {
+      return res.status(400).json({
+        message: "Ingredient name or unit not found in supply_tbl",
+      });
+    }
 
-          db.query(
-            "UPDATE menu_tbl SET availability = 'Available' WHERE menu_id = ?",
-            [menu_id],
-            (err3) => {
-              if (err3)
-                return res.status(500).json({
-                  message: "Ingredient added but menu update failed",
-                });
+    // Actual values fetched from the database
+    const ingredientName = supplies[0].product_name;
+    const unit = supplies[0].unit;
 
-              // ✅ KEPT RESPONSE (UNCHANGED)
-              res.status(200).json({
-                message: "Ingredient added successfully",
-                id: result.insertId,
-                ingredient: {
-                  ingredients_name,
-                  unit,
-                  measurement,
-                  item_name: category,
-                  menu_id,
-                  date_created,
-                  created_by,
-                },
+    // 2. Fetch menu_id using the selected food category
+    db.query(
+      "SELECT menu_id FROM menu_tbl WHERE item_name = ? LIMIT 1",
+      [category],
+      (err2, menu) => {
+        if (err2) {
+          console.error("Menu lookup error:", err2);
+          return res.status(500).json({
+            message: "Database error fetching menu",
+          });
+        }
+
+        if (!menu.length) {
+          return res.status(400).json({
+            message: "Selected category/item does not exist",
+          });
+        }
+
+        const menu_id = menu[0].menu_id;
+        const date_created = new Date();
+
+        // 3. Insert ingredient using the name and unit from supply_tbl
+        const insertSql = `
+            INSERT INTO ingredients_tbl
+            (
+              ingredients_name,
+              unit,
+              measurement,
+              date_created,
+              item_name,
+              menu_id,
+              created_by
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `;
+
+        db.query(
+          insertSql,
+          [
+            ingredientName,
+            unit,
+            measurement,
+            date_created,
+            category,
+            menu_id,
+            created_by,
+          ],
+          (err3, result) => {
+            if (err3) {
+              console.error("Ingredient insert error:", err3);
+              return res.status(500).json({
+                message: "Failed to insert ingredient",
               });
-            },
-          );
-        },
-      );
-    },
-  );
+            }
+
+            // 4. Update menu availability
+            db.query(
+              "UPDATE menu_tbl SET availability = 'Available' WHERE menu_id = ?",
+              [menu_id],
+              (err4) => {
+                if (err4) {
+                  console.error("Menu availability update error:", err4);
+
+                  return res.status(500).json({
+                    message: "Ingredient added but menu update failed",
+                  });
+                }
+
+                return res.status(200).json({
+                  message: "Ingredient added successfully",
+                  id: result.insertId,
+                  ingredient: {
+                    ingredients_name: ingredientName,
+                    unit,
+                    measurement,
+                    item_name: category,
+                    menu_id,
+                    date_created,
+                    created_by,
+                  },
+                });
+              },
+            );
+          },
+        );
+      },
+    );
+  });
 });
 
 // Get ingredient name by ID

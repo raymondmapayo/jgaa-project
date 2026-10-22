@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { UploadOutlined } from "@ant-design/icons";
+import {
+  InfoCircleOutlined,
+  PlusOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
 import {
   Button,
   Col,
@@ -15,7 +19,7 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface AddMenuFormProps {
   isAddModalVisible: boolean;
@@ -33,12 +37,24 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<
     string | number | null
   >(null);
+  const [submitting, setSubmitting] = useState<"one" | "all" | null>(null);
 
   const user_id = sessionStorage.getItem("user_id");
 
   // Temporary queue for multiple menu items.
   const [menuList, setMenuList] = useState<any[]>([]);
   const [existingMenus, setExistingMenus] = useState<any[]>([]);
+
+  // Keeps one preview URL per queued file (avoids creating a new one every render)
+  const previewUrls = useRef(new WeakMap<File, string>());
+  const getPreviewUrl = (file: File) => {
+    let url = previewUrls.current.get(file);
+    if (!url) {
+      url = URL.createObjectURL(file);
+      previewUrls.current.set(file, url);
+    }
+    return url;
+  };
 
   const apiUrl = import.meta.env.VITE_API_URL;
 
@@ -243,6 +259,8 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
         return;
       }
 
+      setSubmitting("one");
+
       const formData = createMenuFormData(values, file);
 
       console.log("Submitting menu...", {
@@ -301,12 +319,16 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
           description: error.message || "Failed to add menu.",
         });
       }
+    } finally {
+      setSubmitting(null);
     }
   };
 
   // Submit all queued items.
   const handleSubmitAll = async () => {
     if (menuList.length === 0) return;
+
+    setSubmitting("all");
 
     let successCount = 0;
     let failedCount = 0;
@@ -368,11 +390,36 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
         }),
       );
     }
+
+    setSubmitting(null);
   };
 
   const columns: ColumnsType<any> = [
-    { title: "Menu Name", dataIndex: "item_name" },
-    { title: "Category", dataIndex: "categoryName" },
+    {
+      title: "Menu",
+      dataIndex: "item_name",
+      render: (name: string, record: any) => (
+        <div className="flex min-w-[200px] items-center gap-3">
+          {record.menu_img && (
+            <img
+              src={getPreviewUrl(record.menu_img)}
+              alt={name}
+              className="h-12 w-12 flex-shrink-0 rounded-xl object-cover shadow-sm ring-2 ring-white"
+            />
+          )}
+          <span className="font-semibold text-gray-900">{name}</span>
+        </div>
+      ),
+    },
+    {
+      title: "Category",
+      dataIndex: "categoryName",
+      render: (text: string) => (
+        <span className="whitespace-nowrap rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+          {text}
+        </span>
+      ),
+    },
     {
       title: "Unit",
       dataIndex: "unit",
@@ -380,27 +427,14 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
         isDrinksCategory(record.categories_id) ? unit || "Not selected" : "—",
     },
     {
-      title: "Menu Image",
-      dataIndex: "menu_img",
-      render: (file: File) => {
-        if (!file) return null;
-
-        const url = URL.createObjectURL(file);
-
-        return (
-          <img
-            src={url}
-            alt="menu"
-            style={{
-              width: 50,
-              height: 50,
-              objectFit: "cover",
-            }}
-          />
-        );
-      },
+      title: "Price",
+      dataIndex: "price",
+      render: (price: any) => (
+        <span className="whitespace-nowrap font-bold text-gray-900">
+          ₱{Number(price).toLocaleString()}
+        </span>
+      ),
     },
-    { title: "Price", dataIndex: "price" },
     {
       title: "Action",
       render: (_: any, _record: any, index: number) => (
@@ -413,236 +447,315 @@ const AddMenuForm: React.FC<AddMenuFormProps> = ({
 
   return (
     <Modal
-      title="Add New Menu"
       open={isAddModalVisible}
       onCancel={onClose}
       footer={null}
-      width={600}
+      width={680}
+      centered
+      styles={{
+        content: { padding: 0, borderRadius: 28, overflow: "hidden" },
+        body: { padding: 0 },
+      }}
     >
-      <div className="mb-4 p-3 rounded-md bg-blue-50 border border-blue-200 text-sm text-blue-700">
-        <strong>Important:</strong> After adding a menu, please go to
-        <span className="font-semibold"> Ingredients Management </span>
-        and assign ingredients to food menus.
-        <br />
-        Menus <strong>without ingredients</strong> may not be displayed on the
-        client side, depending on your existing menu logic.
+      {/* ================= Header ================= */}
+      <div className="relative overflow-hidden bg-[radial-gradient(circle_at_top_right,#dbeafe,transparent_55%),radial-gradient(circle_at_bottom_left,#e0f2fe,transparent_50%)] bg-white px-6 pb-5 pt-6 sm:px-8">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full border border-blue-200/70" />
+        <div className="pointer-events-none absolute -right-2 -top-2 h-20 w-20 rounded-full border border-blue-200/70" />
+
+        <div className="relative flex items-center gap-4">
+          <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-xl text-white shadow-lg shadow-blue-500/30">
+            <PlusOutlined />
+          </span>
+          <div className="min-w-0">
+            <h2 className="m-0 text-xl font-extrabold leading-tight text-gray-900">
+              Add new menu
+            </h2>
+            <p className="m-0 mt-0.5 text-sm text-gray-500">
+              Add one menu now, or queue several and insert them together.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <Form
-        layout="vertical"
-        form={form}
-        onValuesChange={(changedValues) => {
-          if (changedValues.categories_id !== undefined) {
-            handleCategoryChange(changedValues.categories_id);
-          }
-        }}
-      >
-        {/* First Row: Menu Name and Category */}
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              label="Menu Name"
-              name="item_name"
-              rules={[
-                {
-                  required: true,
-                  message: "Menu name is required",
-                },
-              ]}
-            >
-              <Input />
-            </Form.Item>
-          </Col>
-
-          <Col span={12}>
-            <Form.Item
-              label="Category"
-              name="categories_id"
-              rules={[
-                {
-                  required: true,
-                  message: "Category is required",
-                },
-              ]}
-            >
-              <Select
-                placeholder="Select a category"
-                optionLabelProp="label"
-                onChange={(value) => {
-                  setSelectedCategory(value);
-                  form.setFieldsValue({ unit: undefined });
-                }}
-              >
-                {categories.map((category: any) => (
-                  <Select.Option
-                    key={category.categories_id}
-                    value={category.categories_id}
-                    label={category.categories_name}
-                  >
-                    <Radio
-                      checked={
-                        String(selectedCategory) ===
-                        String(category.categories_id)
-                      }
-                      style={{
-                        pointerEvents: "none",
-                        marginRight: 8,
-                      }}
-                    />
-                    {category.categories_name}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* Unit: only shown for Drinks */}
-        {isDrinksCategory(selectedCategory) && (
-          <Form.Item
-            label="Drink Unit"
-            name="unit"
-            rules={[
-              {
-                required: true,
-                message: "Please select the drink unit",
-              },
-            ]}
-          >
-            <Select placeholder="Select drink unit">
-              <Select.Option value="liters">Liters</Select.Option>
-              <Select.Option value="ml">Milliliters (ml)</Select.Option>
-              <Select.Option value="kg">Kilograms (kg)</Select.Option>
-              <Select.Option value="bottle">Bottle</Select.Option>
-              <Select.Option value="can">Can</Select.Option>
-              <Select.Option value="piece">Piece</Select.Option>
-            </Select>
-          </Form.Item>
-        )}
-
-        {/* Second Row: Price and Image */}
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              label="Price"
-              name="price"
-              rules={[
-                {
-                  required: true,
-                  message: "Price is required",
-                },
-              ]}
-            >
-              <Input type="number" min={0} />
-            </Form.Item>
-          </Col>
-
-          <Col span={12}>
-            <Form.Item
-              label="Menu Image"
-              name="menu_img"
-              valuePropName="fileList"
-              getValueFromEvent={(e) => e?.fileList}
-              rules={[
-                {
-                  required: true,
-                  message: "Menu image is required",
-                },
-              ]}
-            >
-              <Upload
-                beforeUpload={(file) => {
-                  const isValidType = [
-                    "image/png",
-                    "image/jpeg",
-                    "image/jpg",
-                  ].includes(file.type);
-
-                  if (!isValidType) {
-                    notification.error({
-                      message: "Invalid File Type",
-                      description:
-                        "Only .png, .jpg, and .jpeg pictures are allowed.",
-                    });
-
-                    return Upload.LIST_IGNORE;
-                  }
-
-                  return false;
-                }}
-                maxCount={1}
-                listType="picture"
-              >
-                <Button icon={<UploadOutlined />}>Upload Image</Button>
-              </Upload>
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* Third Row: Description */}
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item label="Description" name="description">
-              <Input.TextArea rows={3} />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* Form Buttons */}
-        <div className="flex justify-end gap-2 mb-4">
-          <Button
-            onClick={() => {
-              form.resetFields();
-              setSelectedCategory(null);
-            }}
-          >
-            Clear
-          </Button>
-
-          <Button
-            onClick={() => {
-              form
-                .validateFields()
-                .then((values) => handleSubmitOne(values))
-                .catch(() => {});
-            }}
-          >
-            Add One
-          </Button>
-
-          <Button
-            type="primary"
-            onClick={() => {
-              form
-                .validateFields()
-                .then((values) => handleAddToList(values))
-                .catch(() => {});
-            }}
-          >
-            Add to List
-          </Button>
+      {/* ================= Body (scrolls if tall) ================= */}
+      <div className="max-h-[72vh] overflow-y-auto bg-white px-6 pb-6 pt-5 sm:px-8">
+        {/* Important note */}
+        <div className="mb-5 flex gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+          <InfoCircleOutlined className="mt-0.5 flex-shrink-0 text-base text-blue-600" />
+          <p className="m-0 leading-relaxed">
+            <strong>Important:</strong> After adding a menu, go to{" "}
+            <span className="font-semibold">Ingredients Management</span> and
+            assign ingredients to food menus. Menus{" "}
+            <strong>without ingredients</strong> may not be displayed on the
+            client side, depending on your existing menu logic.
+          </p>
         </div>
-      </Form>
 
-      {/* Queue Table */}
-      {menuList.length > 0 && (
-        <>
-          <Table
-            dataSource={menuList}
-            columns={columns}
-            rowKey={(_, index) => index!.toString()}
-            pagination={false}
-            scroll={{ x: 800 }}
-            size="small"
-          />
+        <Form
+          layout="vertical"
+          form={form}
+          requiredMark={false}
+          onValuesChange={(changedValues) => {
+            if (changedValues.categories_id !== undefined) {
+              handleCategoryChange(changedValues.categories_id);
+            }
+          }}
+        >
+          {/* Menu Name and Category */}
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={<span className="font-semibold">Menu name</span>}
+                name="item_name"
+                rules={[
+                  {
+                    required: true,
+                    message: "Menu name is required",
+                  },
+                ]}
+              >
+                <Input size="large" className="rounded-xl" />
+              </Form.Item>
+            </Col>
 
-          <div className="flex justify-end mt-3">
-            <Button type="primary" onClick={handleSubmitAll}>
-              Insert All
-            </Button>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={<span className="font-semibold">Category</span>}
+                name="categories_id"
+                rules={[
+                  {
+                    required: true,
+                    message: "Category is required",
+                  },
+                ]}
+              >
+                <Select
+                  size="large"
+                  placeholder="Select a category"
+                  optionLabelProp="label"
+                  onChange={(value) => {
+                    setSelectedCategory(value);
+                    form.setFieldsValue({ unit: undefined });
+                  }}
+                >
+                  {categories.map((category: any) => (
+                    <Select.Option
+                      key={category.categories_id}
+                      value={category.categories_id}
+                      label={category.categories_name}
+                    >
+                      <Radio
+                        checked={
+                          String(selectedCategory) ===
+                          String(category.categories_id)
+                        }
+                        style={{
+                          pointerEvents: "none",
+                          marginRight: 8,
+                        }}
+                      />
+                      {category.categories_name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Unit: only shown for Drinks */}
+          {isDrinksCategory(selectedCategory) && (
+            <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+              <Form.Item
+                label={<span className="font-semibold">Drink unit</span>}
+                name="unit"
+                extra="Drinks need a unit so different sizes can be saved separately."
+                style={{ marginBottom: 0 }}
+                rules={[
+                  {
+                    required: true,
+                    message: "Please select the drink unit",
+                  },
+                ]}
+              >
+                <Select size="large" placeholder="Select drink unit">
+                  <Select.Option value="liters">Liters</Select.Option>
+                  <Select.Option value="ml">Milliliters (ml)</Select.Option>
+                  <Select.Option value="kg">Kilograms (kg)</Select.Option>
+                  <Select.Option value="bottle">Bottle</Select.Option>
+                  <Select.Option value="can">Can</Select.Option>
+                  <Select.Option value="piece">Piece</Select.Option>
+                </Select>
+              </Form.Item>
+            </div>
+          )}
+
+          {/* Price and Image */}
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={<span className="font-semibold">Price</span>}
+                name="price"
+                rules={[
+                  {
+                    required: true,
+                    message: "Price is required",
+                  },
+                ]}
+              >
+                <Input
+                  size="large"
+                  type="number"
+                  min={0}
+                  prefix="₱"
+                  className="rounded-xl"
+                />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={<span className="font-semibold">Menu image</span>}
+                name="menu_img"
+                valuePropName="fileList"
+                getValueFromEvent={(e) => e?.fileList}
+                extra="PNG, JPG or JPEG"
+                rules={[
+                  {
+                    required: true,
+                    message: "Menu image is required",
+                  },
+                ]}
+              >
+                <Upload
+                  beforeUpload={(file) => {
+                    const isValidType = [
+                      "image/png",
+                      "image/jpeg",
+                      "image/jpg",
+                    ].includes(file.type);
+
+                    if (!isValidType) {
+                      notification.error({
+                        message: "Invalid File Type",
+                        description:
+                          "Only .png, .jpg, and .jpeg pictures are allowed.",
+                      });
+
+                      return Upload.LIST_IGNORE;
+                    }
+
+                    return false;
+                  }}
+                  maxCount={1}
+                  listType="picture"
+                >
+                  <Button size="large" icon={<UploadOutlined />} block>
+                    Upload image
+                  </Button>
+                </Upload>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Description */}
+          <Form.Item
+            label={<span className="font-semibold">Description</span>}
+            name="description"
+          >
+            <Input.TextArea
+              rows={3}
+              maxLength={300}
+              showCount
+              className="rounded-xl"
+            />
+          </Form.Item>
+
+          {/* Form buttons */}
+          <div className="border-t border-dashed border-gray-200 pt-5">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                size="large"
+                onClick={() => {
+                  form.resetFields();
+                  setSelectedCategory(null);
+                }}
+              >
+                Clear
+              </Button>
+
+              <Button
+                size="large"
+                loading={submitting === "one"}
+                disabled={submitting === "all"}
+                onClick={() => {
+                  form
+                    .validateFields()
+                    .then((values) => handleSubmitOne(values))
+                    .catch(() => {});
+                }}
+              >
+                Add one
+              </Button>
+
+              <Button
+                size="large"
+                type="primary"
+                icon={<PlusOutlined />}
+                disabled={submitting !== null}
+                onClick={() => {
+                  form
+                    .validateFields()
+                    .then((values) => handleAddToList(values))
+                    .catch(() => {});
+                }}
+              >
+                Add to list
+              </Button>
+            </div>
+
+            <p className="m-0 mt-3 text-xs text-gray-500 sm:text-right">
+              <strong>Add one</strong> saves it right away.{" "}
+              <strong>Add to list</strong> queues it so you can insert several
+              menus at once.
+            </p>
           </div>
-        </>
-      )}
+        </Form>
+
+        {/* Queue */}
+        {menuList.length > 0 && (
+          <div className="mt-6 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="m-0 text-base font-bold text-gray-900">
+                Queued menus
+              </h3>
+              <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white">
+                {menuList.length}
+              </span>
+            </div>
+
+            <Table
+              dataSource={menuList}
+              columns={columns}
+              rowKey={(_, index) => index!.toString()}
+              pagination={false}
+              scroll={{ x: 640 }}
+              size="small"
+            />
+
+            <div className="mt-4 flex justify-end">
+              <Button
+                size="large"
+                type="primary"
+                loading={submitting === "all"}
+                disabled={submitting === "one"}
+                onClick={handleSubmitAll}
+              >
+                Insert all ({menuList.length})
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </Modal>
   );
 };

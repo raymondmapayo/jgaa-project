@@ -1,19 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { DeleteOutlined, UploadOutlined } from "@ant-design/icons";
+import {
+  DeleteOutlined,
+  PlusOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
 import {
   Button,
-  Col,
   Form,
   Input,
   Modal,
   notification,
   Popconfirm,
-  Row,
   Table,
   Upload,
 } from "antd";
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface AddCategoriesFormProps {
   isAddModalVisible: boolean;
@@ -34,6 +36,19 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
   const [isAddingToList, setIsAddingToList] = useState(false);
   const [isInsertingSingle, setIsInsertingSingle] = useState(false);
   const [isInsertingAll, setIsInsertingAll] = useState(false);
+
+  // Keeps one preview URL per queued file (avoids creating a new one every render)
+  const previewUrls = useRef(new WeakMap<object, string>());
+  const getPreviewUrl = (file: any) => {
+    const key = file.originFileObj;
+    let url = previewUrls.current.get(key);
+    if (!url) {
+      url = URL.createObjectURL(key);
+      previewUrls.current.set(key, url);
+    }
+    return url;
+  };
+
   // Fetch existing categories when modal opens
   useEffect(() => {
     if (isAddModalVisible) {
@@ -230,31 +245,41 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
 
   const columns = [
     {
-      title: "Category Name",
+      title: "Category",
       dataIndex: "categories_name",
       key: "categories_name",
+      render: (_: any, record: any) => (
+        <div className="flex min-w-[200px] items-center gap-3">
+          {record.categories_img?.originFileObj && (
+            <img
+              src={getPreviewUrl(record.categories_img)}
+              alt={record.categories_name}
+              className="h-12 w-12 flex-shrink-0 rounded-xl object-cover shadow-sm ring-2 ring-white"
+            />
+          )}
+          <span className="font-semibold text-gray-900">
+            {record.categories_name}
+          </span>
+        </div>
+      ),
     },
     {
       title: "Description",
       dataIndex: "description",
       key: "description",
-    },
-    {
-      title: "Image",
-      dataIndex: "categories_img",
-      key: "categories_img",
-      render: (file: any) => (
-        <img
-          src={URL.createObjectURL(file.originFileObj)}
-          alt="preview"
-          width={60}
-          height={40}
-        />
-      ),
+      render: (text?: string) =>
+        text ? (
+          <p className="m-0 line-clamp-2 max-w-[220px] text-sm text-gray-500">
+            {text}
+          </p>
+        ) : (
+          <span className="text-gray-400">-</span>
+        ),
     },
     {
       title: "Action",
       key: "action",
+      width: 80,
       render: (_: any, __: any, index: number) => (
         <Popconfirm
           title="Are you sure to remove this category?"
@@ -268,125 +293,167 @@ const AddCategories: React.FC<AddCategoriesFormProps> = ({
 
   return (
     <Modal
-      title="Add New Category"
       open={isAddModalVisible}
       onCancel={handleCancel}
       footer={null}
-      width={500}
+      width={600}
+      centered
+      styles={{
+        content: { padding: 0, borderRadius: 28, overflow: "hidden" },
+        body: { padding: 0 },
+      }}
     >
-      <Form layout="vertical" form={form}>
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item
-              label="Category Name"
-              name="categories_name"
-              rules={[{ required: true, message: "Category name is required" }]}
+      {/* ================= Header ================= */}
+      <div className="relative overflow-hidden bg-[radial-gradient(circle_at_top_right,#dbeafe,transparent_55%),radial-gradient(circle_at_bottom_left,#e0f2fe,transparent_50%)] bg-white px-6 pb-5 pt-6 sm:px-8">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full border border-blue-200/70" />
+        <div className="pointer-events-none absolute -right-2 -top-2 h-20 w-20 rounded-full border border-blue-200/70" />
+
+        <div className="relative flex items-center gap-4">
+          <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-xl text-white shadow-lg shadow-blue-500/30">
+            <PlusOutlined />
+          </span>
+          <div className="min-w-0">
+            <h2 className="m-0 text-xl font-extrabold leading-tight text-gray-900">
+              Add new category
+            </h2>
+            <p className="m-0 mt-0.5 text-sm text-gray-500">
+              Insert one category now, or queue several and insert them
+              together.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ================= Body (scrolls if tall) ================= */}
+      <div className="max-h-[72vh] overflow-y-auto bg-white px-6 pb-6 pt-5 sm:px-8">
+        <Form layout="vertical" form={form} requiredMark={false}>
+          <Form.Item
+            label={<span className="font-semibold">Category name</span>}
+            name="categories_name"
+            rules={[{ required: true, message: "Category name is required" }]}
+          >
+            <Input size="large" className="rounded-xl" />
+          </Form.Item>
+
+          <Form.Item
+            label={<span className="font-semibold">Description</span>}
+            name="description"
+          >
+            <Input.TextArea
+              rows={3}
+              maxLength={300}
+              showCount
+              className="rounded-xl"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label={<span className="font-semibold">Category image</span>}
+            name="categories_img"
+            extra="PNG, JPG or JPEG"
+            rules={[{ required: true, message: "Category image is required" }]}
+          >
+            <Upload
+              beforeUpload={(file) => {
+                const isValidType =
+                  file.type === "image/png" ||
+                  file.type === "image/jpeg" ||
+                  file.type === "image/jpg";
+
+                if (!isValidType) {
+                  notification.error({
+                    message: "Invalid File Type",
+                    description:
+                      "Only .png, .jpg, and .jpeg pictures are allowed.",
+                  });
+                  return Upload.LIST_IGNORE;
+                }
+
+                return false;
+              }}
+              maxCount={1}
+              listType="picture"
             >
-              <Input />
-            </Form.Item>
-          </Col>
-        </Row>
+              <Button size="large" icon={<UploadOutlined />}>
+                Upload category image
+              </Button>
+            </Upload>
+          </Form.Item>
 
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item label="Description" name="description">
-              <Input.TextArea rows={3} />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item
-              label="Category Image"
-              name="categories_img"
-              rules={[
-                { required: true, message: "Category image is required" },
-              ]}
-            >
-              <Upload
-                beforeUpload={(file) => {
-                  const isValidType =
-                    file.type === "image/png" ||
-                    file.type === "image/jpeg" ||
-                    file.type === "image/jpg";
-
-                  if (!isValidType) {
-                    notification.error({
-                      message: "Invalid File Type",
-                      description:
-                        "Only .png, .jpg, and .jpeg pictures are allowed.",
-                    });
-                    return Upload.LIST_IGNORE;
-                  }
-
-                  return false;
-                }}
-                maxCount={1}
-                listType="picture"
-              >
-                <Button icon={<UploadOutlined />}>Upload Category Image</Button>
-              </Upload>
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* Buttons side by side */}
-        <Row justify="end" gutter={16}>
-          <Col>
-            <Button
-              onClick={handleAddToTable}
-              type="dashed"
-              loading={isAddingToList}
-              disabled={isInsertingSingle || isInsertingAll}
-            >
-              {isAddingToList ? "Adding..." : "Add to List"}
-            </Button>
-          </Col>
-          <Col>
-            <Button
-              type="primary"
-              onClick={handleInsertSingle}
-              loading={isInsertingSingle}
-              disabled={isAddingToList || isInsertingAll}
-            >
-              {isInsertingSingle ? "Inserting..." : "Insert Now"}
-            </Button>
-          </Col>
-        </Row>
-      </Form>
-
-      {/* Show list if many are added */}
-      {categoryList.length > 0 && (
-        <div style={{ marginTop: 20 }}>
-          <Table
-            dataSource={categoryList.map((item, index) => ({
-              ...item,
-              key: index,
-            }))}
-            columns={columns}
-            pagination={false}
-            scroll={{ x: 800 }} // 👈 enable horizontal & vertical scroll
-            bordered
-          />
-
-          <Row justify="end" gutter={16} style={{ marginTop: 20 }}>
-            <Col>
-              <Button onClick={handleCancel}>Cancel</Button>
-            </Col>
-            <Col>
+          {/* Buttons */}
+          <div className="border-t border-dashed border-gray-200 pt-5">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
+                size="large"
+                onClick={handleAddToTable}
+                type="dashed"
+                icon={<PlusOutlined />}
+                loading={isAddingToList}
+                disabled={isInsertingSingle || isInsertingAll}
+              >
+                {isAddingToList ? "Adding..." : "Add to list"}
+              </Button>
+              <Button
+                size="large"
+                type="primary"
+                onClick={handleInsertSingle}
+                loading={isInsertingSingle}
+                disabled={isAddingToList || isInsertingAll}
+              >
+                {isInsertingSingle ? "Inserting..." : "Insert now"}
+              </Button>
+            </div>
+
+            <p className="m-0 mt-3 text-xs text-gray-500 sm:text-right">
+              <strong>Insert now</strong> saves it right away.{" "}
+              <strong>Add to list</strong> queues it so you can insert several
+              categories at once.
+            </p>
+          </div>
+        </Form>
+
+        {/* Queue */}
+        {categoryList.length > 0 && (
+          <div className="mt-6 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="m-0 text-base font-bold text-gray-900">
+                Queued categories
+              </h3>
+              <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white">
+                {categoryList.length}
+              </span>
+            </div>
+
+            <Table
+              dataSource={categoryList.map((item, index) => ({
+                ...item,
+                key: index,
+              }))}
+              columns={columns}
+              pagination={false}
+              scroll={{ x: 520 }}
+              size="small"
+            />
+
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button size="large" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button
+                size="large"
                 type="primary"
                 onClick={handleInsertAll}
                 loading={isInsertingAll}
                 disabled={isAddingToList || isInsertingSingle}
               >
-                {isInsertingAll ? "Inserting All..." : "Insert All"}
+                {isInsertingAll
+                  ? "Inserting all..."
+                  : `Insert all (${categoryList.length})`}
               </Button>
-            </Col>
-          </Row>
-        </div>
-      )}
+            </div>
+          </div>
+        )}
+      </div>
     </Modal>
   );
 };

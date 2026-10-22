@@ -1,14 +1,15 @@
 import { Menu } from "antd";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LuNotebookPen } from "react-icons/lu";
 import { AiOutlineMessage } from "react-icons/ai";
 import { RiMenuSearchLine } from "react-icons/ri";
 import { MdOutlineInventory } from "react-icons/md";
 import { RxDashboard } from "react-icons/rx";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { StyledSider } from "../../styled/worker";
 import { LuChartLine } from "react-icons/lu";
 import { TbCategoryPlus } from "react-icons/tb";
+
 interface SidebarProps {
   collapsed: boolean;
   setCollapsed: (value: boolean) => void;
@@ -16,6 +17,8 @@ interface SidebarProps {
 
 const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [openKeys, setOpenKeys] = useState<string[]>(["dashboard"]);
 
   // Load sidebar state from localStorage (default open)
   useEffect(() => {
@@ -55,7 +58,6 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
           label: "Menu Items",
           link: "/Worker/Manage/Menu",
         },
-
         {
           key: "recipe",
           label: "Ingredients & Drinks",
@@ -73,7 +75,6 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
           label: "Inventory & Supplies",
           link: "/Worker/Manage/Inventory",
         },
-
         {
           key: "supply",
           label: "Supply",
@@ -129,6 +130,27 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
     },
   ];
 
+  // Get the selected sidebar item based on the current URL
+  const selectedMenuKey =
+    menuItems
+      .flatMap((item) => item.children || [item])
+      .find((child) => child.link === location.pathname)?.key || "overview";
+
+  // Automatically open the parent menu of the selected child
+  const selectedParentKey = menuItems.find((item) =>
+    item.children?.some((child) => child.key === selectedMenuKey),
+  )?.key;
+
+  useEffect(() => {
+    if (selectedParentKey) {
+      setOpenKeys((prevKeys) =>
+        prevKeys.includes(selectedParentKey)
+          ? prevKeys
+          : [...prevKeys, selectedParentKey],
+      );
+    }
+  }, [selectedParentKey, location.pathname]);
+
   return (
     <StyledSider
       $collapsed={collapsed}
@@ -157,13 +179,9 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
         <Menu
           theme="light"
           mode="inline"
-          defaultOpenKeys={["dashboard"]}
-          defaultSelectedKeys={[
-            menuItems
-              .flatMap((item) => item.children || [item])
-              .find((child) => child.link === window.location.pathname)?.key ||
-              "overview",
-          ]}
+          selectedKeys={[selectedMenuKey]}
+          openKeys={openKeys}
+          onOpenChange={(keys) => setOpenKeys(keys as string[])}
           onClick={({ key }) => {
             // Search both parent and child items
             const found =
@@ -172,7 +190,9 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
                 .flatMap((group) => group.children || [])
                 .find((child) => child.key === key);
 
-            if (found && found.link) navigate(found.link);
+            if (found && found.link) {
+              navigate(found.link);
+            }
           }}
           items={menuItems.map((group) => ({
             key: group.key,
@@ -183,7 +203,7 @@ const WorkerSidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
                   key: child.key,
                   label: child.label,
                 }))
-              : undefined, // ✅ Allows single (non-dropdown) items to work
+              : undefined, // Allows single (non-dropdown) items to work
           }))}
         />
       </div>

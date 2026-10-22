@@ -126,7 +126,7 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
   const navigate = useNavigate();
   const [isNotificationVisible, setIsNotificationVisible] = useState(false);
 
-  useState(false);
+  const [workerProfilePic, setWorkerProfilePic] = useState("");
 
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -203,6 +203,22 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
       </Menu.Item>
     </Menu>
   );
+  useEffect(() => {
+    if (!workerId) return;
+
+    const fetchWorkerProfile = async () => {
+      try {
+        const response = await axios.get(`${apiUrl}/get_user/${workerId}`);
+
+        setWorkerProfilePic(response.data.profile_pic || "");
+      } catch (error) {
+        console.error("Error fetching worker profile:", error);
+        setWorkerProfilePic("");
+      }
+    };
+
+    fetchWorkerProfile();
+  }, [workerId, apiUrl]);
 
   return (
     <StyledHeader>
@@ -250,8 +266,17 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
         <ProfileDropdown overlay={profileMenu} trigger={["click"]}>
           <Avatar
             size={40}
-            src="https://dreamspos.dreamstechnologies.com/html/template/assets/img/users/user-11.jpg"
-            style={{ border: "2px solid #6b46c1", cursor: "pointer" }}
+            src={
+              workerProfilePic
+                ? workerProfilePic.startsWith("http")
+                  ? workerProfilePic
+                  : `${apiUrl}/uploads/images/${workerProfilePic}`
+                : "/avatar.jpg"
+            }
+            style={{
+              border: "2px solid #6b46c1",
+              cursor: "pointer",
+            }}
           />
         </ProfileDropdown>
       </StyledRightSection>
