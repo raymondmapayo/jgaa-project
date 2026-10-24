@@ -32,13 +32,16 @@ const AllNotificationsDrawer: React.FC<AllNotificationsDrawerProps> = ({
       onClose={onClose}
       width={380}
       mask
-      maskStyle={{ backgroundColor: "transparent" }}
-      // 🔴 CHANGE #1 (IMPORTANT)
-      bodyStyle={{
-        padding: 0,
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
+      styles={{
+        mask: {
+          backgroundColor: "transparent",
+        },
+        body: {
+          padding: 0,
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+        },
       }}
       zIndex={2000}
     >

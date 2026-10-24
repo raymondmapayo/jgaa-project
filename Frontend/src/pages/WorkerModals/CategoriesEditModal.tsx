@@ -184,11 +184,15 @@ const CategoriesEdit: React.FC<CategoriesEditProps> = ({
                     width="100%"
                     height="100%"
                     src={
-                      selectedItem.categories_img.startsWith("http")
-                        ? selectedItem.categories_img
-                        : `${apiUrl}/uploads/images/${selectedItem.categories_img}`
+                      selectedItem.categories_img?.trim()
+                        ? selectedItem.categories_img.startsWith("http")
+                          ? selectedItem.categories_img
+                          : `${apiUrl}/uploads/images/${selectedItem.categories_img}`
+                        : "/avatar.jpg"
                     }
                     alt="Existing Category Image"
+                    fallback="/avatar.jpg"
+                    preview={false}
                     style={{ objectFit: "cover" }}
                   />
                 ) : (

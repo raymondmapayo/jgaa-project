@@ -4035,7 +4035,16 @@ app.get("/get_clients_info/:user_id", async (req, res) => {
       u.user_login_time,
       m.message AS last_message,
       m.timestamp AS last_message_time,
-      m.sender_id AS last_sender_id
+      m.sender_id AS last_sender_id,
+
+      (
+        SELECT COUNT(*)
+        FROM message_tbl unread_msg
+        WHERE unread_msg.sender_id = u.user_id
+          AND unread_msg.receiver_id = ?
+          AND LOWER(TRIM(COALESCE(unread_msg.is_read, ''))) = 'unread'
+      ) AS unread_count
+
     FROM user_tbl u
 
     LEFT JOIN (
@@ -4075,7 +4084,7 @@ app.get("/get_clients_info/:user_id", async (req, res) => {
   try {
     const [results] = await db
       .promise()
-      .query(sql, [user_id, user_id, user_id]);
+      .query(sql, [user_id, user_id, user_id, user_id]);
 
     console.log("CLIENTS INFO:", results);
 
@@ -4526,14 +4535,11 @@ app.put("/update_reservation_status", async (req, res) => {
 // DELETE reservation and related reservation_activity records
 app.delete("/delete_reservation/:user_id/:reservation_id", async (req, res) => {
   const { user_id, reservation_id } = req.params;
-
-  const connection = await db.promise().getConnection();
+  const connection = db.promise();
 
   try {
-    // Start transaction
     await connection.beginTransaction();
 
-    // 1️⃣ Archive reservation instead of deleting
     const updateReservationSql = `
         UPDATE reservation_tbl
         SET reservation_status = 'Deleted'
@@ -4543,7 +4549,6 @@ app.delete("/delete_reservation/:user_id/:reservation_id", async (req, res) => {
 
     await connection.query(updateReservationSql, [reservation_id, user_id]);
 
-    // 2️⃣ Archive reservation activities
     const updateActivitySql = `
         UPDATE reservation_activity_tbl
         SET status = 'Deleted'
@@ -4553,7 +4558,6 @@ app.delete("/delete_reservation/:user_id/:reservation_id", async (req, res) => {
 
     await connection.query(updateActivitySql, [reservation_id, user_id]);
 
-    // 3️⃣ Commit transaction
     await connection.commit();
 
     console.log(`Archived reservation ${reservation_id} for user ${user_id}`);
@@ -4563,18 +4567,18 @@ app.delete("/delete_reservation/:user_id/:reservation_id", async (req, res) => {
       message: "Reservation archived successfully",
     });
   } catch (error) {
-    // Rollback if anything fails
-    await connection.rollback();
+    try {
+      await connection.rollback();
+    } catch (rollbackError) {
+      console.error("Rollback failed:", rollbackError);
+    }
 
-    console.error("Error archiving reservation:", error.sqlMessage || error);
+    console.error("Error archiving reservation:", error);
 
     return res.status(500).json({
       success: false,
       error: "Failed to archive reservation",
     });
-  } finally {
-    // Release connection back to pool
-    connection.release();
   }
 });
 app.get("/get_clients", async (req, res) => {
@@ -6419,21 +6423,20 @@ app.get("/top_selling", async (req, res) => {
       menu_img
     FROM topselling_tbl
     ORDER BY total_order_quantity DESC
-    LIMIT 10;
+    LIMIT 10
   `;
 
-  console.log("Executing query:", query);
-
   try {
-    const [results] = await db.query(query);
+    const [results] = await db.promise().query(query);
 
-    console.log("Query results:", results);
-
-    return res.json(results);
+    return res.status(200).json(results);
   } catch (error) {
     console.error("Error fetching top selling data:", error);
 
-    return res.status(500).send("Error fetching data");
+    return res.status(500).json({
+      message: "Error fetching top selling data",
+      error: error.message,
+    });
   }
 });
 // ✅ API route for top selling products
@@ -8142,32 +8145,35 @@ app.get("/checkTestimonialStatus", (req, res) => {
   });
 });
 
-app.get("/Testimonial", (req, res) => {
-  const sql = `
-    SELECT 
-      t.user_id, 
-      u.profile_pic, 
-      u.fname, 
-      u.lname, 
-      t.testimonial_text, 
-      t.created_at
-    FROM testimonial_tbl t
-    JOIN user_tbl u ON t.user_id = u.user_id
-  `;
-
+app.get("/Testimonial", async (req, res) => {
   console.log("Fetching testimonials...");
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching testimonials:", err);
-      return res.status(500).send("Error fetching testimonials");
-    }
+  try {
+    const sql = `
+      SELECT 
+        t.user_id,
+        u.profile_pic,
+        u.fname,
+        u.lname,
+        t.testimonial_text,
+        t.created_at
+      FROM testimonial_tbl t
+      JOIN user_tbl u ON t.user_id = u.user_id
+    `;
+
+    const [results] = await db.promise().query(sql);
 
     console.log("Fetched testimonials successfully:", results);
 
-    // Send the testimonials as JSON response
-    res.json(results);
-  });
+    return res.status(200).json(results);
+  } catch (err) {
+    console.error("Error fetching testimonials:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching testimonials",
+    });
+  }
 });
 
 // Insert new message

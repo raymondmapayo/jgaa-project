@@ -1,8 +1,9 @@
 import { UploadOutlined } from "@ant-design/icons";
-import { Button, Modal, Table, Tooltip, Tag } from "antd";
+import { Button, Modal, Table, Tooltip, Tag, message } from "antd";
 import axios from "axios";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
+import Swal from "sweetalert2";
 
 interface ArchivedReservation {
   reservation_id: number;
@@ -34,6 +35,8 @@ const ArchiveReservationModal = ({
   const apiUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
+    if (!isArchivedModalVisible) return;
+
     let isMounted = true;
 
     const fetchArchivedReservations = async () => {
@@ -61,30 +64,67 @@ const ArchiveReservationModal = ({
     return () => {
       isMounted = false;
     };
-  }, [apiUrl]);
+  }, [apiUrl, isArchivedModalVisible]);
 
   const handleRestore = async (reservation_id: number) => {
-    Modal.confirm({
-      title: "Restore reservation?",
-      content: "This reservation will be restored to active list.",
-      okText: "Yes, Restore",
-      okType: "primary",
-      cancelText: "Cancel",
-      onOk: async () => {
-        try {
-          await axios.put(`${apiUrl}/restore_reservation/${reservation_id}`);
-
-          setArchivedReservations((prev) =>
-            prev.filter((item) => item.reservation_id !== reservation_id),
-          );
-
-          // Refresh main table
-          if (onRestore) onRestore();
-        } catch (error) {
-          console.error("Error restoring reservation:", error);
-        }
-      },
+    const result = await Swal.fire({
+      title: "Restore Reservation?",
+      text: "This reservation will be restored to the active list.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, Restore",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
     });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      Swal.fire({
+        title: "Restoring...",
+        text: "Please wait.",
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      await axios.put(`${apiUrl}/restore_reservation/${reservation_id}`);
+
+      // Kuhaa dayon sa archived list
+      setArchivedReservations((prev) =>
+        prev.filter((item) => item.reservation_id !== reservation_id),
+      );
+
+      // I-refresh ang main reservations table
+      if (onRestore) {
+        onRestore();
+      }
+
+      // Automatic close sa Archived modal
+      onClose();
+
+      // Success notification
+      await Swal.fire({
+        title: "Restored!",
+        text: "The reservation has been restored successfully.",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Error restoring reservation:", error);
+
+      Swal.fire({
+        title: "Error!",
+        text: "Failed to restore reservation. Please try again.",
+        icon: "error",
+        confirmButtonColor: "#d33",
+      });
+    }
   };
 
   const columns = [

@@ -15,6 +15,7 @@ import Swal from "sweetalert2";
 import WorkerReservationModal from "../WorkerModals/WorkerViewReservationModal";
 import ReservationCanceledModal from "../WorkerModals/ReservationCanceledModal";
 import ArchiveReservationModal from "./Archive/ArchiveReservationModal";
+import { refreshWorkerCounts } from "../../utils/useWorkerCounts";
 
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
@@ -295,11 +296,34 @@ const WorkerReservation = () => {
         `${apiUrl}/delete_reservation/${reservation.user_id}/${reservation_id}`,
       );
 
-      setReservations((prev) =>
-        prev.filter((r) => r.reservation_id !== reservation_id),
-      );
+      // Kuhaa dayon ang deleted reservation sa UI
+      setReservations((prev) => {
+        const updatedReservations = prev.filter(
+          (r) => r.reservation_id !== reservation_id,
+        );
 
-      Swal.fire("Deleted!", "The reservation has been deleted.", "success");
+        // I-adjust ang current page kung wala nay sulod
+        const pageSize = 5;
+        const maxPage = Math.max(
+          1,
+          Math.ceil(updatedReservations.length / pageSize),
+        );
+
+        setCurrentPage((current) => Math.min(current, maxPage));
+
+        return updatedReservations;
+      });
+
+      // Update sidebar counts
+      refreshWorkerCounts();
+
+      await Swal.fire({
+        title: "Deleted!",
+        text: "The reservation has been deleted.",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
     } catch (error) {
       console.error("Error deleting reservation:", error);
 
@@ -646,6 +670,7 @@ const WorkerReservation = () => {
       <ArchiveReservationModal
         isArchivedModalVisible={isArchivedModalVisible}
         onClose={() => setIsArchivedModalVisible(false)}
+        onRestore={() => fetchReservations(false)}
       />
 
       <ReservationCanceledModal
@@ -660,6 +685,9 @@ const WorkerReservation = () => {
                 : r,
             ),
           );
+
+          // Refresh Worker Sidebar badge
+          refreshWorkerCounts();
         }}
       />
     </StyledContainer>

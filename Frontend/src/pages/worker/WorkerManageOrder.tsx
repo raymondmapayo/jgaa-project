@@ -13,6 +13,7 @@ import styled from "styled-components";
 import OrderDetailsModal from "../WorkerModals/ViewOrderDetailsModal";
 import ValidationEditTabsModal from "./Tabs/ValidationEditModalTabs";
 import OrdersPdfModal from "./Pdf/OrdersPdfModal";
+import { refreshWorkerCounts } from "../../utils/useWorkerCounts";
 
 // ====================== Styled Components ======================
 const StyledContainer = styled.div`
@@ -318,12 +319,17 @@ const WorkerManageOrder = () => {
   const calculateTotal = () =>
     orderItems.reduce((total, item) => total + item.final_total, 0);
 
-  const getAvatarSrc = (pic?: string | null) =>
-    pic
-      ? pic.startsWith("http")
-        ? pic // from Cloudinary
-        : `${apiUrl}/uploads/images/${pic}` // from local uploads folder
-      : "/avatar.jpg"; // default placeholder
+  const getAvatarSrc = (pic?: string | null) => {
+    const image = pic?.trim();
+
+    if (!image) return "/avatar.jpg";
+
+    if (image.startsWith("https://") || image.startsWith("http://")) {
+      return image;
+    }
+
+    return `${apiUrl}/uploads/images/${encodeURIComponent(image)}`;
+  };
 
   const columns = [
     {
@@ -345,9 +351,16 @@ const WorkerManageOrder = () => {
           <img
             src={getAvatarSrc(record.profile_pic)}
             alt={`${record.fname} ${record.lname}`}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "/avatar.jpg";
+            }}
             className="h-11 w-11 flex-shrink-0 rounded-full object-cover shadow-md ring-2 ring-white"
           />
-          <span className="font-semibold text-sm sm:text-base">{`${record.fname} ${record.lname}`}</span>
+
+          <span className="font-semibold text-sm sm:text-base">
+            {`${record.fname} ${record.lname}`}
+          </span>
         </div>
       ),
     },
@@ -419,6 +432,10 @@ const WorkerManageOrder = () => {
                   ? `${record.worker_fname} ${record.worker_lname}`
                   : "No user"
               }
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/avatar.jpg";
+              }}
               className={`h-11 w-11 flex-shrink-0 rounded-full object-cover shadow-md ring-2 ring-white ${
                 hasName ? "" : "opacity-60"
               }`}
@@ -618,7 +635,10 @@ const WorkerManageOrder = () => {
         onClose={() => setIsValidationEditVisible(false)}
         order={selectedOrderForValidation}
         transaction={selectedTransaction}
-        onSuccess={fetchOrders}
+        onSuccess={async () => {
+          await fetchOrders(false);
+          refreshWorkerCounts();
+        }}
         onUpdateOrder={(updatedOrder) => {
           setOrders((prevOrders) =>
             prevOrders.map((o) =>

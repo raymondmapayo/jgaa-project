@@ -7,6 +7,7 @@ import { io, Socket } from "socket.io-client";
 import ChatWindow from "./Chat/ChatWindow";
 import Sidebar from "./Chat/Sidebar";
 import WorkerAnnouncementView from "./WorkerAnnouncement";
+import { refreshWorkerCounts } from "../../utils/useWorkerCounts";
 
 export type Message = {
   id: number;
@@ -191,8 +192,11 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
   }, [admins, clients, selectedUser]);
 
   // Mark messages as read when selecting a user
+  // Mark messages as read when selecting a user
   useEffect(() => {
     if (!selectedUser || !workerIdNum) return;
+
+    let cancelled = false;
 
     const markAsRead = async () => {
       try {
@@ -201,19 +205,32 @@ const WorkerChat: React.FC<WorkerChatProps> = ({ onNewMessage }) => {
           read_by: user_id,
         });
 
+        if (cancelled) return;
+
+        // Dayon i-zero ang unread count sa selected conversation
         const clear = <T extends User>(list: T[]) =>
           list.map((u) =>
-            u.user_id === selectedUser.user_id ? { ...u, unread_count: 0 } : u,
+            Number(u.user_id) === Number(selectedUser.user_id)
+              ? { ...u, unread_count: 0 }
+              : u,
           );
+
         setAdmins((prev) => clear(prev));
         setClients((prev) => clear(prev));
+
+        // Dayon i-refresh ang count sa main Worker Sidebar
+        refreshWorkerCounts();
       } catch (err) {
         console.error("Failed to mark messages read", err);
       }
     };
 
     markAsRead();
-  }, [selectedUser, workerIdNum]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUser?.user_id, workerIdNum, apiUrl, user_id]);
 
   // Fetch messages for selected user
   useEffect(() => {

@@ -6,7 +6,16 @@ import {
   PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Dropdown, Input, Modal, Table, Tag, Tooltip } from "antd";
+import {
+  Button,
+  Dropdown,
+  Input,
+  Modal,
+  Table,
+  TableProps,
+  Tag,
+  Tooltip,
+} from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
@@ -93,7 +102,7 @@ const StyledContainer = styled.div`
   }
 `;
 
-const StyledTable = styled(Table)`
+const StyledTable = styled(Table)<TableProps<CategoryItem>>`
   width: 100%;
 
   .ant-table {
@@ -166,10 +175,29 @@ const WorkerManageCategories = () => {
   const [isArchivedModalVisible, setIsArchivedModalVisible] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL;
+
   const sortMenuItems = [
     { key: "1", label: "Sort by Date" },
     { key: "2", label: "Sort by Name" },
   ];
+  const handleSortMenuClick = ({ key }: { key: string }) => {
+    setDataSource((prevData) => {
+      const sortedData = [...prevData];
+
+      if (key === "1") {
+        // Sort by category ID as a date-order fallback.
+        return sortedData.sort((a, b) => b.categories_id - a.categories_id);
+      }
+
+      if (key === "2") {
+        return sortedData.sort((a, b) =>
+          a.categories_name.localeCompare(b.categories_name),
+        );
+      }
+
+      return prevData;
+    });
+  };
 
   const fetchCategories = async () => {
     try {
@@ -260,14 +288,12 @@ const WorkerManageCategories = () => {
       title: "Category Name",
       dataIndex: "categories_name",
       key: "categories_name",
-      render: (text: any, record: any) => {
-        // ✅ Handle Cloudinary and local images properly
-        const imageUrl =
-          record.categories_img && record.categories_img.startsWith("http")
-            ? record.categories_img // full Cloudinary URL
-            : record.categories_img
-              ? `${apiUrl}/uploads/images/${record.categories_img}` // local fallback
-              : "https://via.placeholder.com/60x40?text=No+Image"; // placeholder
+      render: (text: string, record: CategoryItem) => {
+        const imageUrl = record.categories_img
+          ? record.categories_img.startsWith("http")
+            ? record.categories_img
+            : `${apiUrl}/uploads/images/${record.categories_img}`
+          : "/avatar.jpg";
 
         return (
           <div className="flex items-center gap-3">
@@ -275,11 +301,12 @@ const WorkerManageCategories = () => {
               src={imageUrl}
               alt={record.categories_name}
               className="w-10 h-10 rounded object-cover flex-shrink-0 border border-gray-200"
-              onError={(e) =>
-                (e.currentTarget.src =
-                  "https://via.placeholder.com/60x40?text=No+Image")
-              }
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/avatar.jpg";
+              }}
             />
+
             <span className="text-sm sm:text-base">{text}</span>
           </div>
         );
@@ -392,7 +419,13 @@ const WorkerManageCategories = () => {
             </Button>
 
             {/* Sort */}
-            <Dropdown menu={{ items: sortMenuItems }} placement="bottomLeft">
+            <Dropdown
+              menu={{
+                items: sortMenuItems,
+                onClick: handleSortMenuClick,
+              }}
+              placement="bottomLeft"
+            >
               <Button
                 icon={<FilterOutlined />}
                 className="w-full sm:w-[170px] px-3 py-1.5 text-center"

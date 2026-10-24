@@ -117,6 +117,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   : "/avatar.jpg"
               }
               alt="Customer"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/avatar.jpg";
+              }}
               className="h-16 w-16 flex-shrink-0 rounded-full object-cover shadow-lg ring-4 ring-white"
             />
             <div>
@@ -191,17 +195,16 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 >
                   <img
                     src={
-                      product.menu_img
+                      product.menu_img?.trim()
                         ? product.menu_img.startsWith("http")
                           ? product.menu_img
                           : `${apiUrl}/uploads/images/${product.menu_img}`
-                        : "https://via.placeholder.com/64?text=No+Image"
+                        : "/avatar.jpg"
                     }
                     alt={product.item_name}
                     onError={(e) => {
                       e.currentTarget.onerror = null;
-                      e.currentTarget.src =
-                        "https://via.placeholder.com/64?text=No+Image";
+                      e.currentTarget.src = "/avatar.jpg";
                     }}
                     className="h-16 w-16 flex-shrink-0 rounded-2xl bg-gray-100 object-cover shadow-sm"
                   />
